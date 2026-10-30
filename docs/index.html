@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SparRadar</title>
+<meta name="description" content="Lebensmittel-Angebote rund um Wörth am Rhein">
+<meta name="theme-color" content="#FFD60A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brandrow">
+      <div class="logo">
+        <div class="logo-mark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/></svg></div>
+        <div><h1>SparRadar</h1><small id="stand">Wörth am Rhein · 20 km · Angebote werden geladen …</small></div>
+      </div>
+      <div class="seg" role="group" aria-label="Angebotswoche">
+        <button id="wk0" aria-pressed="true">Jetzt gültig</button>
+        <button id="wk1" aria-pressed="false">Demnächst</button>
+      </div>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Bereiche">
+      <button role="tab" id="tab-offers" aria-selected="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/></svg>Angebote</button>
+      <button role="tab" id="tab-watch" aria-selected="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>Merkliste <span class="badge" id="watchBadge" hidden>0</span></button>
+      <button role="tab" id="tab-list" aria-selected="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h3l2.4 12.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.2L21 7H6.2"/></svg>Einkaufszettel <span class="badge" id="listBadge" hidden>0</span></button>
+      <button role="tab" id="tab-tips" aria-selected="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 12h18M12 7v13M12 7c-2-4-6-4-6-1.5S10 7 12 7Zm0 0c2-4 6-4 6-1.5S14 7 12 7Z"/></svg>Spartipps</button>
+    </nav>
+    <div id="filters" style="display:grid;gap:10px">
+      <label class="search" for="q">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="Artikel oder Marke suchen, z. B. Butter, Felix, Kaffee …" autocomplete="off">
+        <button class="clear" id="qclear" type="button" aria-label="Suche leeren" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+      </label>
+      <div class="chips" id="storeChips" aria-label="Märkte"></div>
+      <div class="chips" id="catChips" aria-label="Kategorien"></div>
+      <div class="toolbar">
+        <label for="sort">Sortieren
+          <select id="sort">
+            <option value="off">Höchste Ersparnis</option>
+            <option value="gp">Bester Grundpreis</option>
+            <option value="p">Niedrigster Preis</option>
+          </select>
+        </label>
+        <label><button class="switch" id="appSw" role="switch" aria-checked="true" aria-label="Apps und Coupons einrechnen"></button> Apps &amp; Coupons einrechnen</label>
+        <button class="btn ghost sm" id="openAdd" type="button">+ Angebot eintragen</button>
+      </div>
+    </div>
+  </header>
+  <main id="main"><div class="empty"><b>Angebote werden geladen …</b></div></main>
+</div>
+<div class="scrim" id="sheet" hidden></div>
+<div class="toast" id="toast" hidden></div>
+<script src="app.js"></script>
+<script>if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");</script>
+</body>
+</html>

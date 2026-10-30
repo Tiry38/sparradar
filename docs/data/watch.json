@@ -1,0 +1,8 @@
+{
+  "info": "Merkliste für Push-Nachrichten. k = Suchbegriff, max = optionaler Wunsch-Grundpreis in € pro kg/l.",
+  "watch": [
+    { "k": "Katzenfutter", "max": 6.0 },
+    { "k": "Butter" },
+    { "k": "Kaffee" }
+  ]
+}

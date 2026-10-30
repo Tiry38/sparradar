@@ -1,0 +1,6 @@
+# Testskripte und der alte Prototyp bleiben lokal
+tools/
+sparradar.html
+.claude/
+__pycache__/
+*.tmp

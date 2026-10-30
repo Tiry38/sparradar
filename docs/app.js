@@ -1,0 +1,336 @@
+"use strict";
+// SparRadar – Anzeige der täglich abgerufenen Angebote (docs/data/offers.json)
+
+const REPO = "Tiry38/sparradar";
+const STORES = {
+  lidl:   {n:"Lidl",          m:"Li", c:"#2F6FE4", app:"Lidl Plus",  link:"https://www.lidl.de/"},
+  aldi:   {n:"Aldi Süd",      m:"AS", c:"#1590B5",                   link:"https://www.aldi-sued.de/de/angebote.html"},
+  rewe:   {n:"Rewe",          m:"Re", c:"#D9363E", app:"Rewe Bonus", link:"https://www.kaufda.de/Woerth-am-Rhein/REWE/p-r101"},
+  netto:  {n:"Netto",         m:"Ne", c:"#C99400", app:"Netto App",  link:"https://www.kaufda.de/Woerth-am-Rhein/Netto-Marken-Discount/p-r9"},
+  edeka:  {n:"Edeka Jockgrim",m:"Ed", c:"#1F5FAF", app:"Payback",    link:"https://www.kaufda.de/Jockgrim/EDEKA/p-r107"},
+  scheck: {n:"Scheck-In",     m:"SI", c:"#2E9E5B", app:"Payback",    link:"https://www.scheck-in.de/", manual:true},
+  serpa:  {n:"Serpa Markt",   m:"Se", c:"#D97A12",                   link:"https://www.google.com/search?q=Serpa+Markt+W%C3%B6rth+am+Rhein+Prospekt", manual:true},
+  dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/"}
+};
+const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käse & Eier",brot:"Brot & Backwaren",vorrat:"Vorrat",tk:"Tiefkühl",suess:"Süßes & Snacks",kaffee:"Kaffee & Tee",getraenke:"Getränke",katze:"Katzenfutter",drogerie:"Drogerie & Pflege"};
+const CC = {obst:"#E5484D",fleisch:"#C2453A",kuehl:"#F2B705",brot:"#C98A4B",vorrat:"#3B6FD9",tk:"#3BA5DC",suess:"#8B4A2B",kaffee:"#7A4A2A",getraenke:"#2E9E5B",katze:"#E8893A",drogerie:"#B8327F"};
+// Ersatzbilder, falls ein Angebot kein Foto hat oder das Foto nicht lädt
+const ILL = {
+obst:'<svg class="ill" viewBox="0 0 120 90"><circle cx="74" cy="58" r="20" fill="#F59E0B"/><circle cx="50" cy="52" r="27" fill="#E5484D"/><path d="M50 26l5 7 8-3-5 7 7 4-9 1-1 8-5-7-5 7-1-8-9-1 7-4-5-7 8 3z" fill="#2E9E5B"/></svg>',
+fleisch:'<svg class="ill" viewBox="0 0 120 90"><path d="M22 44c0-16 20-26 44-24 22 2 34 14 32 30-2 18-22 24-44 22C32 70 22 60 22 44z" fill="#F4D3C4"/><path d="M28 45c0-12 17-20 38-18 19 2 28 11 26 23-2 13-19 18-38 16-17-2-26-9-26-21z" fill="#C2453A"/><circle cx="72" cy="45" r="8" fill="#F4D3C4"/></svg>',
+kuehl:'<svg class="ill" viewBox="0 0 120 90"><rect x="74" y="16" width="26" height="58" rx="8" fill="#fff"/><rect x="74" y="34" width="26" height="18" fill="#3B6FD9"/><path d="M14 66l52-34 4 34z" fill="#F7C948"/><circle cx="44" cy="58" r="4" fill="#E0A82E"/></svg>',
+brot:'<svg class="ill" viewBox="0 0 120 90"><path d="M18 56c0-20 18-34 42-34s42 14 42 34c0 8-6 12-14 12H32c-8 0-14-4-14-12z" fill="#C98A4B"/><path d="M40 36l8 16M56 32l6 18M72 34l4 17" stroke="#F1C995" stroke-width="4" stroke-linecap="round"/></svg>',
+vorrat:'<svg class="ill" viewBox="0 0 120 90"><rect x="22" y="22" width="38" height="52" rx="6" fill="#3B6FD9"/><rect x="22" y="38" width="38" height="18" fill="#fff"/><rect x="66" y="30" width="34" height="44" rx="4" fill="#F2B705"/></svg>',
+tk:'<svg class="ill" viewBox="0 0 120 90"><rect x="28" y="18" width="64" height="54" rx="8" fill="#3BA5DC"/><g stroke="#fff" stroke-width="3.5" stroke-linecap="round"><path d="M60 32v30M47 40l26 14M73 40L47 54"/></g></svg>',
+suess:'<svg class="ill" viewBox="0 0 120 90"><g transform="rotate(-12 60 45)"><rect x="20" y="28" width="80" height="34" rx="5" fill="#6B3E26"/><rect x="62" y="26" width="40" height="38" rx="4" fill="#E5484D"/></g></svg>',
+kaffee:'<svg class="ill" viewBox="0 0 120 90"><path d="M30 36h50v18c0 14-11 22-25 22S30 68 30 54z" fill="#fff"/><path d="M80 42h6c6 0 9 4 9 8s-3 8-9 8h-7" stroke="#fff" stroke-width="5" fill="none"/><ellipse cx="55" cy="37" rx="24" ry="5" fill="#7A4A2A"/></svg>',
+getraenke:'<svg class="ill" viewBox="0 0 120 90"><path d="M48 8h12v12c8 4 12 10 12 18v42c0 3-2 5-5 5H41c-3 0-5-2-5-5V38c0-8 4-14 12-18z" fill="#2E9E5B"/><rect x="36" y="46" width="36" height="20" fill="#fff"/><rect x="78" y="38" width="22" height="46" rx="5" fill="#E5484D"/></svg>',
+drogerie:'<svg class="ill" viewBox="0 0 120 90"><rect x="26" y="22" width="30" height="58" rx="8" fill="#B8327F"/><rect x="33" y="10" width="16" height="14" rx="3" fill="#7A1F55"/><rect x="26" y="42" width="30" height="16" fill="#fff" opacity=".85"/><rect x="64" y="40" width="34" height="40" rx="6" fill="#fff"/><circle cx="81" cy="40" r="10" fill="#fff"/><circle cx="81" cy="40" r="4" fill="#DCE1EE"/></svg>',
+katze:'<svg class="ill" viewBox="0 0 120 90"><path d="M20 66h80l-6 16H26z" fill="#3B6FD9"/><path d="M36 36l-4-24 16 12M84 36l4-24-16 12" fill="#E8893A"/><ellipse cx="60" cy="38" rx="26" ry="20" fill="#E8893A"/><circle cx="50" cy="36" r="3.5" fill="#141726"/><circle cx="70" cy="36" r="3.5" fill="#141726"/></svg>'
+};
+const IC = {
+ star:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9Z"/></svg>',
+ plus:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+ check:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>',
+ x:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+ layers:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>',
+ bell:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>',
+ flame:'<svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c.6 3.6 4.5 5.4 5.6 9.2A6 6 0 1 1 6.1 13c.3-1.9 1.4-3 2.4-3.8 0 1.8.9 3 2.1 3.4C9.9 9.3 10.6 5.4 12 2Z"/></svg>',
+ cal:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+ chart:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
+ scale:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M5 7h14M5 7l-3 7h6zM19 7l-3 7h6z"/></svg>',
+ box:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m3 7 9-4 9 4v10l-9 4-9-4z"/><path d="m3 7 9 4 9-4M12 11v10"/></svg>',
+ bag:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M5 8h14l-1 13H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>'
+};
+
+// ---------- Zustand ----------
+const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
+const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
+  watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
+  manual:store.get("manual",[]),sheet:null,limit:60};
+let OFFERS = [], HIST = {}, META = {};
+const TODAY = new Date().toISOString().slice(0,10);
+
+// ---------- Helfer ----------
+const eur = v => (v<0?"−":"")+Math.abs(v).toFixed(2).replace(".",",")+" €";
+const norm = s => (s||"").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]/g,"");
+const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const parseNum = s => {const v=parseFloat(String(s||"").replace(",","."));return isFinite(v)&&v>0?v:null};
+const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"}) : "";
+const sb = (s,lg) => `<span class="sb${lg?" lg":""}" style="--c:${(STORES[s]||{}).c||"#888"}" aria-hidden="true">${(STORES[s]||{}).m||"?"}</span>`;
+const sname = s => (STORES[s]||{}).n || s;
+let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
+const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual)};
+
+function histOf(o){const rows=HIST[o.s+"|"+norm(o.n).slice(0,40)]||[];return rows.filter(r=>r[0]<(o.from||TODAY)).map(r=>r[1])}
+// Referenzpreis für "Ersparnis": statt-Preis, sonst Durchschnitt aus dem Verlauf, sonst Angebotspreis
+function ref(o){if(o.o)return o.o;const h=histOf(o);return h.length>=3?Math.max(o.p,h.reduce((a,b)=>a+b,0)/h.length):o.p}
+function steps(o){const st=[{l:o.o?"Normalpreis":"Angebotspreis",v:o.o||o.p,t:"base"}];
+  if(o.o)st.push({l:"Angebot",v:o.p-o.o,t:"of"});
+  if(S.useApp){if(o.ap)st.push({l:(STORES[o.s]||{}).app?STORES[o.s].app+" App-Preis":"App-Preis",v:o.ap-o.p,t:"app"});(o.x||[]).forEach(([t,l,v])=>st.push({l,v:-v,t}))}
+  return st}
+const fin = o => Math.round(steps(o).reduce((a,s)=>a+s.v,0)*100)/100;
+const offPct = o => {const r=ref(o);return r>0?Math.max(0,Math.round((1-fin(o)/r)*100)):0};
+const unit = o => o.gp ? o.gp.v*(fin(o)/o.p) : null;
+const unitTxt = o => o.gp ? `1 ${o.gp.u} = ${eur(unit(o))}` : "";
+const hay = o => norm([o.n,o.b,o.d,CATS[o.c],sname(o.s)].join(" "));
+const matches = (o,k) => hay(o).includes(norm(k));
+const hitW = (o,w) => matches(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
+const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(o.from) : o.to ? "bis "+fmtDate(o.to) : "";
+const tagHTML = v => {v=Math.max(v,0);const e=Math.floor(v+1e-9),c=Math.round((v-e)*100);return `<span class="eu">${e||"-"}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
+const comboLabels = o => steps(o).filter(s=>s.t!=="base"&&s.t!=="of").map(s=>s.l);
+function verdict(o){const h=histOf(o);
+  if(h.length<3)return{t:"ok",l:"Preisverlauf wird gerade aufgebaut",s:"Neu im Verlauf"};
+  const avg=h.reduce((a,b)=>a+b,0)/h.length,min=Math.min(...h);
+  if(o.o&&avg<=o.p*1.05)return{t:"fake",l:`Rabatt fraglich: kostete zuletzt meist ${eur(avg)}`,s:"Rabatt fraglich"};
+  if(o.p<min-.001)return{t:"low",l:`Tiefstpreis seit ${h.length} Abrufen`,s:"Tiefstpreis"};
+  return{t:"ok",l:`Gab es zuletzt schon für ${eur(min)}`,s:"Übliches Angebot"}}
+function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.length<2)return"";
+  const mx=Math.max(...pts),mn=Math.min(...pts)*0.95,sx=w/(pts.length-1),y=v=>h-2-(v-mn)/(mx-mn||1)*(h-4);
+  return `<svg width="${w}" height="${h}" viewBox="-3 -3 ${w+6} ${h+6}" aria-hidden="true"><polyline points="${pts.map((v,i)=>`${(i*sx).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" opacity=".55"/><circle cx="${w}" cy="${y(o.p).toFixed(1)}" r="3" fill="currentColor"/></svg>`}
+const imgTag = (o,cls="") => o.img ? `<img src="${esc(o.img)}" alt="${esc(o.n)}" loading="lazy" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : ILL[o.c];
+function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off">−${offPct(o)} %</span>`:""}</div>`}
+
+// ---------- Daten ----------
+const weekOffers = () => OFFERS.filter(o => S.week ? (o.from && o.from>TODAY) : (!o.from || o.from<=TODAY));
+function filtered(){
+  let r=weekOffers();
+  if(S.stores.size)r=r.filter(o=>S.stores.has(o.s));
+  if(S.cat)r=r.filter(o=>o.c===S.cat);
+  if(S.q.trim()){const t=S.q.trim().split(/\s+/);r=r.filter(o=>t.every(x=>matches(o,x)))}
+  const f={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>fin(a)-fin(b)}[S.sort];
+  return r.sort(f)}
+const score = o => {const v=verdict(o).t;return offPct(o)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?(o.x||[]).length*3+(o.ap?3:0):0)};
+const ranked = () => weekOffers().slice().sort((a,b)=>score(b)-score(a));
+const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
+
+function manualOffers(){return S.manual.filter(m=>!m.to||m.to>=TODAY).map(m=>({...m,src:"selbst eingetragen",manual:true}))}
+async function load(){
+  try{
+    const [o,h]=await Promise.all([fetch("data/offers.json",{cache:"no-store"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({}))]);
+    META=o;HIST=h;
+    OFFERS=o.offers.filter(x=>!x.to||x.to>=TODAY).concat(manualOffers());
+    const g=new Date(o.generated);
+    document.getElementById("stand").textContent=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote`;
+  }catch(e){
+    OFFERS=manualOffers();
+    document.getElementById("stand").textContent="Wörth am Rhein · Angebote konnten nicht geladen werden";
+    toast("Angebote konnten nicht geladen werden. Bitte später neu öffnen.");
+  }
+  OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});
+  render();
+}
+const byId = id => OFFERS.find(o=>o.id===id);
+
+// ---------- Ansichten ----------
+function card(o,bestIds){
+  const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o);
+  const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} Mit Kombi<b>${eur(fin(o))}</b></div><div class="src">${cl.map(esc).join(" + ")}</div></div>`:"";
+  return `<article class="card">${thumb(o)}
+   <div class="body">
+   <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}</span>
+   ${o.manual?'<span class="manual">selbst eingetragen</span>':""}
+   <div class="name">${o.url?`<a href="${esc(o.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(o.n)}</a>`:esc(o.n)}<small>${esc(o.d||"")}</small></div>
+   <div class="pricerow"><div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>
+     <div class="was">${o.o?`<s>statt ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
+   <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
+   ${combo}
+   <div class="card-foot"><span class="valid">${validTxt(o)}</span>
+     <button class="ibtn" data-fav="${esc(o.id)}" aria-pressed="${fav}" aria-label="${fav?"Von Merkliste entfernen":"Auf Merkliste setzen"}" title="Merken">${IC.star}</button>
+     <button class="ibtn add" data-add="${esc(o.id)}" aria-pressed="${inL}" aria-label="${inL?"Vom Einkaufszettel nehmen":"Auf den Einkaufszettel"}" title="Einkaufszettel">${inL?IC.check:IC.plus}</button></div>
+   </div></article>`}
+
+function kracherBtn(){const k=ranked()[0];if(!k)return"";
+  return `<button class="kracher" id="openK" aria-label="Kracher öffnen">
+   <span class="boom">${IC.flame}</span>
+   <span><span class="eyebrow">Kracher ${S.week?"demnächst":"der Woche"}</span><span class="what" style="display:block">${esc(k.n)} bei ${esc(sname(k.s))}</span><span class="how" style="display:block">${comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).l} · tippen für alle Top-Deals</span></span>
+   <span class="big"><b>${eur(fin(k))}</b>${offPct(k)?`<span>−${offPct(k)} %</span>`:""}</span></button>`}
+
+function renderOffers(){
+  if(!OFFERS.length)return `<div class="empty"><b>Noch keine Angebote</b>Sobald der tägliche Abruf gelaufen ist, erscheinen hier die Angebote.</div>`;
+  const r=filtered(),bestIds=new Set();
+  if((S.q.trim()||S.cat)&&r.length>1){const by={};r.forEach(o=>{if(unit(o)==null)return;const k=o.gp.u;if(!by[k]||unit(o)<unit(by[k]))by[k]=o});Object.values(by).forEach(o=>bestIds.add(o.id))}
+  const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
+  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cat?CATS[S.cat]:(S.week?"Angebote, die bald starten":"Angebote, die jetzt gelten");
+  const shown=r.slice(0,S.limit);
+  return `${kracherBtn()}
+   ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
+   <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
+   ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
+    `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste, dann meldet sich SparRadar, sobald ein Markt ihn reduziert.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
+   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden Lebensmittel, Getränke, Katzenfutter und Drogerie &amp; Pflege. Scheck-In und Serpa trägst du über „+ Angebot eintragen“ selbst ein. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
+
+function weekPlan(){const by={};S.watch.forEach(w=>{const h=weekOffers().filter(o=>hitW(o,w)).sort((a,b)=>(unit(a)??fin(a))-(unit(b)??fin(b)))[0];if(h){(by[h.s]=by[h.s]||{items:[],save:0});if(!by[h.s].items.includes(h)){by[h.s].items.push(h);by[h.s].save+=ref(h)-fin(h)}}});
+  return Object.entries(by).sort((a,b)=>b[1].items.length-a[1].items.length)}
+
+function renderKracher(){
+  const r=ranked(),k=r[0];if(!k)return"";
+  const vd=verdict(k),st=steps(k),inL=S.list.includes(k.id);
+  const top=S.useApp?r.filter(o=>o!==k&&((o.x||[]).length||o.ap)).slice(0,5):[];
+  const rest=r.filter(o=>o!==k&&!top.includes(o)).slice(0,8-top.length);
+  const lows=r.filter(o=>verdict(o).t==="low").slice(0,5),fakes=weekOffers().filter(o=>verdict(o).t==="fake").slice(0,5);
+  const plan=weekPlan();
+  const drow=o=>`<div class="drow"><div class="mini" style="--cc:${CC[o.c]}">${imgTag(o)}</div>
+    <div class="t">${esc(o.n)}<small>${esc(sname(o.s))}${o.b?" · "+esc(o.b):""} · ${esc(o.d||"")}</small><div class="pills">${offPct(o)?`<span class="pill of">−${offPct(o)} %</span>`:""}${steps(o).filter(s=>!["base","of"].includes(s.t)).map(s=>`<span class="pill ${s.t==="cb"?"cb":""}">${esc(s.l)}</span>`).join("")}</div></div>
+    <div class="pr"><b>${eur(fin(o))}</b>${ref(o)>fin(o)?`<s>${eur(ref(o))}</s>`:""}</div></div>`;
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kracher">
+   <div class="sheet-h"><span style="width:38px;height:38px;border-radius:11px;background:#E5332A;color:#FFE27A;display:grid;place-items:center;transform:rotate(-8deg)">${IC.flame}</span><h2>Kracher ${S.week?"demnächst":"der Woche"}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <section class="hero">${thumb(k,true)}
+    <div class="info">
+     <div class="store" style="gap:9px">${sb(k.s,true)}${esc(sname(k.s))} · ${validTxt(k)}</div>
+     <h3>${esc(k.n)}<small>${esc([k.b,k.d,unitTxt(k)].filter(Boolean).join(" · "))}</small></h3>
+     <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap"><div class="tag xl">${tagHTML(fin(k))}</div>${ref(k)>fin(k)?`<div class="was" style="text-align:left"><s>statt ${eur(ref(k))}</s><b style="color:var(--save);font-size:1rem">Du sparst ${eur(ref(k)-fin(k))} (${offPct(k)} %)</b></div>`:""}</div>
+     <div class="stack">${st.map((s,i)=>i===0?`<div><span>${esc(s.l)}</span><span>${eur(s.v)}</span></div>`:`<div class="neg"><span>− ${esc(s.l)}</span><span>${eur(s.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(k))}</span></div></div>
+     <div class="verdict ${vd.t}">${spark(k,90,24)}<span>${esc(vd.l)}</span></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-add="${esc(k.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button><button class="btn ghost" data-fav="${esc(k.id)}">${IC.star}Merken</button></div>
+    </div></section>
+   ${top.length?`<h3 class="sec-h">Beste Kombi-Deals</h3><p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Angebot + App-Preis oder Bonus-Guthaben zusammengerechnet.</p><div class="rows">${top.map(drow).join("")}</div>`:""}
+   <h3 class="sec-h">Weitere Top-Angebote</h3><div class="rows">${rest.map(drow).join("")}</div>
+   <h3 class="sec-h">Dein Wochenplan</h3>
+   ${plan.length?`<p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Für deine Merkliste lohnen sich ${plan.length} ${plan.length===1?"Markt":"Märkte"}:</p>
+    <div class="plan">${plan.map(([s,g])=>`<div class="stop"><h4>${sb(s)}${esc(sname(s))}${g.save>0.005?`<em>spart ${eur(g.save)}</em>`:""}</h4><ul>${g.items.map(o=>`<li>${esc(o.n)}: ${eur(fin(o))}${unitTxt(o)?" ("+unitTxt(o)+")":""}</li>`).join("")}</ul></div>`).join("")}</div>
+    <div><button class="btn" id="planToList">${IC.plus}Wochenplan auf den Einkaufszettel</button></div>`
+    :'<div class="empty"><b>Noch kein Plan</b>Gerade ist nichts von deiner Merkliste im Angebot.</div>'}
+   <div class="two">
+    <section class="panel"><h3 style="color:var(--save)">Echte Tiefpreise</h3>${lows.length?`<div class="rows">${lows.map(o=>`<div style="display:flex;justify-content:space-between;gap:10px;font-size:.9rem"><span>${esc(o.n)} <span style="color:var(--muted)">${esc(sname(o.s))}</span></span><b style="font-variant-numeric:tabular-nums">${eur(fin(o))}</b></div>`).join("")}</div>`:"<p>Der Preisverlauf baut sich noch auf. Nach ein paar Tagen erscheinen hier die echten Tiefpreise.</p>"}</section>
+    <section class="panel"><h3 style="color:var(--alert)">Vorsicht, Fake-Rabatt</h3>${fakes.length?`<div class="rows">${fakes.map(o=>`<div style="font-size:.9rem"><b>${esc(o.n)}</b> <span style="color:var(--muted)">${esc(sname(o.s))}</span><br><span style="color:var(--muted)">${esc(verdict(o).l)}</span></div>`).join("")}</div>`:"<p>Keine verdächtigen Rabatte gefunden.</p>"}</section>
+   </div></div>`}
+
+function renderAdd(){
+  const opts=Object.entries(STORES).map(([k,s])=>`<option value="${k}" ${k==="scheck"?"selected":""}>${esc(s.n)}</option>`).join("");
+  const copts=Object.entries(CATS).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Angebot eintragen">
+   <div class="sheet-h"><h2>Angebot eintragen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <p style="margin:0;color:var(--muted)">Für Märkte ohne automatischen Abruf, zum Beispiel Scheck-In oder Serpa. Prospekt öffnen, Angebot abtippen, fertig. Es zählt dann bei Merkliste, Kracher und Einkaufszettel mit.</p>
+   <div class="links">${Object.entries(STORES).filter(([,s])=>s.manual).map(([k,s])=>`<a class="btn ghost sm" href="${s.link}" target="_blank" rel="noopener">${esc(s.n)}: Prospekt öffnen</a>`).join("")}</div>
+   <form class="form" id="addForm">
+    <div class="row"><label>Markt<select id="fStore">${opts}</select></label><label>Kategorie<select id="fCat">${copts}</select></label></div>
+    <label>Artikel<input id="fName" required placeholder="z. B. Schweinenackensteaks" autocomplete="off"></label>
+    <label>Marke oder Menge (optional)<input id="fDesc" placeholder="z. B. 1 kg, mariniert" autocomplete="off"></label>
+    <div class="row"><label>Angebotspreis in €<input id="fPrice" required inputmode="decimal" placeholder="5,99"></label><label>Statt-Preis (optional)<input id="fOld" inputmode="decimal" placeholder="7,99"></label></div>
+    <div class="row"><label>Grundpreis € pro kg/l (optional)<input id="fGp" inputmode="decimal" placeholder="5,99"></label><label>Gültig bis<input id="fTo" type="date"></label></div>
+    <button class="btn" type="submit">${IC.plus}Angebot speichern</button>
+   </form>
+   ${S.manual.length?`<h3 class="sec-h">Deine Einträge</h3><div class="rows">${S.manual.map((m,i)=>`<div class="drow"><div class="mini" style="--cc:${CC[m.c]}">${ILL[m.c]}</div><div class="t">${esc(m.n)}<small>${esc(sname(m.s))} · ${m.to?"bis "+fmtDate(m.to):"ohne Ende"}</small></div><div class="pr"><b>${eur(m.p)}</b><button class="ibtn" data-delman="${i}" aria-label="${esc(m.n)} löschen">${IC.x}</button></div></div>`).join("")}</div>`:""}
+  </div>`}
+
+function renderWatch(){
+  const wh=watchHits(null);
+  const hits=[...new Map(wh.flatMap(x=>x.hits).map(o=>[o.id,o])).values()].sort((a,b)=>offPct(b)-offPct(a));
+  const pushJson=JSON.stringify({watch:S.watch.map(w=>w.max?{k:w.k,max:w.max}:{k:w.k})},null,2);
+  return `<div class="two">
+   <section class="panel"><h3>Was soll ich für dich beobachten?</h3>
+    <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt.</p>
+    <form class="addrow" id="kwForm"><input id="kwIn" placeholder="z. B. Mozzarella, Felix, Cola" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg (optional)" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
+    <div class="kw">${S.watch.map((w,i)=>{const n=wh[i].hits.length;return `<span class="kwchip">${esc(w.k)}${w.max?`<em>≤ ${eur(w.max)}/kg</em>`:""}<span class="n ${n?"":"zero"}">${n}</span><button data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></span>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
+   </section>
+   <section class="panel"><h3>Push aufs Handy</h3>
+    <p>Jeden Morgen gegen 6 Uhr prüft SparRadar alle Märkte. Neue Treffer deiner Merkliste kommen über die kostenlose App <b>ntfy</b> aufs Handy.</p>
+    <p>Damit der Morgen-Check deine aktuelle Merkliste kennt: Merkliste kopieren, dann auf GitHub einfügen und speichern.</p>
+    <div class="links"><button class="btn ghost sm" id="copyWatch">1. Merkliste kopieren</button><a class="btn ghost sm" href="https://github.com/${REPO}/edit/main/docs/data/watch.json" target="_blank" rel="noopener">2. Auf GitHub einfügen</a></div>
+    <textarea id="watchJson" readonly style="width:100%;min-height:90px;font-family:var(--f-mono);font-size:.75rem;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--fg);padding:8px">${esc(pushJson)}</textarea>
+   </section></div>
+   <div class="meta"><h2>Deine Treffer</h2><span>${hits.length} Angebote</span></div>
+   ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis.</div>'}`}
+
+function renderList(){
+  const items=S.list.map(byId).filter(Boolean);
+  if(!items.length)return `<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus oder übernimm im Kracher-Fenster deinen Wochenplan. SparRadar sortiert alles nach Markt.</div>`;
+  const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
+  const sum=items.reduce((a,o)=>a+fin(o),0),reg=items.reduce((a,o)=>a+ref(o),0);
+  const todo=[...new Set(items.flatMap(comboLabels))];
+  return `<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length} Märkte · ${items.length} Artikel</div>
+   ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>
+     ${os.map(o=>`<div class="rline"><span>${esc(o.n)}${comboLabels(o).length?" *":""}</span><span>${eur(fin(o))}</span><button data-add="${esc(o.id)}" aria-label="${esc(o.n)} entfernen">${IC.x}</button></div>`).join("")}</div>`).join("")}
+   <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
+   ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
+   <div class="ractions"><button class="btn" id="copyList">Als Text kopieren</button><button class="btn ghost" id="clearList">Zettel leeren</button></div>`}
+
+function renderTips(){
+  const T=[
+   ["lidl","Lidl Plus","Personalisierte Coupons, günstigere App-Preise und Belohnungen ab einem bestimmten Monatseinkauf. Coupons vor dem Einkauf aktivieren."],
+   ["rewe","Rewe Bonus","Seit dem Payback-Ausstieg Ende 2024 sammelst du in der Rewe-App Euro-Guthaben auf Aktionsartikel und Coupons. Ab 1 € an der Kasse einlösbar."],
+   ["netto","Netto App + Payback","Netto Marken-Discount ist seit 2025 bei Payback. Dazu gibt es eigene Coupons in der Netto-App."],
+   ["edeka","Payback + Edeka App","Edeka ist seit 2025 bei Payback. Punkte-Coupons vorher in der Payback-App aktivieren, dazu Coupons in der Edeka-App."],
+   ["scheck","Payback (Edeka-Verbund)","Scheck-In gehört zum Edeka-Verbund, auch dort gilt Payback. Angebote trägst du über „+ Angebot eintragen“ ein."],
+   ["dm","dm App","Digitale Coupons und Aktionen, auch für Lebensmittel und Tierfutter."],
+   ["aldi","Aldi Süd","Kaum Coupons, dafür dauerhaft niedrige Preise. Neue Aktionsware kommt montags und donnerstags."],
+   ["serpa","Serpa Markt","Wochenprospekt prüfen und starke Angebote selbst eintragen."]];
+  const G=[
+   [IC.layers,"Stapeln","Angebotspreis, dann App-Preis, dann Coupon oder Bonus, dazu Payback-Punkte und am Ende Cashback per Kassenbon."],
+   [IC.chart,"Fake-Rabatte erkennen","SparRadar speichert jeden Tag die Preise. Nach ein paar Wochen zeigt es dir, ob ein „statt“-Preis wirklich verlangt wurde."],
+   [IC.box,"Vorrat bei Tiefpreis","Haltbares wie Katzenfutter, Kaffee, Nudeln oder Getränke nur kaufen, wenn der Grundpreis unter deinem Wunschpreis liegt. Dann gleich für mehrere Wochen."],
+   [IC.scale,"Grundpreis zählt","Vergleiche immer den Preis pro kg oder l. Die Großpackung ist nicht automatisch günstiger."],
+   [IC.cal,"Montag und Donnerstag","An diesen Tagen starten bei Lidl und Aldi die neuen Aktionen. Unter „Demnächst“ siehst du sie schon vorher."],
+   [IC.bag,"Too Good To Go","Bäcker und Märkte geben abends übrig gebliebene Lebensmittel als Überraschungstüte ab, meist für etwa ein Drittel des Werts."]];
+  return `<section class="panel"><h3>Geht „Extreme Couponing“ wie in den USA auch hier?</h3>
+   <p>Nur teilweise. In Deutschland sind Coupons fast immer Händler-Coupons in Apps, oft auf ein Stück pro Einkauf begrenzt. Einen 200-€-Wagen für 0 € schaffst du hier nicht. Einzelne Artikel umsonst oder mit Plus gehen aber, wenn du Händler-App, Payback oder Rewe Bonus, Cashback-Apps und „Gratis testen“-Aktionen der Hersteller kombinierst.</p></section>
+   <h3 class="sec-h">So holst du am meisten raus</h3>
+   <div class="tips">${G.map(([i,h,p])=>`<div class="tip"><h4><span class="ico">${i}</span>${h}</h4><p>${p}</p></div>`).join("")}</div>
+   <h3 class="sec-h">Apps und Programme deiner Märkte</h3>
+   <div class="tips">${T.map(([s,prog,txt])=>`<div class="tip"><h4>${sb(s,true)}${esc(sname(s))}</h4><span class="prog">${prog}</span><p>${txt}</p><a href="${STORES[s].link}" target="_blank" rel="noopener" style="font-size:.84rem">Angebote ansehen</a></div>`).join("")}
+   <div class="tip"><h4><span class="ico">${IC.layers}</span>Cashback-Apps</h4><span class="prog">Marktguru · Scondoo · Coupies</span><p>Geld zurück auf bestimmte Markenprodukte, egal in welchem Markt gekauft. Kassenbon fotografieren, das Geld kommt aufs Konto oder per PayPal.</p></div>
+   <div class="tip"><h4><span class="ico">${IC.bag}</span>Too Good To Go</h4><span class="prog">Abends Essen retten</span><p>Standort Wörth am Rhein wählen und Bäcker und Märkte in der Nähe als Favoriten speichern.</p><a href="https://www.toogoodtogo.com/de" target="_blank" rel="noopener" style="font-size:.84rem">toogoodtogo.com</a></div></div>`}
+
+function render(){
+  document.getElementById("filters").hidden=S.tab!=="offers";
+  ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
+  document.getElementById("wk0").setAttribute("aria-pressed",S.week===0);document.getElementById("wk1").setAttribute("aria-pressed",S.week===1);
+  const hits=new Set(watchHits(null).flatMap(x=>x.hits.map(o=>o.id))).size;
+  const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;
+  const lb=document.getElementById("listBadge");lb.textContent=S.list.length;lb.hidden=!S.list.length;
+  const counts={};OFFERS.forEach(o=>counts[o.s]=(counts[o.s]||0)+1);
+  document.getElementById("storeChips").innerHTML=`<button class="chip plain" data-store="" aria-pressed="${!S.stores.size}">Alle Märkte</button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="chip" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k)}${esc(STORES[k].n)}</button>`).join("");
+  document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).map(([k,n])=>`<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
+  document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
+  document.getElementById("qclear").hidden=!S.q;
+  document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
+  const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
+  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=S.sheet==="add"?renderAdd():renderKracher();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
+}
+
+// kaputte Fotos durch Illustration ersetzen
+document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.dataset.cat){t.outerHTML=ILL[t.dataset.cat]||""}},true);
+
+document.addEventListener("click",e=>{
+  if(e.target.id==="sheet"){S.sheet=null;render();return}
+  const b=e.target.closest("button");if(!b)return;
+  if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
+  if(b.id==="wk0"||b.id==="wk1"){S.week=+b.id[2];S.limit=60;render();return}
+  if(b.id==="openK"){S.sheet="k";render();return}
+  if(b.id==="openAdd"){S.sheet="add";render();return}
+  if(b.id==="closeSheet"){S.sheet=null;render();return}
+  if(b.id==="more"){S.limit+=60;render();return}
+  if(b.dataset.store!==undefined){const k=b.dataset.store;if(!k)S.stores.clear();else S.stores.has(k)?S.stores.delete(k):S.stores.add(k);S.limit=60;render();return}
+  if(b.dataset.cat!==undefined){S.cat=b.dataset.cat||null;S.limit=60;render();return}
+  if(b.id==="appSw"){S.useApp=!S.useApp;save();render();return}
+  if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
+  if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
+  if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0)S.list.splice(i,1);else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
+  if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);save();render();return}
+  if(b.dataset.delman){const m=S.manual.splice(+b.dataset.delman,1)[0];OFFERS=OFFERS.filter(o=>!(o.manual&&o.id===m.id));save();render();return}
+  if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
+  if(b.id==="goWatch"){S.tab="watch";render();return}
+  if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
+  if(b.id==="clearList"){S.list=[];save();render();return}
+  if(b.id==="copyWatch"){copy(document.getElementById("watchJson").value,"Merkliste kopiert. Jetzt auf GitHub einfügen.");return}
+  if(b.id==="copyList"){
+    const items=S.list.map(byId).filter(Boolean),g={};items.forEach(o=>(g[o.s]=g[o.s]||[]).push(o));
+    copy(Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${o.n}${o.d?" ("+o.d+")":""} ${eur(fin(o))}${comboLabels(o).length?" mit "+comboLabels(o).join(" + "):""}`).join("\n")).join("\n\n"),"Einkaufszettel kopiert");return}
+});
+function copy(txt,ok){const fail=()=>toast("Kopieren hat nicht geklappt. Bitte Text markieren und von Hand kopieren.");try{navigator.clipboard.writeText(txt).then(()=>toast(ok),fail)}catch(e){fail()}}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.sheet){S.sheet=null;render()}});
+document.addEventListener("submit",e=>{
+  if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
+    if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
+  if(e.target.id==="addForm"){e.preventDefault();
+    const val=id=>document.getElementById(id).value.trim();
+    const p=parseNum(val("fPrice"));if(!p||!val("fName")){toast("Bitte Artikel und Preis eintragen.");return}
+    const gp=parseNum(val("fGp"));
+    const m={s:val("fStore"),c:val("fCat"),n:val("fName"),d:val("fDesc"),p,o:parseNum(val("fOld")),gp:gp?{v:gp,u:"kg"}:null,to:val("fTo")||null,x:[]};
+    m.id="m-"+norm(m.s+m.n)+"-"+Date.now();
+    S.manual.push(m);OFFERS.push({...m,src:"selbst eingetragen",manual:true});save();toast(`${m.n} eingetragen`);render()}
+});
+document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render()});
+document.getElementById("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
+load();
