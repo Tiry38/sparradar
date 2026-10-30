@@ -1,7 +1,8 @@
-"""SparRadar: holt einmal am Tag die Lebensmittel-Angebote rund um Wörth am Rhein.
+"""SparRadar: holt einmal am Tag alle Angebote rund um Wörth am Rhein
+(Lebensmittel, Drogerie und Non-Food wie Haushalt, Technik, Mode, Garten).
 
 Quellen (nur öffentliche Seiten, ohne Login, ein Abruf pro Seite und Tag):
-  - Lidl:      lidl.de Suche, Kategorie "Essen & Trinken", nur Filialartikel mit Rabatt
+  - Lidl:      lidl.de Suche, Kategorie "Essen & Trinken", nur Filialartikel mit Rabatt (Non-Food über kaufDA)
   - Aldi Süd:  aldi-sued.de/de/angebote.html (Daten stecken in der Seite)
   - kaufDA:    öffentliche Prospekt-Seiten für Wörth/Karlsruhe -> Rewe, Netto, Edeka, dm (+ Lidl/Aldi als Ergänzung)
 
@@ -42,7 +43,9 @@ Schokolade Chips Kekse Pralinen
 Kaffee Espresso Tee
 Cola Mineralwasser Saft Bier Wein Sekt Energydrink
 Katzenfutter
-Shampoo Duschbad Deodorant Zahncreme Toilettenpapier Rasierer Seife Kosmetik""".split()
+Shampoo Duschbad Deodorant Zahncreme Toilettenpapier Rasierer Seife Kosmetik
+Waschmittel Spuelmittel Windeln Hundefutter Katzenstreu Werkzeug Fernseher Kopfhoerer Staubsauger
+Bettwaesche Pfanne Spielzeug Fahrrad Jacke Schuhe Pflanzen""".split()
 
 DROGERIE = (r"duschgel|duschbad|dusche\b|shampoo|sp[üu]lung|conditioner|\bdeo\b|deodorant|deospray|antitranspirant|"
             r"zahncreme|zahnpasta|zahnb[üu]rste|zahnseide|mundsp[üu]l|seife|bodylotion|k[öo]rperlotion|k[öo]rpermilch|body ?butter|"
@@ -57,15 +60,25 @@ CATS = [  # Reihenfolge = Priorität
     ("drogerie", DROGERIE),
     ("tk", r"tiefk[üu]hl|\btk\b|tk-|gefroren|fischst[äa]bchen|pommes|eiscreme|\beis\b|speiseeis|pizza"),
     ("kaffee", r"kaffee|espresso|cappuccino|crema|kapseln|pads\b|\btee\b|teebeutel|kakao"),
-    ("getraenke", r"getr[äa]nk|wasser|saft|nektar|\bcola\b|limo|schorle|\bbier\b|pils|radler|weizenbier|hefeweizen|(?<![a-zäöüß])weine?\b|rotwein|wei[ßs]wein|ros[ée]wein|gl[üu]hwein|punsch|riesling|sekt|prosecco|secco|spirituos|lik[öo]r|whisk|wodka|vodka|\bgin\b|\brum\b|energy|eistee|smoothie|sprudel"),
-    ("suess", r"s[üu][ßs]waren|schoko|praline|bonbon|gummi|fruchtgummi|chips|snack|keks|cookie|riegel|waffel|lebkuchen|spekulatius|stollen|n[üu]sse|nuss|erdn[üu]ss|popcorn|cracker|salzst"),
-    ("fleisch", r"fleisch|wurst|w[üu]rstchen|schinken|h[äa]hnchen|huhn|gefl[üu]gel|pute|rind|schwein|hack|steak|schnitzel|gulasch|salami|aufschnitt|leberk[äa]se|lachs|fisch|forelle|thunfisch|garnele|shrimps|hering|kassler|filet|bacon|speck|saumagen"),
-    ("kuehl", r"milch|k[äa]se|gouda|emmentaler|camembert|mozzarella|feta|joghurt|jogurt|quark|skyr|sahne|butter|margarine|\beier?\b|pudding|dessert|frischk[äa]se|kefir|molke"),
+    ("getraenke", r"getr[äa]nk|wasser\b|mineralwasser|saft\b|s[äa]fte\b|fruchtsaft|nektar|ouzo|amaro|kr[äa]uterlik|obstbrand|volvic|gerolsteiner|\bcola\b|limo\b|limonade|schorle|\bbier\b|pils|radler|weizenbier|hefeweizen|(?<![a-zäöüß])weine?\b|rotwein|wei[ßs]wein|ros[ée]wein|gl[üu]hwein|punsch|riesling|sekt|prosecco|secco|spirituos|lik[öo]r|whisk|wodka|vodka|\bgin\b|\brum\b|energy|eistee|smoothie|sprudel"),
+    ("suess", r"s[üu][ßs]waren|oreo|schoko|praline|bonbon|gummi|fruchtgummi|chips|snack|keks|cookie|riegel|waffel|lebkuchen|spekulatius|stollen|n[üu]sse|nuss|erdn[üu]ss|popcorn|cracker|salzst"),
+    ("fleisch", r"fleisch|wurst|w[üu]rstchen|schinken|h[äa]hnchen|huhn|gefl[üu]gel|pute|rind|schwein|hack|steak|schnitzel|gulasch|salami|aufschnitt|leberk[äa]se|lachs|fisch|forelle|thunfisch|garnele|shrimps|hering|kassler|filet|bacon|speck|saumagen|frikadell|braten\b|tafelspitz|nacken|kotelett|schweinehals|spareribs|ribs\b|leber\b|wade\b|ente\b|entenpfanne|gans\b|cordon bleu"),
+    ("kuehl", r"milch|k[äa]se|gouda|emmentaler|camembert|mozzarella|feta|joghurt|jogurt|quark|skyr|sahne|butter|margarine|\beier?\b|pudding|dessert|frischk[äa]se|kefir|molke|ziegen|\brama\b|sanella|l[äa]tta|schmand|buttermilch"),
+    ("vorrat", r"honig|marmelade|konfit|nudel|pasta\b|teigwaren|spaghetti|lasagne|ravioli|gnocchi|tortiglioni|basmati|\breis\b|mehl\b|type 405|zucker|dressing|senf|mayo|ketchup|gew[üu]rz|gemahlen|chilisalz|\bfix\b|br[üu]he|suppe|heisse tasse|p[üu]ree|fertiggericht|konserve|essig|m[üu]sli|cornflakes|aufstrich|streichcreme|pflanzenfett|cremefine"),
     ("brot", r"\bbrot|br[öo]tchen|toast|baguette|croissant|brezel|kuchen|backwaren|semmel|laugen|bagel|wrap"),
     ("obst", r"obst|gem[üu]se|tomate|apfel|[äa]pfel|banane|kartoffel|salat|gurke|paprika|zwiebel|beere|traube|orange|mandarine|clementine|zitrone|k[üu]rbis|pilz|champignon|avocado|m[öo]hre|karotte|birne|kiwi|ananas|mango|melone|kohl|brokkoli|lauch|porree|spinat|zucchini|aubergine|radieschen"),
 ]
-# Was nie rein soll (Drogerie & Pflege ist erwünscht und wird vorher erkannt)
-NONFOOD = re.compile(r"streu\b|katzenstreu|hygienestreu|waschmittel|weichsp[üu]ler|windel|reiniger|sp[üu]lmittel|geschirrsp[üu]l|batterie|kerze|blumenstrau|schnittblume|topfblume|zimmerpflanze|dekoration|adventskalender|socke|kleid\b|\bhose\b|jacke|werkzeug|lampe|kabel|spielzeug|bratpfanne|kochtopf|hundefutter|hundesnack|vogelfutter|pflaster|nahrungserg[äa]nzung|tabletten", re.I)
+# Alles außer Essen & Drogerie. Reihenfolge = Priorität, gilt nur für Artikel ohne Lebensmittel-Hinweis der Quelle
+NF_CATS = [
+    ("tier", r"\bhund|katzenstreu|streu\b|vogel|nager|aquarium|tierbedarf|kratzbaum|halsband|\bleine\b"),
+    ("baby", r"baby|windel|kinderwagen|schnuller|feuchtt[üu]cher"),
+    ("haushalt", r"waschmittel|weichsp[üu]l|reiniger|sp[üu]lmittel|geschirrsp[üu]l|putz|m[üu]llbeutel|frischhaltefolie|alufolie|backpapier|schw[äa]mm|wischmop|batterie|gl[üu]hbirne|leuchtmittel|haushalt"),
+    ("technik", r"elektr|\btv\b|fernseher|laptop|notebook|tablet\b|smartphone|handy|kopfh[öo]rer|lautsprecher|kabel|ladeger|\bakku|powerbank|kamera|drucker|monitor|konsole|playstation|gaming|haartrockner|f[öo]hn\b|mixer|k[üu]chenmaschine|kaffeemaschine|wasserkocher|toaster|fritteuse|hei[ßs]luft|staubsauger|lampe|leuchte|\bled\b"),
+    ("mode", r"kleid|hose\b|jacke|mantel|pullover|pulli|shirt|bluse|socke|strumpf|unterw[äa]sche|\bslip|schuh|stiefel|sneaker|m[üu]tze|\bschal\b|handschuh|pyjama|schlafanzug|bekleidung|jeans|leggings|weste\b"),
+    ("garten", r"garten|pflanze|blume|\berde\b|d[üu]nger|rasen|\bgrill\b|werkzeug|bohr|schrauber|s[äa]ge\b|schrauben|heimwerk|leiter\b|\bauto\b|kfz|fahrrad|e-bike"),
+    ("wohnen", r"m[öo]bel|glas\b|regal|tisch\b|stuhl|sofa|\bbett|kissen|decke\b|matratze|teppich|handtuch|gardine|vorhang|deko|weihnachtsbaum|kerze|vase|pfanne|\btopf|geschirr|besteck|gl[äa]ser\b|aufbewahrung|adventskalender"),
+    ("freizeit", r"spielzeug|spiel\b|spiele\b|lego|puppe|pl[üu]sch|puzzle|sport|fitness|yoga|camping|zelt|koffer|rucksack|\breisen?\b|rundreise|kreuzfahrt|urlaub|\bhotel|netto-reisen|\bbuch\b|b[üu]cher|basteln"),
+]
 
 
 def log(*a):
@@ -95,29 +108,19 @@ def norm(s):
 GENERIC = re.compile(r"lebensmittel\s*(?:und|&)\s*getr[äa]nke|essen\s*(?:und|&)\s*trinken|wochenangebote|im angebot|kategorien/|bed[üu]rfniswelten/", re.I)
 
 
-def classify(text):
-    t = GENERIC.sub(" ", (text or "").lower())
-    for key, rx in CATS:
-        if re.search(rx, t):
-            return key
-    return "vorrat"
+def classify(title, text="", food=True):
+    """Erst nur der Artikelname (zuverlässiger), dann der ganze Text inkl. Beschreibung und Kategorie.
+    food=False: die Quelle sagt nicht "Lebensmittel" -> zuerst die Non-Food-Kategorien prüfen."""
+    full = (text or "").lower()
+    if "katz" in full and "streu" not in full and re.search(r"futter|nahrung|snack|sheba|felix|whiskas|gourmet|schale|beutel|multipack", full):
+        return "katze"
+    for t in (title, text):
+        t = GENERIC.sub(" ", (t or "").lower())
+        for key, rx in ([] if food else [("drogerie", DROGERIE)] + NF_CATS) + CATS:
+            if re.search(rx, t):
+                return key
+    return "vorrat" if food else "sonstiges"
 
-
-def is_food(text, food_hint):
-    t = (text or "").lower()
-    if "katz" in t and "streu" not in t and re.search(r"futter|nahrung|snack|sheba|felix|whiskas|gourmet|schale|beutel|multipack", t):
-        return True  # Katzenfutter ja, Katzenstreu nein
-    if NONFOOD.search(t):
-        return False
-    if re.search(DROGERIE, t):
-        return True  # Drogerie & Pflege: Duschgel, Deo, Kosmetik, Klopapier …
-    if re.search(r"drogerie|k[öo]rperpflege|hygiene", t) and not food_hint:
-        return False  # sonstiger Drogeriekram (z. B. Haushalt) bleibt draußen
-    if NONFOOD.search(t):
-        return False
-    if food_hint:
-        return True
-    return any(re.search(rx, t) for _, rx in CATS)
 
 
 def unit_price(text):
@@ -135,7 +138,7 @@ def unit_price(text):
 
 
 def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=None, start=None, end=None,
-          app=None, extra=None, src="", url=None, cat_text=""):
+          app=None, extra=None, src="", url=None, cat_text="", food=True):
     title = re.sub(r"\s+", " ", (title or "").strip())
     if not title or not price or price <= 0:
         return None
@@ -145,7 +148,7 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         "n": title,
         "b": (brand or "").strip() or None,
         "d": re.sub(r"\s+", " ", (desc or "").strip())[:140],
-        "c": classify(" ".join([title, desc or "", cat_text, brand or ""])),
+        "c": classify(title, " ".join([title, desc or "", cat_text, brand or ""]), food),
         "p": round(float(price), 2),
         "o": round(float(old), 2) if old and old > price else None,
         "gp": {"v": up[0], "u": up[1]} if up else None,
@@ -185,13 +188,12 @@ def fetch_lidl():
                 continue  # nur Angebote
             kf = g.get("keyfacts") or {}
             text = " ".join([g.get("fullTitle") or "", g.get("category") or "", kf.get("wonCategoryPrimary") or ""])
-            if q != "&category.id=10068374" and not is_food(text, False):
-                continue
             bp = pr.get("basePrice") or {}
             o = offer("lidl", g.get("fullTitle") or g.get("title"), p, old=old,
                       base=(bp.get("price"), (bp.get("unit") or "").lower()) if bp.get("price") else None,
                       img=g.get("image"), start=pr.get("startDate"), end=pr.get("endDate"), app=plus,
-                      src="lidl.de", url="https://www.lidl.de" + (g.get("canonicalUrl") or ""), cat_text=text)
+                      src="lidl.de", url="https://www.lidl.de" + (g.get("canonicalUrl") or ""), cat_text=text,
+                      food=q == "&category.id=10068374")
             if o:
                 out.append(o)
     log("Lidl:", len(out))
@@ -231,10 +233,7 @@ def fetch_aldi():
         if not amount:
             continue
         cats = " ".join(c.get("name", "") for c in it.get("categories") or [] if isinstance(c, dict))
-        text = " ".join([it.get("name") or "", it.get("brandName") or "", cats])
         food_hint = bool(re.search(r"frisch|lebensmittel|getr[äa]nk|k[üu]hl|tiefk|s[üu][ßs]|fleisch|obst|gem[üu]se|feinkost|wein|spirit|backwaren|vorrat|fr[üu]hst", cats, re.I))
-        if not is_food(text, food_hint):
-            continue
         old = None
         if pr.get("wasPriceDisplay"):
             mm = re.search(r"(\d+),(\d\d)", pr["wasPriceDisplay"])
@@ -248,7 +247,8 @@ def fetch_aldi():
         o = offer("aldi", it.get("name"), amount / 100, brand=None if brand in ("BIO", "no-brand") else brand,
                   desc=it.get("sellingSize") or "", old=old, base=pr.get("comparisonDisplay"), img=img,
                   start=it.get("onSaleDate"), src="aldi-sued.de",
-                  url=f"https://www.aldi-sued.de/de/produkt/{it.get('urlSlugText')}-{it.get('sku')}.html", cat_text=cats)
+                  url=f"https://www.aldi-sued.de/de/produkt/{it.get('urlSlugText')}-{it.get('sku')}.html", cat_text=cats,
+                  food=food_hint)
         if o:
             out.append(o)
     log("Aldi Süd:", len(out))
@@ -278,9 +278,6 @@ def kd_offer(it):
     paths = it.get("categoryPaths") or []
     cat_names = " ".join(n.get("name", "") for p in paths for n in p if isinstance(n, dict))
     food_hint = any(p and isinstance(p[0], dict) and p[0].get("name") == "Lebensmittel und Getränke" for p in paths)
-    text = " ".join([it.get("title") or "", it.get("description") or "", it.get("brand") or "", cat_names, " ".join(it.get("categories") or [])])
-    if not is_food(text, food_hint):
-        return None
     pr = it.get("prices") or {}
     p = pr.get("mainPrice")
     old = pr.get("secondaryPrice") or None
@@ -296,7 +293,7 @@ def kd_offer(it):
     return offer(store, it.get("title"), p, brand=it.get("brand"), desc=it.get("description") or "", old=old,
                  base=pr.get("priceByBaseUnit"), img=imgs.get("normal") or imgs.get("large"),
                  start=it.get("validFrom"), end=it.get("validUntil"), app=app, extra=extra,
-                 src="kaufda.de", cat_text=cat_names)
+                 src="kaufda.de", cat_text=cat_names + " " + " ".join(it.get("categories") or []), food=food_hint)
 
 
 def fetch_kaufda():

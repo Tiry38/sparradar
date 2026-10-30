@@ -11,8 +11,11 @@ const STORES = {
   serpa:  {n:"Serpa Markt",   m:"Se", c:"#D97A12",                   link:"https://www.google.com/search?q=Serpa+Markt+W%C3%B6rth+am+Rhein+Prospekt", manual:true},
   dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/"}
 };
-const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käse & Eier",brot:"Brot & Backwaren",vorrat:"Vorrat",tk:"Tiefkühl",suess:"Süßes & Snacks",kaffee:"Kaffee & Tee",getraenke:"Getränke",katze:"Katzenfutter",drogerie:"Drogerie & Pflege"};
-const CC = {obst:"#E5484D",fleisch:"#C2453A",kuehl:"#F2B705",brot:"#C98A4B",vorrat:"#3B6FD9",tk:"#3BA5DC",suess:"#8B4A2B",kaffee:"#7A4A2A",getraenke:"#2E9E5B",katze:"#E8893A",drogerie:"#B8327F"};
+const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käse & Eier",brot:"Brot & Backwaren",vorrat:"Vorrat",tk:"Tiefkühl",suess:"Süßes & Snacks",kaffee:"Kaffee & Tee",getraenke:"Getränke",katze:"Katzenfutter",drogerie:"Drogerie & Pflege",
+  haushalt:"Haushalt & Putzen",tier:"Tierbedarf",baby:"Baby & Kind",technik:"Technik & Elektro",mode:"Mode & Schuhe",wohnen:"Wohnen & Küche",garten:"Garten & Heimwerken",freizeit:"Freizeit, Spiel & Reisen",sonstiges:"Sonstiges"};
+const NONFOOD_CATS = ["haushalt","tier","baby","technik","mode","wohnen","garten","freizeit","sonstiges"];
+const CC = {obst:"#E5484D",fleisch:"#C2453A",kuehl:"#F2B705",brot:"#C98A4B",vorrat:"#3B6FD9",tk:"#3BA5DC",suess:"#8B4A2B",kaffee:"#7A4A2A",getraenke:"#2E9E5B",katze:"#E8893A",drogerie:"#B8327F",
+  haushalt:"#14A3A3",tier:"#9A6B3F",baby:"#E77FB0",technik:"#4B5563",mode:"#7A3CF0",wohnen:"#D97A12",garten:"#3F8F3A",freizeit:"#E5484D",sonstiges:"#6B7280"};
 // Ersatzbilder, falls ein Angebot kein Foto hat oder das Foto nicht lädt
 const ILL = {
 obst:'<svg class="ill" viewBox="0 0 120 90"><circle cx="74" cy="58" r="20" fill="#F59E0B"/><circle cx="50" cy="52" r="27" fill="#E5484D"/><path d="M50 26l5 7 8-3-5 7 7 4-9 1-1 8-5-7-5 7-1-8-9-1 7-4-5-7 8 3z" fill="#2E9E5B"/></svg>',
@@ -25,7 +28,16 @@ suess:'<svg class="ill" viewBox="0 0 120 90"><g transform="rotate(-12 60 45)"><r
 kaffee:'<svg class="ill" viewBox="0 0 120 90"><path d="M30 36h50v18c0 14-11 22-25 22S30 68 30 54z" fill="#fff"/><path d="M80 42h6c6 0 9 4 9 8s-3 8-9 8h-7" stroke="#fff" stroke-width="5" fill="none"/><ellipse cx="55" cy="37" rx="24" ry="5" fill="#7A4A2A"/></svg>',
 getraenke:'<svg class="ill" viewBox="0 0 120 90"><path d="M48 8h12v12c8 4 12 10 12 18v42c0 3-2 5-5 5H41c-3 0-5-2-5-5V38c0-8 4-14 12-18z" fill="#2E9E5B"/><rect x="36" y="46" width="36" height="20" fill="#fff"/><rect x="78" y="38" width="22" height="46" rx="5" fill="#E5484D"/></svg>',
 drogerie:'<svg class="ill" viewBox="0 0 120 90"><rect x="26" y="22" width="30" height="58" rx="8" fill="#B8327F"/><rect x="33" y="10" width="16" height="14" rx="3" fill="#7A1F55"/><rect x="26" y="42" width="30" height="16" fill="#fff" opacity=".85"/><rect x="64" y="40" width="34" height="40" rx="6" fill="#fff"/><circle cx="81" cy="40" r="10" fill="#fff"/><circle cx="81" cy="40" r="4" fill="#DCE1EE"/></svg>',
-katze:'<svg class="ill" viewBox="0 0 120 90"><path d="M20 66h80l-6 16H26z" fill="#3B6FD9"/><path d="M36 36l-4-24 16 12M84 36l4-24-16 12" fill="#E8893A"/><ellipse cx="60" cy="38" rx="26" ry="20" fill="#E8893A"/><circle cx="50" cy="36" r="3.5" fill="#141726"/><circle cx="70" cy="36" r="3.5" fill="#141726"/></svg>'
+katze:'<svg class="ill" viewBox="0 0 120 90"><path d="M20 66h80l-6 16H26z" fill="#3B6FD9"/><path d="M36 36l-4-24 16 12M84 36l4-24-16 12" fill="#E8893A"/><ellipse cx="60" cy="38" rx="26" ry="20" fill="#E8893A"/><circle cx="50" cy="36" r="3.5" fill="#141726"/><circle cx="70" cy="36" r="3.5" fill="#141726"/></svg>',
+haushalt:'<svg class="ill" viewBox="0 0 120 90"><path d="M44 30h28v8l8 6v36c0 3-2 5-5 5H41c-3 0-5-2-5-5V44l8-6z" fill="#14A3A3"/><rect x="50" y="14" width="16" height="16" rx="2" fill="#0E7C7C"/><path d="M66 18h16l4 6H66z" fill="#0E7C7C"/><rect x="36" y="52" width="44" height="16" fill="#fff" opacity=".85"/><circle cx="92" cy="30" r="3" fill="#fff"/><circle cx="98" cy="22" r="2.5" fill="#fff"/><circle cx="96" cy="38" r="2" fill="#fff"/></svg>',
+tier:'<svg class="ill" viewBox="0 0 120 90"><ellipse cx="60" cy="58" rx="18" ry="15" fill="#9A6B3F"/><ellipse cx="38" cy="38" rx="7" ry="9" fill="#9A6B3F"/><ellipse cx="52" cy="26" rx="7" ry="9" fill="#9A6B3F"/><ellipse cx="68" cy="26" rx="7" ry="9" fill="#9A6B3F"/><ellipse cx="82" cy="38" rx="7" ry="9" fill="#9A6B3F"/></svg>',
+baby:'<svg class="ill" viewBox="0 0 120 90"><rect x="46" y="10" width="28" height="10" rx="5" fill="#E77FB0"/><path d="M50 20h20l4 10v44c0 4-3 7-7 7H53c-4 0-7-3-7-7V30z" fill="#fff"/><path d="M46 46h28v28c0 4-3 7-7 7H53c-4 0-7-3-7-7z" fill="#F7C6DD"/><path d="M52 36h8M52 46h8M52 56h8" stroke="#E77FB0" stroke-width="2.5" stroke-linecap="round"/></svg>',
+technik:'<svg class="ill" viewBox="0 0 120 90"><rect x="20" y="16" width="80" height="50" rx="6" fill="#4B5563"/><rect x="26" y="22" width="68" height="38" rx="3" fill="#7DD3FC"/><path d="M50 66h20l4 10H46z" fill="#4B5563"/><path d="M34 52l14-14 10 10 18-18" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+mode:'<svg class="ill" viewBox="0 0 120 90"><path d="M44 14l-24 14 8 16 10-5v41h44V39l10 5 8-16-24-14c-2 6-8 10-16 10s-14-4-16-10z" fill="#7A3CF0"/><path d="M44 14c2 6 8 10 16 10s14-4 16-10" stroke="#fff" stroke-width="3" fill="none" opacity=".7"/></svg>',
+wohnen:'<svg class="ill" viewBox="0 0 120 90"><path d="M20 44 60 14l40 30v36H20z" fill="#D97A12"/><rect x="50" y="54" width="20" height="26" rx="2" fill="#fff"/><rect x="28" y="50" width="14" height="12" rx="2" fill="#FFE7C2"/><rect x="78" y="50" width="14" height="12" rx="2" fill="#FFE7C2"/></svg>',
+garten:'<svg class="ill" viewBox="0 0 120 90"><path d="M40 56h40l-6 26H46z" fill="#C2410C"/><rect x="36" y="50" width="48" height="8" rx="3" fill="#9A3412"/><path d="M60 50V26" stroke="#3F8F3A" stroke-width="4" stroke-linecap="round"/><path d="M60 34c-14 0-20-10-20-18 12 0 20 6 20 18zM60 30c0-12 8-20 22-20 0 10-8 20-22 20z" fill="#3F8F3A"/></svg>',
+freizeit:'<svg class="ill" viewBox="0 0 120 90"><circle cx="60" cy="46" r="30" fill="#E5484D"/><path d="M30 46h60M60 16c-12 10-12 50 0 60M60 16c12 10 12 50 0 60" stroke="#fff" stroke-width="3.5" fill="none"/></svg>',
+sonstiges:'<svg class="ill" viewBox="0 0 120 90"><rect x="28" y="36" width="64" height="44" rx="5" fill="#6B7280"/><rect x="24" y="26" width="72" height="14" rx="4" fill="#9CA3AF"/><rect x="55" y="26" width="10" height="54" fill="#FFD60A"/><path d="M60 26c-8-14-24-12-18-2 4 6 18 2 18 2zm0 0c8-14 24-12 18-2-4 6-18 2-18 2z" fill="#FFD60A"/></svg>'
 };
 const IC = {
  star:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9Z"/></svg>',
@@ -48,11 +60,14 @@ const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   manual:store.get("manual",[]),coupons:store.get("coupons",[]),sheet:null,limit:60};
 let OFFERS = [], HIST = {}, META = {};
-const TODAY = new Date().toISOString().slice(0,10);
+// lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
+const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
 
 // ---------- Helfer ----------
 const eur = v => (v<0?"−":"")+Math.abs(v).toFixed(2).replace(".",",")+" €";
 const norm = s => (s||"").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").replace(/[^a-z0-9]/g,"");
+// nur echte https-Links zulassen (Schutz, falls eine Quelle einmal kaputte oder manipulierte Daten liefert)
+const safeUrl = u => /^https:\/\//i.test(u||"") ? u : "";
 const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 const parseNum = s => {const v=parseFloat(String(s||"").replace(",","."));return isFinite(v)&&v>0?v:null};
 const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"}) : "";
@@ -104,8 +119,8 @@ function verdict(o){const h=histOf(o);
 function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.length<2)return"";
   const mx=Math.max(...pts),mn=Math.min(...pts)*0.95,sx=w/(pts.length-1),y=v=>h-2-(v-mn)/(mx-mn||1)*(h-4);
   return `<svg width="${w}" height="${h}" viewBox="-3 -3 ${w+6} ${h+6}" aria-hidden="true"><polyline points="${pts.map((v,i)=>`${(i*sx).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" opacity=".55"/><circle cx="${w}" cy="${y(o.p).toFixed(1)}" r="3" fill="currentColor"/></svg>`}
-const imgTag = (o,cls="") => o.img ? `<img src="${esc(o.img)}" alt="${esc(o.n)}" loading="lazy" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : ILL[o.c];
-function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off">−${offPct(o)} %</span>`:""}</div>`}
+const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(o.img)}" alt="${esc(o.n)}" loading="lazy" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
+function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off">−${offPct(o)} %</span>`:""}</div>`}
 
 // ---------- Daten ----------
 const weekOffers = () => OFFERS.filter(o => S.week ? (o.from && o.from>TODAY) : (!o.from || o.from<=TODAY));
@@ -147,7 +162,7 @@ function card(o,bestIds){
    <div class="body">
    <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}</span>
    ${o.manual?'<span class="manual">selbst eingetragen</span>':""}
-   <div class="name">${o.url?`<a href="${esc(o.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(o.n)}</a>`:esc(o.n)}<small>${esc(o.d||"")}</small></div>
+   <div class="name">${safeUrl(o.url)?`<a href="${esc(o.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(o.n)}</a>`:esc(o.n)}<small>${esc(o.d||"")}</small></div>
    <div class="pricerow"><div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>
      <div class="was">${o.o?`<s>statt ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
@@ -175,7 +190,7 @@ function renderOffers(){
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
-   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden Lebensmittel, Getränke, Katzenfutter und Drogerie &amp; Pflege. Scheck-In und Serpa trägst du über „+ Angebot eintragen“ selbst ein. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
+   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Scheck-In und Serpa trägst du über „+ Angebot eintragen“ selbst ein. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
 
 function weekPlan(){const by={};S.watch.forEach(w=>{const h=weekOffers().filter(o=>hitW(o,w)).sort((a,b)=>(unit(a)??fin(a))-(unit(b)??fin(b)))[0];if(h){(by[h.s]=by[h.s]||{items:[],save:0});if(!by[h.s].items.includes(h)){by[h.s].items.push(h);by[h.s].save+=ref(h)-fin(h)}}});
   return Object.entries(by).sort((a,b)=>b[1].items.length-a[1].items.length)}
@@ -187,7 +202,7 @@ function renderKracher(){
   const rest=r.filter(o=>o!==k&&!top.includes(o)).slice(0,8-top.length);
   const lows=r.filter(o=>verdict(o).t==="low").slice(0,5),fakes=weekOffers().filter(o=>verdict(o).t==="fake").slice(0,5);
   const plan=weekPlan();
-  const drow=o=>`<div class="drow"><div class="mini" style="--cc:${CC[o.c]}">${imgTag(o)}</div>
+  const drow=o=>`<div class="drow"><div class="mini" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}</div>
     <div class="t">${esc(o.n)}<small>${esc(sname(o.s))}${o.b?" · "+esc(o.b):""} · ${esc(o.d||"")}</small><div class="pills">${offPct(o)?`<span class="pill of">−${offPct(o)} %</span>`:""}${steps(o).filter(s=>!["base","of"].includes(s.t)).map(s=>`<span class="pill ${s.t==="cb"?"cb":""}">${esc(s.l)}</span>`).join("")}</div></div>
     <div class="pr"><b>${eur(fin(o))}</b>${ref(o)>fin(o)?`<s>${eur(ref(o))}</s>`:""}</div></div>`;
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kracher">
@@ -228,7 +243,7 @@ function renderAdd(){
     <div class="row"><label>Grundpreis € pro kg/l (optional)<input id="fGp" inputmode="decimal" placeholder="5,99"></label><label>Gültig bis<input id="fTo" type="date"></label></div>
     <button class="btn" type="submit">${IC.plus}Angebot speichern</button>
    </form>
-   ${S.manual.length?`<h3 class="sec-h">Deine Einträge</h3><div class="rows">${S.manual.map((m,i)=>`<div class="drow"><div class="mini" style="--cc:${CC[m.c]}">${ILL[m.c]}</div><div class="t">${esc(m.n)}<small>${esc(sname(m.s))} · ${m.to?"bis "+fmtDate(m.to):"ohne Ende"}</small></div><div class="pr"><b>${eur(m.p)}</b><button class="ibtn" data-delman="${i}" aria-label="${esc(m.n)} löschen">${IC.x}</button></div></div>`).join("")}</div>`:""}
+   ${S.manual.length?`<h3 class="sec-h">Deine Einträge</h3><div class="rows">${S.manual.map((m,i)=>`<div class="drow"><div class="mini" style="--cc:${CC[m.c]||CC.sonstiges}">${ILL[m.c]||ILL.sonstiges}</div><div class="t">${esc(m.n)}<small>${esc(sname(m.s))} · ${m.to?"bis "+fmtDate(m.to):"ohne Ende"}</small></div><div class="pr"><b>${eur(m.p)}</b><button class="ibtn" data-delman="${i}" aria-label="${esc(m.n)} löschen">${IC.x}</button></div></div>`).join("")}</div>`:""}
   </div>`}
 
 function renderWatch(){
@@ -318,7 +333,7 @@ function render(){
   const nc=S.coupons.filter(cpActive).length,cb=document.getElementById("cpBadge");cb.textContent=nc;cb.hidden=!nc;
   const counts={};OFFERS.forEach(o=>counts[o.s]=(counts[o.s]||0)+1);
   document.getElementById("storeChips").innerHTML=`<button class="chip plain" data-store="" aria-pressed="${!S.stores.size}">Alle Märkte</button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="chip" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k)}${esc(STORES[k].n)}</button>`).join("");
-  document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).map(([k,n])=>`<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
+  document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).map(([k,n])=>`${k===NONFOOD_CATS[0]?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("qclear").hidden=!S.q;
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
@@ -327,7 +342,7 @@ function render(){
 }
 
 // kaputte Fotos durch Illustration ersetzen
-document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.dataset.cat){t.outerHTML=ILL[t.dataset.cat]||""}},true);
+document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.dataset.cat){t.outerHTML=ILL[t.dataset.cat]||ILL.sonstiges}},true);
 
 document.addEventListener("click",e=>{
   if(e.target.id==="sheet"){S.sheet=null;render();return}

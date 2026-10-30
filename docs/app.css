@@ -3,7 +3,7 @@ html,body{margin:0}
 body{font-size:15px;-webkit-text-size-adjust:100%;padding-top:env(safe-area-inset-top,0px)}
 [hidden]{display:none!important}
 img{max-width:100%}
-@media (max-width:720px){header.top{position:static}}
+header.top{position:static}
 .thumb img{width:100%;height:100%;object-fit:contain;background:#fff;padding:8px}
 .drow .mini img{width:100%;height:100%;object-fit:contain;background:#fff}
 .btn.sm{padding:6px 12px;font-size:.84rem;border-radius:10px}
@@ -17,3 +17,6 @@ img{max-width:100%}
 .links{display:flex;flex-wrap:wrap;gap:8px}
 .links a{font-size:.84rem}
 code.topic{font-family:var(--f-mono);background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:2px 8px;user-select:all}
+.chipsep{flex:none;width:1px;align-self:stretch;background:var(--line);margin:2px 4px}
+/* Maus (PC, Windows-App): Leisten umbrechen statt unsichtbar seitlich scrollen */
+@media (hover:hover) and (pointer:fine){.chips{flex-wrap:wrap;overflow:visible}}

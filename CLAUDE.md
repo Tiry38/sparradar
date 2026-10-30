@@ -35,9 +35,13 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruhe/Angebote/<Begriff>`, Umlaute ausgeschrieben: Käse → Kaese). Für Wörth gibt es keine Stichwortseiten.
 
 ## Was in die App gehört
-- **Ja:** Lebensmittel, Getränke, **Katzenfutter**, **Drogerie & Pflege** (Duschgel, Deo, Kosmetik, Zahnpflege, Rasierer, Klopapier, Taschentücher, Küchenrolle).
-- **Nein:** Non-Food (Kleidung, Werkzeug, Elektro, Deko usw.), Katzenstreu, Hundefutter, Waschmittel, Putz- und Spülmittel, Windeln.
-- Filter und Kategorien: `NONFOOD`, `DROGERIE`, `CATS`, `is_food()`, `classify()` in `fetcher/fetch_offers.py`. Kategorien müssen mit `CATS` in `docs/app.js` übereinstimmen.
+- **Alle Angebote** der Märkte (Wunsch von Kevin, auch für seine Mutter): Lebensmittel, Getränke, Katzenfutter, Drogerie & Pflege **und Non-Food** (Haushalt, Tierbedarf, Baby, Technik, Mode, Wohnen, Garten, Freizeit/Reisen, Sonstiges).
+- Kategorien: `CATS` (Essen & Drogerie) und `NF_CATS` (Non-Food) + `classify()` in `fetcher/fetch_offers.py`. Erst nach Artikelname, dann nach ganzem Text. Die Kategorie-Schlüssel müssen mit `CATS` in `docs/app.js` übereinstimmen.
+
+## Prüfen vor jedem Push (immer, für Handy UND Windows-App)
+- Jeder Tab, jede Kategorie, jeder Markt anklickbar; jede Seite und jedes Fenster bis ganz unten scrollbar; kein seitliches Scrollen.
+- Mit Maus (PC/Windows): alle Chips sichtbar (Leisten brechen um). Mit Touch (Handy): Leisten seitlich wischbar.
+- Test mit Playwright (Chromium = gleiche Engine wie WebView2 und Android-WebView) in 390×844 (Touch), 800×600 und 1920×1080.
 
 ## Bewusste Entscheidungen – nicht ändern ohne ausdrücklichen Wunsch
 - **Keine Push-Benachrichtigungen.** Wurden gebaut und auf Wunsch wieder komplett entfernt. Der Nutzer schaut selbst in die App.
