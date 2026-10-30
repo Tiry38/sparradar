@@ -1,7 +1,6 @@
 "use strict";
 // SparRadar – Anzeige der täglich abgerufenen Angebote (docs/data/offers.json)
 
-const REPO = "Tiry38/sparradar";
 const STORES = {
   lidl:   {n:"Lidl",          m:"Li", c:"#2F6FE4", app:"Lidl Plus",  link:"https://www.lidl.de/"},
   aldi:   {n:"Aldi Süd",      m:"AS", c:"#1590B5",                   link:"https://www.aldi-sued.de/de/angebote.html"},
@@ -157,7 +156,7 @@ function renderOffers(){
    ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
-    `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste, dann meldet sich SparRadar, sobald ein Markt ihn reduziert.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
+    `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
    <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden Lebensmittel, Getränke, Katzenfutter und Drogerie &amp; Pflege. Scheck-In und Serpa trägst du über „+ Angebot eintragen“ selbst ein. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
 
 function weekPlan(){const by={};S.watch.forEach(w=>{const h=weekOffers().filter(o=>hitW(o,w)).sort((a,b)=>(unit(a)??fin(a))-(unit(b)??fin(b)))[0];if(h){(by[h.s]=by[h.s]||{items:[],save:0});if(!by[h.s].items.includes(h)){by[h.s].items.push(h);by[h.s].save+=ref(h)-fin(h)}}});
@@ -217,19 +216,11 @@ function renderAdd(){
 function renderWatch(){
   const wh=watchHits(null);
   const hits=[...new Map(wh.flatMap(x=>x.hits).map(o=>[o.id,o])).values()].sort((a,b)=>offPct(b)-offPct(a));
-  const pushJson=JSON.stringify({watch:S.watch.map(w=>w.max?{k:w.k,max:w.max}:{k:w.k})},null,2);
-  return `<div class="two">
-   <section class="panel"><h3>Was soll ich für dich beobachten?</h3>
-    <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt.</p>
+  return `<section class="panel"><h3>Was soll ich für dich beobachten?</h3>
+    <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt. Die Zahl am Tab „Merkliste“ zeigt dir beim Öffnen, wie viele Treffer gerade im Angebot sind.</p>
     <form class="addrow" id="kwForm"><input id="kwIn" placeholder="z. B. Mozzarella, Felix, Cola" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg (optional)" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
     <div class="kw">${S.watch.map((w,i)=>{const n=wh[i].hits.length;return `<span class="kwchip">${esc(w.k)}${w.max?`<em>≤ ${eur(w.max)}/kg</em>`:""}<span class="n ${n?"":"zero"}">${n}</span><button data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></span>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
    </section>
-   <section class="panel"><h3>Push aufs Handy</h3>
-    <p>Jeden Morgen gegen 6 Uhr prüft SparRadar alle Märkte. Neue Treffer deiner Merkliste kommen über die kostenlose App <b>ntfy</b> aufs Handy.</p>
-    <p>Damit der Morgen-Check deine aktuelle Merkliste kennt: Merkliste kopieren, dann auf GitHub einfügen und speichern.</p>
-    <div class="links"><button class="btn ghost sm" id="copyWatch">1. Merkliste kopieren</button><a class="btn ghost sm" href="https://github.com/${REPO}/edit/main/docs/data/watch.json" target="_blank" rel="noopener">2. Auf GitHub einfügen</a></div>
-    <textarea id="watchJson" readonly style="width:100%;min-height:90px;font-family:var(--f-mono);font-size:.75rem;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--fg);padding:8px">${esc(pushJson)}</textarea>
-   </section></div>
    <div class="meta"><h2>Deine Treffer</h2><span>${hits.length} Angebote</span></div>
    ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis.</div>'}`}
 
@@ -313,7 +304,6 @@ document.addEventListener("click",e=>{
   if(b.id==="goWatch"){S.tab="watch";render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){S.list=[];save();render();return}
-  if(b.id==="copyWatch"){copy(document.getElementById("watchJson").value,"Merkliste kopiert. Jetzt auf GitHub einfügen.");return}
   if(b.id==="copyList"){
     const items=S.list.map(byId).filter(Boolean),g={};items.forEach(o=>(g[o.s]=g[o.s]||[]).push(o));
     copy(Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${o.n}${o.d?" ("+o.d+")":""} ${eur(fin(o))}${comboLabels(o).length?" mit "+comboLabels(o).join(" + "):""}`).join("\n")).join("\n\n"),"Einkaufszettel kopiert");return}

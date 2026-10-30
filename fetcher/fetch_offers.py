@@ -6,7 +6,6 @@ Quellen (nur öffentliche Seiten, ohne Login, ein Abruf pro Seite und Tag):
   - kaufDA:    öffentliche Prospekt-Seiten für Wörth/Karlsruhe -> Rewe, Netto, Edeka, dm (+ Lidl/Aldi als Ergänzung)
 
 Ergebnis: docs/data/offers.json und docs/data/history.json (Preisverlauf).
-Wenn NTFY_TOPIC gesetzt ist, gehen neue Merklisten-Treffer als Push aufs Handy.
 """
 import datetime as dt
 import json
@@ -21,7 +20,6 @@ import urllib.request
 UA = "SparRadar/1.0 (private Angebotsuebersicht; 1 Abruf pro Tag)"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "docs", "data")
-APP_URL = os.environ.get("APP_URL", "")
 PAUSE = 1.5  # Sekunden zwischen zwei Abrufen bei kaufDA
 
 KD_STORES = {  # kaufDA-Händlerseiten für Wörth am Rhein
@@ -301,11 +299,11 @@ def kd_offer(it):
                  src="kaufda.de", cat_text=cat_names)
 
 
-def fetch_kaufda(extra_keywords):
+def fetch_kaufda():
     out = []
     pages = list(KD_STORES.values())
     seen_kw = set()
-    for kw in KEYWORDS + list(extra_keywords):
+    for kw in KEYWORDS:
         k = kw.strip()
         if not k or norm(k) in seen_kw:
             continue
@@ -326,7 +324,7 @@ def fetch_kaufda(extra_keywords):
     return out
 
 
-# ---------- Zusammenführen, Verlauf, Push ----------
+# ---------- Zusammenführen und Preisverlauf ----------
 def load(name, default):
     try:
         with open(os.path.join(DATA, name), encoding="utf-8") as f:
@@ -376,63 +374,10 @@ def update_history(offers, today):
     save("history.json", hist)
 
 
-def unit_val(o):
-    return o["gp"]["v"] if o.get("gp") else None
-
-
-def notify(offers):
-    topic = os.environ.get("NTFY_TOPIC", "").strip()
-    watch = load("watch.json", {}).get("watch", [])
-    sent = load("notified.json", {})
-    today = dt.date.today().isoformat()
-    sent = {k: v for k, v in sent.items() if v >= (dt.date.today() - dt.timedelta(days=21)).isoformat()}
-    hits = []
-    for w in watch:
-        kw = norm(w.get("k", ""))
-        if not kw:
-            continue
-        for o in offers:
-            if kw not in norm(" ".join([o["n"], o.get("b") or "", o.get("d") or "", o["c"]])):
-                continue
-            mx = w.get("max")
-            if mx and (unit_val(o) is None or unit_val(o) > mx):
-                continue
-            key = f"{w['k']}|{o['id']}"
-            if key in sent:
-                continue
-            hits.append((w["k"], o))
-            sent[key] = today
-    save("notified.json", sent)
-    if not hits:
-        log("Push: keine neuen Treffer")
-        return
-    names = {"lidl": "Lidl", "aldi": "Aldi Süd", "rewe": "Rewe", "netto": "Netto", "edeka": "Edeka", "dm": "dm"}
-    lines = []
-    for k, o in hits[:8]:
-        price = o["ap"] if o.get("ap") else o["p"]
-        lines.append(f"{o['n']} bei {names.get(o['s'], o['s'])}: {price:.2f} €".replace(".", ","))
-    more = f"\n… und {len(hits) - 8} weitere" if len(hits) > 8 else ""
-    title = f"{len(hits)} Merklisten-Treffer im Angebot"
-    log("Push:", title)
-    if not topic:
-        log("  (NTFY_TOPIC nicht gesetzt, kein Push gesendet)")
-        return
-    headers = {"Title": title.encode("utf-8").decode("latin-1", "ignore"), "Tags": "shopping_cart", "Priority": "default"}
-    if APP_URL:
-        headers["Click"] = APP_URL
-    req = urllib.request.Request(f"https://ntfy.sh/{urllib.parse.quote(topic)}",
-                                 data=("\n".join(lines) + more).encode("utf-8"), headers=headers, method="POST")
-    try:
-        urllib.request.urlopen(req, timeout=20).read()
-    except urllib.error.URLError as e:
-        log("  ! Push fehlgeschlagen:", e)
-
-
 def main():
     today = dt.date.today().isoformat()
-    watch_kw = [w.get("k", "") for w in load("watch.json", {}).get("watch", [])]
     offers = []
-    for name, fn in (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("kaufDA", lambda: fetch_kaufda(watch_kw))):
+    for name, fn in (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("kaufDA", fetch_kaufda)):
         try:
             offers += fn()
         except Exception as e:  # eine kaputte Quelle soll die anderen nicht stoppen
@@ -451,7 +396,6 @@ def main():
     save("offers.json", {"generated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
                          "region": "Wörth am Rhein", "counts": counts, "offers": offers})
     update_history(offers, today)
-    notify(offers)
 
 
 if __name__ == "__main__":
