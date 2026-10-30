@@ -1,0 +1,75 @@
+/* SparRadar-Look: Farbverläufe und mehr Tiefe. Liegt über style.css/app.css, ändert nur das Aussehen. */
+:root{
+  --grad-brand:linear-gradient(135deg,#3552F5 0%,#7A3CF0 55%,#C2378F 100%);
+  --grad-sun:linear-gradient(135deg,#FFE45C 0%,#FFC21A 45%,#FF8A1F 100%);
+  --grad-hot:linear-gradient(135deg,#FF5A5F 0%,#E5332A 50%,#C2185B 100%);
+  --grad-save:linear-gradient(135deg,#19C27E 0%,#0B8F62 100%);
+  --glow-a:rgba(53,82,245,.13); --glow-b:rgba(255,194,26,.18); --glow-c:rgba(194,55,143,.10);
+  --card-hi:rgba(255,255,255,.7);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --grad-brand:linear-gradient(135deg,#5B73FF 0%,#9A6BFF 55%,#E05AAE 100%);
+  --glow-a:rgba(91,115,255,.20); --glow-b:rgba(255,194,26,.08); --glow-c:rgba(224,90,174,.14);
+  --card-hi:rgba(255,255,255,.04);
+}}
+:root[data-theme="dark"]{
+  --grad-brand:linear-gradient(135deg,#5B73FF 0%,#9A6BFF 55%,#E05AAE 100%);
+  --glow-a:rgba(91,115,255,.20); --glow-b:rgba(255,194,26,.08); --glow-c:rgba(224,90,174,.14);
+  --card-hi:rgba(255,255,255,.04);
+}
+
+/* Hintergrund: sanfte Farbwolken */
+body{background:
+  radial-gradient(900px 520px at 0% -8%,var(--glow-a),transparent 70%),
+  radial-gradient(700px 460px at 100% -4%,var(--glow-b),transparent 70%),
+  radial-gradient(800px 600px at 50% 110%,var(--glow-c),transparent 70%),
+  var(--bg);
+  background-repeat:no-repeat;min-height:100vh}
+header.top{background:transparent}
+
+/* Logo und Titel */
+.logo-mark{background:var(--grad-sun);box-shadow:0 4px 14px rgba(255,138,31,.35)}
+.logo h1{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* A+ Knopf */
+.zoombtn{background:var(--grad-sun);border:0;box-shadow:0 4px 14px rgba(255,138,31,.35)}
+.zoombtn[aria-pressed="true"]{background:var(--grad-brand);color:#fff;box-shadow:0 4px 14px rgba(122,60,240,.35)}
+
+/* Umschalter, Tabs, Chips: aktiv = Farbverlauf */
+.seg button[aria-pressed="true"],
+nav.tabs button[aria-selected="true"],
+.chip[aria-pressed="true"]{background:var(--grad-brand);color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(122,60,240,.28)}
+nav.tabs{box-shadow:var(--shadow)}
+.chip{transition:transform .12s,box-shadow .12s}
+.chip:hover{transform:translateY(-1px)}
+
+/* Suche */
+.search{border-color:transparent;box-shadow:0 0 0 1px var(--line),0 8px 24px rgba(53,82,245,.08)}
+.search:focus-within{box-shadow:0 0 0 2px #7A3CF0,0 8px 24px rgba(122,60,240,.18)}
+
+/* Knöpfe */
+.btn{background:var(--grad-brand);color:#fff;box-shadow:0 4px 14px rgba(122,60,240,.25)}
+.btn.ghost{background:var(--surface);color:var(--fg);box-shadow:none}
+.switch[aria-checked="true"]{background:var(--grad-brand)}
+.badge{background:var(--grad-hot)}
+
+/* Kracher-Banner */
+.kracher{background:var(--grad-sun);box-shadow:0 10px 30px rgba(255,138,31,.30)}
+.kracher .boom{background:var(--grad-hot)}
+.kracher .big span{background:var(--grad-hot)}
+.alertbar{background:linear-gradient(90deg,var(--app-bg),color-mix(in oklab,var(--app-bg) 60%,var(--surface)))}
+
+/* Angebotskarten */
+.card{background:linear-gradient(180deg,var(--card-hi),transparent 40%),var(--surface);border-color:transparent;
+  box-shadow:0 0 0 1px var(--line),var(--shadow);transition:transform .15s,box-shadow .15s}
+@media (hover:hover){.card:hover{transform:translateY(-3px);box-shadow:0 0 0 1px var(--line),0 14px 34px rgba(20,23,38,.14)}}
+.off{background:var(--grad-hot);box-shadow:0 3px 10px rgba(229,51,42,.3)}
+.tag{background:var(--grad-sun)}
+.best{background:var(--grad-save);color:#fff}
+.ibtn[aria-pressed="true"]{background:var(--grad-sun);border-color:transparent}
+.ibtn.add[aria-pressed="true"]{background:var(--grad-brand);color:#fff;border-color:transparent}
+
+/* Fenster (Kracher, Filter, Eintragen) */
+.sheet{background:linear-gradient(180deg,color-mix(in oklab,var(--bg) 85%,#7A3CF0 15%) 0,var(--bg) 160px)}
+.sheet-h{background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(8px)}
+.panel,.tip,.hero{box-shadow:var(--shadow)}

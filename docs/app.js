@@ -339,6 +339,27 @@ function renderTips(){
    <div class="tip"><h4><span class="ico">${IC.box}</span>SparRadar als App</h4><span class="prog">Android · Windows</span><p>Zum Installieren: APK aufs Handy laden und öffnen, Setup.exe am PC starten. Beide zeigen immer diese aktuelle Version.</p><div class="links"><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar.apk">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></div>
    <div class="tip"><h4><span class="ico">${IC.bag}</span>Too Good To Go</h4><span class="prog">Abends Essen retten</span><p>Standort Wörth am Rhein wählen und Bäcker und Märkte in der Nähe als Favoriten speichern.</p><a href="https://www.toogoodtogo.com/de" target="_blank" rel="noopener" style="font-size:.84rem">toogoodtogo.com</a></div></div>`}
 
+// Handy: Märkte, Kategorien und Sortierung aufgeräumt in einem Fenster statt drei langer Leisten
+const SORTS={off:"Höchste Ersparnis",gp:"Bester Grundpreis",p:"Niedrigster Preis"};
+function renderFilter(){
+  const counts={},cc={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;cc[o.c]=(cc[o.c]||0)+1});
+  const n=filtered().length;
+  const chip=(attr,k,label,on,extra="")=>`<button class="chip${extra}" ${attr}="${k}" aria-pressed="${on}">${label}</button>`;
+  const food=Object.entries(CATS).filter(([k])=>!NONFOOD_CATS.includes(k)&&cc[k]),nf=Object.entries(CATS).filter(([k])=>NONFOOD_CATS.includes(k)&&cc[k]);
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Märkte und Filter">
+   <div class="sheet-h"><h2>Märkte &amp; Filter</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <h3 class="fh">Märkte</h3>
+   <div class="fchips">${chip("data-store","","Alle Märkte",!S.stores.size," plain")}${Object.keys(STORES).filter(k=>counts[k]).map(k=>chip("data-store",k,sb(k)+esc(STORES[k].n)+`<em>${counts[k]}</em>`,S.stores.has(k))).join("")}</div>
+   <h3 class="fh">Essen &amp; Drogerie</h3>
+   <div class="fchips">${chip("data-cat","","Alle Kategorien",!S.cat," plain")}${food.map(([k,v])=>chip("data-cat",k,esc(v),S.cat===k," plain")).join("")}</div>
+   ${nf.length?`<h3 class="fh">Weitere Angebote</h3><div class="fchips">${nf.map(([k,v])=>chip("data-cat",k,esc(v),S.cat===k," plain")).join("")}</div>`:""}
+   <h3 class="fh">Sortieren</h3>
+   <div class="fchips">${Object.entries(SORTS).map(([k,v])=>chip("data-sort",k,v,S.sort===k," plain")).join("")}</div>
+   <div class="frow"><button class="switch" data-toggleapp="1" role="switch" aria-checked="${S.useApp}" aria-label="Apps und Coupons einrechnen"></button><span>Apps &amp; Coupons einrechnen</span></div>
+   <div class="factions"><button class="btn ghost" data-freset="1">Zurücksetzen</button><button class="btn" data-fdone="1">${n} Angebote zeigen</button></div>
+   <button class="btn ghost sm" data-openadd="1" style="justify-self:start">+ Angebot selbst eintragen</button>
+  </div>`}
+
 function render(){
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
@@ -351,10 +372,14 @@ function render(){
   document.getElementById("storeChips").innerHTML=`<button class="chip plain" data-store="" aria-pressed="${!S.stores.size}">Alle Märkte</button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="chip" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k)}${esc(STORES[k].n)}</button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cat===k).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
+  document.getElementById("sort").value=S.sort;
+  const act=[...S.stores].map(sname).concat(S.cat?[CATS[S.cat]]:[],S.sort!=="off"?[SORTS[S.sort]]:[]);
+  document.getElementById("fsum").textContent=act.length?act.join(" · "):"Alle Märkte · Alle Kategorien";
+  const fc=document.getElementById("fcount");fc.textContent=act.length;fc.hidden=!act.length;
   document.getElementById("qclear").hidden=!S.q;
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
-  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=S.sheet==="add"?renderAdd():renderKracher();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
+  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=S.sheet==="add"?renderAdd():S.sheet==="filter"?renderFilter():renderKracher();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
 }
 
 // kaputte Fotos durch Illustration ersetzen
@@ -366,7 +391,12 @@ document.addEventListener("click",e=>{
   if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
   if(b.id==="wk0"||b.id==="wk1"){S.week=+b.id[2];S.limit=60;render();return}
   if(b.id==="openK"){S.sheet="k";render();return}
-  if(b.id==="openAdd"){S.sheet="add";render();return}
+  if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
+  if(b.id==="openFilter"){S.sheet="filter";render();return}
+  if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
+  if(b.dataset.toggleapp){S.useApp=!S.useApp;save();render();return}
+  if(b.dataset.freset){S.stores.clear();S.cat=null;S.sort="off";S.limit=60;render();return}
+  if(b.dataset.fdone){S.sheet=null;render();scrollTo({top:0});return}
   if(b.id==="closeSheet"){S.sheet=null;render();return}
   if(b.id==="more"){S.limit+=60;render();return}
   if(b.dataset.store!==undefined){const k=b.dataset.store;if(!k)S.stores.clear();else S.stores.has(k)?S.stores.delete(k):S.stores.add(k);S.limit=60;render();return}

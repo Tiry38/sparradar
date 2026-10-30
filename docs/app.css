@@ -52,3 +52,19 @@ header.top,#filters,main{grid-template-columns:minmax(0,1fr)}
 .flyerinfo span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .flyerinfo .sb{transform:scale(.8)}
 .logo{align-items:flex-start}.logo-mark{margin-top:2px}
+/* Handy: aufgeräumte Filterzeile statt drei Leisten */
+.fbar{display:none;align-items:center;gap:10px;min-width:0}
+.fbtn{flex:none;position:relative}
+.fbtn .badge{margin-left:2px}
+.fsum{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:.85rem;font-weight:600}
+@media (max-width:720px){
+  .fbar{display:flex}
+  #storeChips,#catChips,.toolbar{display:none!important}
+}
+.fh{font-family:var(--f-display);font-weight:800;font-size:1rem;margin:6px 0 -4px}
+.fchips{display:flex;flex-wrap:wrap;gap:8px}
+.fchips .chip{white-space:normal;text-align:left}
+.fchips .chip em{font-style:normal;font-size:.75rem;opacity:.7;margin-left:2px}
+.frow{display:flex;align-items:center;gap:10px;font-weight:600}
+.factions{display:grid;grid-template-columns:auto 1fr;gap:10px;position:sticky;bottom:0;padding:10px 0 4px;background:var(--bg)}
+.factions .btn{justify-content:center}
