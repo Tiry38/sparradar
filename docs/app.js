@@ -360,10 +360,13 @@ function renderSync(){
   return `<section class="panel" id="syncPanel"><h3>📱 ↔ 💻 Geräte verbinden</h3>
    ${c?.gist?`<p><b>Handy und PC sind verbunden.</b> Merkliste, Einkaufszettel, Coupons und eigene Angebote gleichen sich automatisch ab.</p>
      <p id="syncState">${esc(Sync.status||"Verbunden")}</p>
-     <div class="links"><button class="btn sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
+     <p><b>Zweites Gerät verbinden:</b> Code kopieren, an dich selbst schicken (z. B. WhatsApp oder E-Mail) und auf dem anderen Gerät hier einfügen.</p>
+     <div class="links"><button class="btn sm" id="syncCopy">Code kopieren</button><button class="btn ghost sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
    :`<p>Damit du auf Handy und PC dieselbe Merkliste, denselben Einkaufszettel und dieselben Coupons siehst. Einmal pro Gerät den Schlüssel eintragen, danach läuft alles unsichtbar im Hintergrund.</p>
-     <ol class="steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=SparRadar" target="_blank" rel="noopener">Schlüssel bei GitHub erstellen</a>: Ablauf „No expiration“ wählen, nur der Haken bei <b>gist</b>, dann „Generate token“.</li><li>Den Schlüssel (beginnt mit <code>ghp_</code>) kopieren und hier einfügen. Auf dem anderen Gerät denselben Schlüssel eintragen.</li></ol>
-     <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="ghp_…" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Verbinden</button></form>
+     <p><b>Schon ein Gerät verbunden?</b> Dort „Code kopieren“ drücken, dir schicken und hier einfügen. Fertig.</p>
+     <details class="steps-d"><summary>Noch kein Gerät verbunden? So bekommst du den Code (einmalig, am besten am PC)</summary>
+     <ol class="steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=SparRadar" target="_blank" rel="noopener">Hier tippen</a> und bei GitHub anmelden.</li><li>Bei „Expiration“ <b>No expiration</b> auswählen. Der Haken bei <b>gist</b> ist schon gesetzt, sonst nichts anhaken.</li><li>Ganz unten auf den grünen Knopf <b>Generate token</b>.</li><li>Den langen Code, der mit <code>ghp_</code> anfängt, kopieren und unten einfügen.</li></ol></details>
+     <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="Code einfügen (ghp_…)" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Verbinden</button></form>
      <p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p>`}
   </section>`}
 
@@ -450,6 +453,7 @@ document.addEventListener("click",e=>{
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
   if(b.id==="openFilter"){S.sheet="filter";render();return}
+  if(b.id==="syncCopy"){copy(Sync.cfg().token,"Code kopiert. Jetzt an dich selbst schicken und auf dem anderen Gerät einfügen.");return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
