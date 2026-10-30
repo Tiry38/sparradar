@@ -1,10 +1,13 @@
 // SparRadar für Windows: zeigt die Web-App in einem eigenen Fenster (WebView2).
 // Links zu anderen Seiten (Prospekte, Händler) öffnen im Standardbrowser.
+// Das Programm aktualisiert sich selbst: neue Version installieren und neu starten.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{WebviewUrl, WebviewWindowBuilder};
 
 const APP_URL: &str = "https://tiry38.github.io/sparradar/";
+const REL: &str = "https://github.com/Tiry38/sparradar/releases/download/apps/";
+const CHECK_EVERY: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
 
 // Links mit target="_blank" im selben Fenster öffnen, damit on_navigation sie abfangen kann
 const SAME_WINDOW_LINKS: &str = r#"
@@ -17,6 +20,39 @@ document.addEventListener("click", e => {
 fn is_app(url: &tauri::Url) -> bool {
     url.host_str() == Some("tiry38.github.io") && url.path().starts_with("/sparradar")
 }
+
+/// Prüft unsichtbar per PowerShell, ob im Release eine neuere Version liegt. Wenn ja:
+/// herunterladen, dieses Programm schließen, still installieren (/S) und wieder starten.
+/// Ohne Internet oder bei Fehlern passiert einfach nichts.
+#[cfg(windows)]
+fn check_for_update(version: &str) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Ok(exe) = std::env::current_exe() else { return };
+    let script = format!(
+        r#"$ErrorActionPreference='Stop'
+[Net.ServicePointManager]::SecurityProtocol=[Net.SecurityProtocolType]::Tls12
+$v=(Invoke-RestMethod -UseBasicParsing -Headers @{{'Cache-Control'='no-cache'}} '{rel}version.json').desktop
+if(-not $v -or [version]$v -le [version]'{cur}'){{exit}}
+$f=Join-Path $env:TEMP 'SparRadar-Update.exe'
+Invoke-WebRequest -UseBasicParsing '{rel}SparRadar-Setup.exe' -OutFile $f
+Stop-Process -Id {pid} -Force
+Start-Sleep -Seconds 1
+Start-Process -FilePath $f -ArgumentList '/S' -Wait
+Start-Process -FilePath '{exe}'"#,
+        rel = REL,
+        cur = version,
+        pid = std::process::id(),
+        exe = exe.display().to_string().replace('\'', "''"),
+    );
+    let _ = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+}
+
+#[cfg(not(windows))]
+fn check_for_update(_version: &str) {}
 
 fn main() {
     tauri::Builder::default()
@@ -37,6 +73,12 @@ fn main() {
                     false
                 })
                 .build()?;
+            // beim Start und dann alle 6 Stunden nach einer neuen Programmversion schauen
+            let version = app.package_info().version.to_string();
+            std::thread::spawn(move || loop {
+                check_for_update(&version);
+                std::thread::sleep(CHECK_EVERY);
+            });
             Ok(())
         })
         .run(tauri::generate_context!())

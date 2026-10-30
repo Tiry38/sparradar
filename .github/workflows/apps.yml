@@ -39,7 +39,7 @@ jobs:
             echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/sr.p12"
             SR_KEYSTORE="$RUNNER_TEMP/sr.p12" gradle -p android assembleRelease -Pvc=$VC --no-daemon
             cp android/app/build/outputs/apk/release/app-release.apk SparRadar.apk
-            echo "{\"code\":$VC}" > version.json
+            echo "$VC" > android-code.txt
           else
             echo "::warning::Secret ANDROID_KEYSTORE fehlt: APK ohne festen Schlüssel, Updates in der App sind aus."
             gradle -p android assembleDebug -Pvc=$VC --no-daemon
@@ -50,13 +50,15 @@ jobs:
           name: android
           path: |
             SparRadar.apk
-            version.json
+            android-code.txt
 
   windows:
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # für die Versionsnummer (Anzahl Änderungen an desktop/)
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -69,14 +71,23 @@ jobs:
         run: npx --yes @tauri-apps/cli@2 icon ../docs/icon.svg
       - name: Setup.exe bauen
         working-directory: desktop
-        run: npx --yes @tauri-apps/cli@2 build --bundles nsis
+        shell: pwsh
+        run: |
+          # Version steigt nur, wenn sich das Windows-Programm selbst geändert hat -> nur dann Selbst-Update
+          $n = git rev-list --count HEAD -- .
+          $v = "1.0.$n"
+          Set-Content -Path ../desktop-version.txt -Value $v -NoNewline
+          Set-Content -Path version-config.json -Value ('{"version":"' + $v + '"}')
+          npx --yes @tauri-apps/cli@2 build --bundles nsis --config version-config.json
       - name: Umbenennen
         shell: pwsh
         run: Copy-Item (Get-ChildItem desktop/src-tauri/target/release/bundle/nsis/*-setup.exe | Select-Object -First 1).FullName SparRadar-Setup.exe
       - uses: actions/upload-artifact@v4
         with:
           name: windows
-          path: SparRadar-Setup.exe
+          path: |
+            SparRadar-Setup.exe
+            desktop-version.txt
 
   release:
     needs: [android, windows]
@@ -94,5 +105,8 @@ jobs:
             gh release create apps --repo "$REPO" --title "SparRadar Apps" \
               --notes "SparRadar.apk für Android und SparRadar-Setup.exe für Windows. Beide zeigen immer die aktuelle SparRadar-Web-App."
           gh release upload apps SparRadar.apk SparRadar-Setup.exe --repo "$REPO" --clobber
-          # erst nach der APK: sonst meldet die App ein Update, das noch nicht da ist
-          if [ -f version.json ]; then gh release upload apps version.json --repo "$REPO" --clobber; fi
+          # version.json erst nach den Dateien hochladen: sonst meldet die App ein Update, das noch nicht da ist
+          # code = Android-Version (0 = ohne festen Schlüssel, kein Update-Hinweis), desktop = Windows-Version
+          printf '{"code":%s,"desktop":"%s"}' "$(cat android-code.txt 2>/dev/null || echo 0)" "$(cat desktop-version.txt)" > version.json
+          cat version.json
+          gh release upload apps version.json --repo "$REPO" --clobber

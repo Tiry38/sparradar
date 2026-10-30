@@ -398,3 +398,18 @@ document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getEl
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render()});
 document.getElementById("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
 load();
+
+// Bleibt die App lange offen (Windows-Fenster, Handy im Hintergrund): neue Version still neu laden,
+// neue Angebote nachladen. Nie mitten in einer Eingabe oder bei offenem Fenster.
+const MYV=((document.querySelector('script[src*="app.js"]')||{}).src||"").match(/v=(\d+)/)?.[1];
+async function freshen(){
+  if(document.hidden||S.sheet||document.activeElement?.matches("input,select,textarea"))return;
+  try{
+    const v=(await (await fetch("index.html",{cache:"no-store"})).text()).match(/app\.js\?v=(\d+)/)?.[1];
+    if(v&&MYV&&v!==MYV){location.reload();return}
+    const o=await (await fetch("data/offers.json",{cache:"no-store"})).json();
+    if(o.generated!==META.generated)load();
+  }catch(e){}
+}
+setInterval(freshen,30*60*1000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(freshen.last||0)>5*60*1000){freshen.last=Date.now();freshen()}});
