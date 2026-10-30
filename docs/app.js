@@ -305,6 +305,7 @@ function renderTips(){
    <h3 class="sec-h">Apps und Programme deiner Märkte</h3>
    <div class="tips">${T.map(([s,prog,txt])=>`<div class="tip"><h4>${sb(s,true)}${esc(sname(s))}</h4><span class="prog">${prog}</span><p>${txt}</p><a href="${STORES[s].link}" target="_blank" rel="noopener" style="font-size:.84rem">Angebote ansehen</a></div>`).join("")}
    <div class="tip"><h4><span class="ico">${IC.layers}</span>Cashback-Apps</h4><span class="prog">Marktguru · Scondoo · Coupies</span><p>Geld zurück auf bestimmte Markenprodukte, egal in welchem Markt gekauft. Kassenbon fotografieren, das Geld kommt aufs Konto oder per PayPal.</p></div>
+   <div class="tip"><h4><span class="ico">${IC.box}</span>SparRadar als App</h4><span class="prog">Android · Windows</span><p>Zum Installieren: APK aufs Handy laden und öffnen, Setup.exe am PC starten. Beide zeigen immer diese aktuelle Version.</p><div class="links"><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar.apk">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></div>
    <div class="tip"><h4><span class="ico">${IC.bag}</span>Too Good To Go</h4><span class="prog">Abends Essen retten</span><p>Standort Wörth am Rhein wählen und Bäcker und Märkte in der Nähe als Favoriten speichern.</p><a href="https://www.toogoodtogo.com/de" target="_blank" rel="noopener" style="font-size:.84rem">toogoodtogo.com</a></div></div>`}
 
 function render(){
