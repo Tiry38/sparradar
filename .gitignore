@@ -3,4 +3,10 @@ tools/
 sparradar.html
 .claude/
 __pycache__/
+android/.gradle/
+android/build/
+android/app/build/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+desktop/src-tauri/icons/
 *.tmp
