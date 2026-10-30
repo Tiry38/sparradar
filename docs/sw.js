@@ -1,5 +1,5 @@
 // SparRadar Service Worker: App offline verfügbar, Angebote immer frisch (Netz zuerst, sonst Cache)
-const CACHE = "sparradar-v1";
+const CACHE = "sparradar-v2";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", e => {
@@ -14,7 +14,8 @@ self.addEventListener("fetch", e => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
   e.respondWith(
-    fetch(e.request)
+    // am Browser-Cache vorbei, damit neue App-Versionen und Angebote sofort ankommen
+    fetch(new Request(e.request.url, { cache: "no-cache" }))
       .then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy));
