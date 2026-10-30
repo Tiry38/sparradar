@@ -311,6 +311,8 @@ def fetch_kaufda(extra_keywords):
             continue
         seen_kw.add(norm(k))
         slug = k[0].upper() + k[1:]
+        for a, b in (("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
+            slug = slug.replace(a, b)  # kaufDA schreibt Umlaute aus: Käse -> Kaese
         pages.append(f"https://www.kaufda.de/{KD_CITY}/Angebote/{urllib.parse.quote(slug)}")
     for n, url in enumerate(pages, 1):
         items = kd_items(url)
