@@ -9,7 +9,14 @@
 <meta name="theme-color" content="#FFD60A">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-512.png">
+<!-- Vorschau beim Teilen des Links (WhatsApp, Mail …) -->
+<meta property="og:title" content="SparRadar">
+<meta property="og:description" content="Alle Angebote rund um Wörth am Rhein">
+<meta property="og:image" content="https://tiry38.github.io/sparradar/og.png">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:url" content="https://tiry38.github.io/sparradar/">
+<meta property="og:type" content="website">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
@@ -67,7 +74,7 @@
 </div>
 <div class="scrim" id="sheet" hidden></div>
 <div class="toast" id="toast" hidden></div>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>

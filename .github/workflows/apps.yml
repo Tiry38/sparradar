@@ -104,7 +104,9 @@ jobs:
           gh release view apps --repo "$REPO" >/dev/null 2>&1 || \
             gh release create apps --repo "$REPO" --title "SparRadar Apps" \
               --notes "SparRadar.apk für Android und SparRadar-Setup.exe für Windows. Beide zeigen immer die aktuelle SparRadar-Web-App."
-          gh release upload apps SparRadar.apk SparRadar-Setup.exe --repo "$REPO" --clobber
+          # SparRadar-App.apk = Name zum Weiterschicken; SparRadar.apk bleibt für den Updater in der App
+          cp SparRadar.apk SparRadar-App.apk
+          gh release upload apps SparRadar-App.apk SparRadar.apk SparRadar-Setup.exe --repo "$REPO" --clobber
           # version.json erst nach den Dateien hochladen: sonst meldet die App ein Update, das noch nicht da ist
           # code = Android-Version (0 = ohne festen Schlüssel, kein Update-Hinweis), desktop = Windows-Version
           printf '{"code":%s,"desktop":"%s"}' "$(cat android-code.txt 2>/dev/null || echo 0)" "$(cat desktop-version.txt)" > version.json
