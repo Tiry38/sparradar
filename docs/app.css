@@ -68,3 +68,5 @@ header.top,#filters,main{grid-template-columns:minmax(0,1fr)}
 .frow{display:flex;align-items:center;gap:10px;font-weight:600}
 .factions{display:grid;grid-template-columns:auto 1fr;gap:10px;position:sticky;bottom:0;padding:10px 0 4px;background:var(--bg)}
 .factions .btn{justify-content:center}
+.steps{margin:0;padding-left:20px;display:grid;gap:6px;color:var(--muted);font-size:.9rem}
+#syncPanel code{font-family:var(--f-mono);font-size:.85em}

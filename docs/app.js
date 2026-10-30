@@ -74,7 +74,52 @@ const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{wee
 const sb = (s,lg) => `<span class="sb${lg?" lg":""}" style="--c:${(STORES[s]||{}).c||"#888"}" aria-hidden="true">${(STORES[s]||{}).m||"?"}</span>`;
 const sname = s => (STORES[s]||{}).n || s;
 let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
-const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual);store.set("coupons",S.coupons)};
+const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual);store.set("coupons",S.coupons);Sync.changed()};
+
+// ---------- Geräte verbinden (Handy <-> PC) ----------
+// Merkliste, Einkaufszettel, Coupons und eigene Angebote liegen zusätzlich in einem geheimen Gist im
+// GitHub-Konto des Nutzers. Der Schlüssel (nur Recht "gist") bleibt auf dem Gerät, nie im Repo.
+const Sync = {
+  API:"https://api.github.com", FILE:"sparradar-sync.json", DESC:"SparRadar-Sync (Merkliste, Einkaufszettel, Coupons)",
+  cfg(){return store.get("sync",null)}, timer:null, busy:false, status:"",
+  data(){return {watch:S.watch,list:S.list,manual:S.manual,coupons:S.coupons}},
+  snap(){return JSON.stringify(this.data())},
+  async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
+    if(r.status===401)throw new Error("Schlüssel ungültig oder abgelaufen");if(!r.ok)throw new Error("GitHub antwortet nicht ("+r.status+")");return r.json()},
+  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.manual=d.manual||[];S.coupons=d.coupons||[];
+    store.set("watch2",S.watch);store.set("list",S.list);store.set("manual",S.manual);store.set("coupons",S.coupons);
+    OFFERS=OFFERS.filter(o=>!o.manual).concat(manualOffers())},
+  // beide Seiten geändert: nichts verlieren, alles zusammenführen
+  merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
+    return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
+      manual:u(a.manual||[],b.manual||[],m=>m.id),coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|"))}},
+  async connect(token){store.set("sync",{token});
+    try{const gs=await this.req("/gists?per_page=100");let g=gs.find(x=>x.description===this.DESC&&x.files[this.FILE]);
+      if(!g)g=await this.req("/gists",{method:"POST",body:JSON.stringify({description:this.DESC,public:false,files:{[this.FILE]:{content:JSON.stringify({updatedAt:Date.now(),data:this.data()})}}})});
+      store.set("sync",{token,gist:g.id});store.set("syncSnap",null);store.set("syncRemoteAt",0);await this.pull(true);return true}
+    catch(e){store.set("sync",null);throw e}},
+  disconnect(){store.set("sync",null);store.set("syncSnap",null);this.status=""},
+  async pull(first){const c=this.cfg();if(!c?.gist||this.busy)return;this.busy=true;
+    try{const g=await this.req("/gists/"+c.gist);const f=g.files[this.FILE];
+      const raw=f.truncated?await (await fetch(f.raw_url,{cache:"no-store"})).text():f.content;const remote=JSON.parse(raw||"{}");
+      const remoteNew=(remote.updatedAt||0)>store.get("syncRemoteAt",0),localNew=this.snap()!==store.get("syncSnap",null);
+      if(remoteNew&&remote.data){
+        if(localNew&&!first){this.apply(this.merge(remote.data,this.data()));this.busy=false;return this.push()}
+        if(first){this.apply(this.merge(remote.data,this.data()))}else this.apply(remote.data);
+        store.set("syncRemoteAt",remote.updatedAt);store.set("syncSnap",this.snap());
+        if(first){this.busy=false;return this.push()}
+        render()}
+      else if(localNew){this.busy=false;return this.push()}
+      this.ok()}
+    catch(e){this.fail(e)}finally{this.busy=false}},
+  async push(){const c=this.cfg();if(!c?.gist)return;if(this.busy){this.changed();return}this.busy=true;
+    try{const at=Date.now();await this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify({updatedAt:at,data:this.data()})}}})});
+      store.set("syncRemoteAt",at);store.set("syncSnap",this.snap());this.ok()}
+    catch(e){this.fail(e)}finally{this.busy=false}},
+  changed(){if(!this.cfg()?.gist)return;clearTimeout(this.timer);this.timer=setTimeout(()=>this.push(),1500)},
+  ok(){this.status="Verbunden · abgeglichen "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+" Uhr";const el=document.getElementById("syncState");if(el)el.textContent=this.status},
+  fail(e){this.status="Abgleich fehlgeschlagen: "+e.message;const el=document.getElementById("syncState");if(el)el.textContent=this.status}
+};
 
 function histOf(o){const rows=HIST[o.s+"|"+norm(o.n).slice(0,40)]||[];return rows.filter(r=>r[0]<(o.from||TODAY)).map(r=>r[1])}
 // Referenzpreis für "Ersparnis": statt-Preis, sonst Durchschnitt aus dem Verlauf, sonst Angebotspreis
@@ -152,7 +197,7 @@ async function load(){
   }
   OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});
   const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
-  render();
+  render();  Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
 }
 // Wie aktuell sind die Prospekte? Häufigster Zeitraum je Markt, dazu wann die nächsten starten
 function flyerInfo(){
@@ -310,6 +355,18 @@ function renderCoupons(){
     ${S.useApp?"":`<p style="color:var(--alert)">„Apps &amp; Coupons einrechnen“ ist ausgeschaltet. Coupons werden gerade nicht berücksichtigt.</p>`}
    </section>`}
 
+function renderSync(){
+  const c=Sync.cfg();
+  return `<section class="panel" id="syncPanel"><h3>📱 ↔ 💻 Geräte verbinden</h3>
+   ${c?.gist?`<p><b>Handy und PC sind verbunden.</b> Merkliste, Einkaufszettel, Coupons und eigene Angebote gleichen sich automatisch ab.</p>
+     <p id="syncState">${esc(Sync.status||"Verbunden")}</p>
+     <div class="links"><button class="btn sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
+   :`<p>Damit du auf Handy und PC dieselbe Merkliste, denselben Einkaufszettel und dieselben Coupons siehst. Einmal pro Gerät den Schlüssel eintragen, danach läuft alles unsichtbar im Hintergrund.</p>
+     <ol class="steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=SparRadar" target="_blank" rel="noopener">Schlüssel bei GitHub erstellen</a>: Ablauf „No expiration“ wählen, nur der Haken bei <b>gist</b>, dann „Generate token“.</li><li>Den Schlüssel (beginnt mit <code>ghp_</code>) kopieren und hier einfügen. Auf dem anderen Gerät denselben Schlüssel eintragen.</li></ol>
+     <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="ghp_…" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Verbinden</button></form>
+     <p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p>`}
+  </section>`}
+
 function renderTips(){
   const T=[
    ["lidl","Lidl Plus","Personalisierte Coupons, günstigere App-Preise und Belohnungen ab einem bestimmten Monatseinkauf. Coupons vor dem Einkauf aktivieren."],
@@ -327,7 +384,7 @@ function renderTips(){
    [IC.scale,"Grundpreis zählt","Vergleiche immer den Preis pro kg oder l. Die Großpackung ist nicht automatisch günstiger."],
    [IC.cal,"Montag und Donnerstag","An diesen Tagen starten bei Lidl und Aldi die neuen Aktionen. Unter „Demnächst“ siehst du sie schon vorher."],
    [IC.bag,"Too Good To Go","Bäcker und Märkte geben abends übrig gebliebene Lebensmittel als Überraschungstüte ab, meist für etwa ein Drittel des Werts."]];
-  return `${renderCoupons()}
+  return `${renderCoupons()}${renderSync()}
    <h3 class="sec-h">Spartipps</h3>
    <section class="panel"><h3>Geht „Extreme Couponing“ wie in den USA auch hier?</h3>
    <p>Nur teilweise. In Deutschland sind Coupons fast immer Händler-Coupons in Apps, oft auf ein Stück pro Einkauf begrenzt. Einen 200-€-Wagen für 0 € schaffst du hier nicht. Einzelne Artikel umsonst oder mit Plus gehen aber, wenn du Händler-App, Payback oder Rewe Bonus, Cashback-Apps und „Gratis testen“-Aktionen der Hersteller kombinierst.</p></section>
@@ -393,6 +450,8 @@ document.addEventListener("click",e=>{
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
   if(b.id==="openFilter"){S.sheet="filter";render();return}
+  if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}
+  if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
   if(b.dataset.toggleapp){S.useApp=!S.useApp;save();render();return}
   if(b.dataset.freset){S.stores.clear();S.cat=null;S.sort="off";S.limit=60;render();return}
@@ -422,6 +481,9 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.sheet){S.sheet=nu
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
+  if(e.target.id==="syncForm"){e.preventDefault();const t=document.getElementById("syncToken").value.trim();
+    if(!/^(ghp_|github_pat_)/.test(t)){toast("Das sieht nicht wie ein GitHub-Schlüssel aus (beginnt mit ghp_).");return}
+    toast("Verbinde …");Sync.connect(t).then(()=>{toast("Verbunden! Deine Listen sind jetzt auf allen Geräten gleich.");render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
   if(e.target.id==="cpForm"){e.preventDefault();
     const val=id=>document.getElementById(id).value.trim();
     const v=parseNum(val("cpVal")),k=val("cpKw").replace(/\s+/g," ");
@@ -466,3 +528,4 @@ async function freshen(){
 }
 setInterval(freshen,30*60*1000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(freshen.last||0)>5*60*1000){freshen.last=Date.now();freshen()}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)Sync.pull()});

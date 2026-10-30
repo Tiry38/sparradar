@@ -48,6 +48,8 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 ## Bewusste Entscheidungen – nicht ändern ohne ausdrücklichen Wunsch
 - **Keine Push-Benachrichtigungen.** Wurden gebaut und auf Wunsch wieder komplett entfernt. Der Nutzer schaut selbst in die App.
 - **Keine Logins** für Lidl Plus, Rewe Bonus, Payback o. Ä. Es gibt keine offiziellen Schnittstellen. Die Passwörter lägen im öffentlichen Repo, und es drohen Kontosperren. Stattdessen gibt es **„Meine Coupons“** zum Selbst-Eintragen (Tab „Coupons“).
+- **Geräte verbinden (Sync):** Merkliste, Einkaufszettel, Coupons und eigene Angebote synchronisieren über ein geheimes Gist im GitHub-Konto des Nutzers (`Sync` in `docs/app.js`, Datei `sparradar-sync.json`). Der GitHub-Schlüssel (nur Recht `gist`) wird pro Gerät im Tab „Coupons“ eingetragen und liegt nur im `localStorage`, nie im Repo. Konflikte werden zusammengeführt, nichts geht verloren.
+- **Bedienung:** „A+“-Knopf (3 Schriftstufen per CSS-`zoom`), am Handy Märkte/Kategorien/Sortierung im Fenster „Märkte & Filter“. Look: Farbverläufe in `docs/look.css`.
 - **Sperren nicht umgehen:** rewe.de und netto-online.de blocken automatische Abrufe (403). Diese Sperren nicht umgehen, keine API-Schlüssel aus Websites auslesen (z. B. bei Marktguru). Nur öffentliche Seiten, die robots.txt erlaubt, mit ehrlichem User-Agent, höchstens einmal pro Tag und mit Pausen (`PAUSE`).
 - Das Repository ist öffentlich (nötig für kostenloses GitHub Pages). Keine Passwörter, Tokens oder persönlichen Daten hineinschreiben.
 
