@@ -331,9 +331,9 @@ function render(){
   const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;
   const lb=document.getElementById("listBadge");lb.textContent=S.list.length;lb.hidden=!S.list.length;
   const nc=S.coupons.filter(cpActive).length,cb=document.getElementById("cpBadge");cb.textContent=nc;cb.hidden=!nc;
-  const counts={};OFFERS.forEach(o=>counts[o.s]=(counts[o.s]||0)+1);
+  const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
   document.getElementById("storeChips").innerHTML=`<button class="chip plain" data-store="" aria-pressed="${!S.stores.size}">Alle Märkte</button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="chip" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k)}${esc(STORES[k].n)}</button>`).join("");
-  document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).map(([k,n])=>`${k===NONFOOD_CATS[0]?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
+  document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cat===k).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("qclear").hidden=!S.q;
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
