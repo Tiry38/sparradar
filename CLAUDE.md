@@ -18,6 +18,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 - `.github/workflows/angebote.yml` – Abruf jeden Morgen ca. 5:15/6:15 Uhr, committet nach `docs/data/`.
 - `android/` – Android-App (WebView auf die Pages-URL), `desktop/src-tauri/` – Windows-App (Tauri 2, WebView2).
 - `.github/workflows/apps.yml` – baut `SparRadar.apk` und `SparRadar-Setup.exe` und lädt sie in den Release `apps` hoch. Beide Apps zeigen immer die Online-Version, müssen also nur bei Änderungen in `android/` oder `desktop/` neu gebaut werden.
+- **Android-Updater:** Die APK prüft beim Start `version.json` im Release `apps` und bietet „Aktualisieren“ an (PackageInstaller, Android fragt selbst nach). Die Versionsnummer = 100 + Anzahl Commits in `android/`. Signiert wird mit dem festen Schlüssel aus dem GitHub-Secret `ANDROID_KEYSTORE` (Base64 einer PKCS12-Datei, Alias `sparradar`). Den Schlüssel **nie** ins Repo legen und nicht austauschen, sonst schlagen alle Updates fehl und jeder muss neu installieren.
 
 ## Märkte (Region Wörth am Rhein, ca. 20 km)
 | Markt | Quelle |

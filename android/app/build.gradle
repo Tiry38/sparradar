@@ -2,6 +2,10 @@ plugins {
     id "com.android.application"
 }
 
+// Fester Signaturschlüssel kommt aus dem GitHub-Secret ANDROID_KEYSTORE (nie ins Repo!).
+// Nur mit immer demselben Schlüssel lässt Android ein Update über die installierte App zu.
+def ks = System.getenv("SR_KEYSTORE")
+
 android {
     namespace "de.sparradar.app"
     compileSdk 34
@@ -10,13 +14,28 @@ android {
         applicationId "de.sparradar.app"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode((project.findProperty("vc") ?: "1") as int)
+        versionName "1." + (project.findProperty("vc") ?: "1")
+    }
+
+    signingConfigs {
+        if (ks) {
+            fest {
+                storeFile file(ks)
+                storePassword System.getenv("SR_KEYSTORE_PASS")
+                keyAlias "sparradar"
+                keyPassword System.getenv("SR_KEYSTORE_PASS")
+            }
+        }
     }
 
     buildTypes {
         debug {
             debuggable false
+        }
+        release {
+            minifyEnabled false
+            if (ks) signingConfig signingConfigs.fest
         }
     }
 
