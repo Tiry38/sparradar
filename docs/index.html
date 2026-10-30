@@ -14,7 +14,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="app.css?v=4">
+<link rel="stylesheet" href="app.css?v=10">
+<script>try{var z=JSON.parse(localStorage.getItem("sr_zoom")||"1");if(z>1)document.documentElement.style.zoom=z}catch(e){}</script>
 </head>
 <body>
 <div class="wrap">
@@ -24,6 +25,7 @@
         <div class="logo-mark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="currentColor"/></svg></div>
         <div><h1>SparRadar</h1><small id="stand">Wörth am Rhein · 20 km · Angebote werden geladen …</small></div>
       </div>
+      <button class="zoombtn" id="zoomBtn" type="button" aria-label="Schrift größer" title="Schrift größer oder wieder normal">A+</button>
       <div class="seg" role="group" aria-label="Angebotswoche">
         <button id="wk0" aria-pressed="true">Jetzt gültig</button>
         <button id="wk1" aria-pressed="false">Demnächst</button>
@@ -32,7 +34,7 @@
     <nav class="tabs" role="tablist" aria-label="Bereiche">
       <button role="tab" id="tab-offers" aria-selected="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/></svg>Angebote</button>
       <button role="tab" id="tab-watch" aria-selected="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg>Merkliste <span class="badge" id="watchBadge" hidden>0</span></button>
-      <button role="tab" id="tab-list" aria-selected="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h3l2.4 12.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.2L21 7H6.2"/></svg>Einkaufszettel <span class="badge" id="listBadge" hidden>0</span></button>
+      <button role="tab" id="tab-list" aria-selected="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h3l2.4 12.2a1.5 1.5 0 0 0 1.5 1.2h8.4a1.5 1.5 0 0 0 1.5-1.2L21 7H6.2"/></svg><span class="tl">Einkaufszettel</span><span class="ts">Zettel</span> <span class="badge" id="listBadge" hidden>0</span></button>
       <button role="tab" id="tab-tips" aria-selected="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M3 12h18M12 7v13M12 7c-2-4-6-4-6-1.5S10 7 12 7Zm0 0c2-4 6-4 6-1.5S14 7 12 7Z"/></svg>Coupons <span class="badge" id="cpBadge" hidden style="background:var(--app)">0</span></button>
     </nav>
     <div id="filters" style="display:grid;gap:10px">
@@ -60,7 +62,7 @@
 </div>
 <div class="scrim" id="sheet" hidden></div>
 <div class="toast" id="toast" hidden></div>
-<script src="app.js?v=8"></script>
+<script src="app.js?v=10"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>

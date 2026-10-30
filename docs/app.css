@@ -20,3 +20,27 @@ code.topic{font-family:var(--f-mono);background:var(--surface2);border:1px solid
 .chipsep{flex:none;width:1px;align-self:stretch;background:var(--line);margin:2px 4px}
 /* Maus (PC, Windows-App): Leisten umbrechen statt unsichtbar seitlich scrollen */
 @media (hover:hover) and (pointer:fine){.chips{flex-wrap:wrap;overflow:visible}}
+/* A+ Knopf: gut sichtbar oben, für größere Schrift */
+.zoombtn{border:2px solid var(--fg);background:var(--tag);color:var(--tag-ink);font-family:var(--f-display);font-weight:800;font-size:1.05rem;line-height:1;min-width:46px;height:40px;padding:0 10px;border-radius:12px;cursor:pointer}
+.zoombtn[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+/* Handy: "Jetzt gültig / Demnächst" in eigene Zeile, damit auch mit großer Schrift alles passt */
+@media (max-width:720px){.brandrow .seg{flex:1 1 100%}.brandrow .seg button{flex:1}}
+.logo>div{min-width:0}
+/* schmale Bildschirme und große Schrift: nichts darf überstehen */
+nav.tabs button{min-width:0}
+.ts{display:none}
+@media (max-width:720px){.tl{display:none}.ts{display:inline}}
+.addrow{flex-wrap:wrap}
+.addrow input{flex:1 1 140px;min-width:0}
+.form .row{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+.form select{width:100%}
+header.top,#filters,main{grid-template-columns:minmax(0,1fr)}
+.seg{max-width:100%}.seg button{white-space:nowrap;min-width:0}
+.panel,.tip,.sec-h,.meta h2,.logo h1,#stand{overflow-wrap:anywhere}
+.grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr))}
+.tips{grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr))}
+.card,.panel,.card .body,.info,.receipt,.rows,.drow .t{grid-template-columns:minmax(0,1fr)}
+.drow{grid-template-columns:auto minmax(0,1fr) auto}
+.pricerow{flex-wrap:wrap}
+.brandrow .logo{flex:1 1 150px;min-width:0}
+.logo-mark{flex:none}

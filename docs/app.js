@@ -396,6 +396,12 @@ document.addEventListener("submit",e=>{
 // Programm passend zum gewählten Markt vorschlagen
 document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render()});
+// Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
+const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];
+function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));document.documentElement.style.zoom=ZOOM[i]>1?ZOOM[i]:"";
+  const b=document.getElementById("zoomBtn");b.textContent=ZOOM_UI[i][0];b.setAttribute("aria-label",ZOOM_UI[i][1]);b.setAttribute("aria-pressed",i>0);return i}
+document.getElementById("zoomBtn").addEventListener("click",()=>{const i=(Math.max(0,ZOOM.indexOf(store.get("zoom",1)))+1)%ZOOM.length;store.set("zoom",ZOOM[i]);applyZoom();toast(["Normale Schriftgröße","Schrift größer","Schrift sehr groß"][i])});
+applyZoom();
 document.getElementById("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
 load();
 
