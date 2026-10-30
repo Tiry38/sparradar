@@ -24,6 +24,7 @@ fn main() {
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(APP_URL.parse().unwrap()))
                 .title("SparRadar")
                 .inner_size(1200.0, 850.0)
+                .maximized(true)
                 .min_inner_size(380.0, 600.0)
                 .initialization_script(SAME_WINDOW_LINKS)
                 .on_navigation(|url| {
