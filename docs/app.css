@@ -44,3 +44,11 @@ header.top,#filters,main{grid-template-columns:minmax(0,1fr)}
 .pricerow{flex-wrap:wrap}
 .brandrow .logo{flex:1 1 150px;min-width:0}
 .logo-mark{flex:none}
+/* Prospekt-Zeitraum: dezent in der Stand-Zeile, antippen zeigt Details je Markt */
+.flyer{all:unset;cursor:pointer;color:var(--muted);text-decoration:underline dotted;text-underline-offset:3px}
+.flyer:focus-visible{outline:2px solid var(--accent)}
+.flyerinfo{display:flex!important;flex-wrap:wrap;gap:4px 12px;margin-top:6px}
+.flyerinfo[hidden]{display:none!important}
+.flyerinfo span{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.flyerinfo .sb{transform:scale(.8)}
+.logo{align-items:flex-start}.logo-mark{margin-top:2px}

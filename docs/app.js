@@ -142,7 +142,9 @@ async function load(){
     META=o;HIST=h;
     OFFERS=o.offers.filter(x=>!x.to||x.to>=TODAY).concat(manualOffers());
     const g=new Date(o.generated);
-    document.getElementById("stand").textContent=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote`;
+    const pr=flyerInfo();
+    document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?` · <button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
+    document.getElementById("flyerInfo").innerHTML=pr.rows;
   }catch(e){
     OFFERS=manualOffers();
     document.getElementById("stand").textContent="Wörth am Rhein · Angebote konnten nicht geladen werden";
@@ -152,6 +154,20 @@ async function load(){
   const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
   render();
 }
+// Wie aktuell sind die Prospekte? Häufigster Zeitraum je Markt, dazu wann die nächsten starten
+function flyerInfo(){
+  const mode=a=>{const c={};a.forEach(x=>{if(x)c[x]=(c[x]||0)+1});return Object.entries(c).sort((x,y)=>y[1]-x[1])[0]?.[0]};
+  const d=x=>new Date(x+"T12:00:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
+  const wd=x=>new Date(x+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short"}).replace(".","")+" "+d(x);
+  // Wochenprospekt = Enddatum in den nächsten 8 Tagen (Dauerangebote bis Jahresende zählen nicht)
+  const soon=new Date(Date.now()+8*864e5).toISOString().slice(0,10),week=a=>{const w=a.filter(o=>o.to&&o.to<=soon);return w.length?w:a};
+  const auto=OFFERS.filter(o=>!o.manual),now=auto.filter(o=>!o.from||o.from<=TODAY),next=auto.filter(o=>o.from&&o.from>TODAY);
+  const to=mode(week(now).map(o=>o.to)),nf=next.map(o=>o.from).sort()[0];
+  const sum=[to?"Prospekte bis "+wd(to):"",nf?"neue ab "+wd(nf):""].filter(Boolean).join(" · ");
+  const rows=Object.keys(STORES).filter(s=>auto.some(o=>o.s===s)).map(s=>{
+    const n=week(now.filter(o=>o.s===s)),f=mode(n.map(o=>o.from)),t=mode(n.map(o=>o.to)),nx=next.filter(o=>o.s===s).map(o=>o.from).sort()[0];
+    return `<span>${sb(s)}${esc(sname(s))}: ${f&&t?d(f)+"–"+d(t):t?"bis "+d(t):"laufend"}${nx?` · neu ab ${d(nx)}`:""}</span>`}).join("");
+  return {sum,rows}}
 const byId = id => OFFERS.find(o=>o.id===id);
 
 // ---------- Ansichten ----------
@@ -402,6 +418,7 @@ function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));docum
   const b=document.getElementById("zoomBtn");b.textContent=ZOOM_UI[i][0];b.setAttribute("aria-label",ZOOM_UI[i][1]);b.setAttribute("aria-pressed",i>0);return i}
 document.getElementById("zoomBtn").addEventListener("click",()=>{const i=(Math.max(0,ZOOM.indexOf(store.get("zoom",1)))+1)%ZOOM.length;store.set("zoom",ZOOM[i]);applyZoom();toast(["Normale Schriftgröße","Schrift größer","Schrift sehr groß"][i])});
 applyZoom();
+document.getElementById("stand").addEventListener("click",e=>{if(e.target.id!=="flyerBtn")return;const i=document.getElementById("flyerInfo");i.hidden=!i.hidden;e.target.setAttribute("aria-expanded",!i.hidden)});
 document.getElementById("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
 load();
 
