@@ -46,7 +46,7 @@ const IC = {
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
-  manual:store.get("manual",[]),sheet:null,limit:60};
+  manual:store.get("manual",[]),coupons:store.get("coupons",[]),sheet:null,limit:60};
 let OFFERS = [], HIST = {}, META = {};
 const TODAY = new Date().toISOString().slice(0,10);
 
@@ -59,15 +59,32 @@ const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{wee
 const sb = (s,lg) => `<span class="sb${lg?" lg":""}" style="--c:${(STORES[s]||{}).c||"#888"}" aria-hidden="true">${(STORES[s]||{}).m||"?"}</span>`;
 const sname = s => (STORES[s]||{}).n || s;
 let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
-const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual)};
+const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual);store.set("coupons",S.coupons)};
 
 function histOf(o){const rows=HIST[o.s+"|"+norm(o.n).slice(0,40)]||[];return rows.filter(r=>r[0]<(o.from||TODAY)).map(r=>r[1])}
 // Referenzpreis für "Ersparnis": statt-Preis, sonst Durchschnitt aus dem Verlauf, sonst Angebotspreis
 function ref(o){if(o.o)return o.o;const h=histOf(o);return h.length>=3?Math.max(o.p,h.reduce((a,b)=>a+b,0)/h.length):o.p}
 function steps(o){const st=[{l:o.o?"Normalpreis":"Angebotspreis",v:o.o||o.p,t:"base"}];
   if(o.o)st.push({l:"Angebot",v:o.p-o.o,t:"of"});
-  if(S.useApp){if(o.ap)st.push({l:(STORES[o.s]||{}).app?STORES[o.s].app+" App-Preis":"App-Preis",v:o.ap-o.p,t:"app"});(o.x||[]).forEach(([t,l,v])=>st.push({l,v:-v,t}))}
+  if(S.useApp){if(o.ap)st.push({l:(STORES[o.s]||{}).app?STORES[o.s].app+" App-Preis":"App-Preis",v:o.ap-o.p,t:"app"});(o.x||[]).forEach(([t,l,v])=>st.push({l,v:-v,t}))
+    // eigene Coupons: werden in der eingetragenen Reihenfolge auf den jeweils aktuellen Preis angewendet
+    couponsFor(o).forEach(c=>{const cur=st.reduce((a,s)=>a+s.v,0),d=cpValue(c,cur);if(d>0.004)st.push({l:cpLabel(c),v:-d,t:c.t==="punkte"||c.prog==="Cashback-App"?"cb":"coupon"})})}
   return st}
+
+// ---------- Meine Coupons ----------
+const PROGS = ["Lidl Plus","Rewe Bonus","Payback","Netto App","Edeka App","dm App","Cashback-App","Hersteller-Coupon","Sonstiges"];
+const CP_TYPES = {euro:"€ Rabatt / Guthaben",pct:"% Rabatt",preis:"Coupon-Preis (zahlst nur …)",punkte:"Payback-Extrapunkte"};
+const defaultProg = s => ({lidl:"Lidl Plus",rewe:"Rewe Bonus",netto:"Payback",edeka:"Payback",scheck:"Payback",dm:"dm App",all:"Cashback-App"})[s]||"Sonstiges";
+const cpActive = c => !c.to || c.to>=TODAY;
+const couponsFor = o => S.coupons.filter(c=>cpActive(c)&&(c.s==="all"||c.s===o.s)&&c.k.split(/\s+/).every(w=>matches(o,w)));
+function cpValue(c,cur){
+  if(c.t==="euro")return c.v;
+  if(c.t==="pct")return Math.round(cur*c.v)/100;
+  if(c.t==="preis")return Math.max(0,cur-c.v);
+  if(c.t==="punkte")return c.v/100; // 1 Payback-Punkt = 1 Cent
+  return 0}
+function cpValueTxt(c){return c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
+const cpLabel = c => `${c.prog} ${cpValueTxt(c)}`;
 const fin = o => Math.round(steps(o).reduce((a,s)=>a+s.v,0)*100)/100;
 const offPct = o => {const r=ref(o);return r>0?Math.max(0,Math.round((1-fin(o)/r)*100)):0};
 const unit = o => o.gp ? o.gp.v*(fin(o)/o.p) : null;
@@ -99,7 +116,7 @@ function filtered(){
   if(S.q.trim()){const t=S.q.trim().split(/\s+/);r=r.filter(o=>t.every(x=>matches(o,x)))}
   const f={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>fin(a)-fin(b)}[S.sort];
   return r.sort(f)}
-const score = o => {const v=verdict(o).t;return offPct(o)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?(o.x||[]).length*3+(o.ap?3:0):0)};
+const score = o => {const v=verdict(o).t;return offPct(o)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().slice().sort((a,b)=>score(b)-score(a));
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
 
@@ -117,6 +134,7 @@ async function load(){
     toast("Angebote konnten nicht geladen werden. Bitte später neu öffnen.");
   }
   OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});
+  const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
   render();
 }
 const byId = id => OFFERS.find(o=>o.id===id);
@@ -165,7 +183,7 @@ function weekPlan(){const by={};S.watch.forEach(w=>{const h=weekOffers().filter(
 function renderKracher(){
   const r=ranked(),k=r[0];if(!k)return"";
   const vd=verdict(k),st=steps(k),inL=S.list.includes(k.id);
-  const top=S.useApp?r.filter(o=>o!==k&&((o.x||[]).length||o.ap)).slice(0,5):[];
+  const top=S.useApp?r.filter(o=>o!==k&&((o.x||[]).length||o.ap||couponsFor(o).length)).slice(0,5):[];
   const rest=r.filter(o=>o!==k&&!top.includes(o)).slice(0,8-top.length);
   const lows=r.filter(o=>verdict(o).t==="low").slice(0,5),fakes=weekOffers().filter(o=>verdict(o).t==="fake").slice(0,5);
   const plan=weekPlan();
@@ -183,7 +201,7 @@ function renderKracher(){
      <div class="verdict ${vd.t}">${spark(k,90,24)}<span>${esc(vd.l)}</span></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-add="${esc(k.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button><button class="btn ghost" data-fav="${esc(k.id)}">${IC.star}Merken</button></div>
     </div></section>
-   ${top.length?`<h3 class="sec-h">Beste Kombi-Deals</h3><p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Angebot + App-Preis oder Bonus-Guthaben zusammengerechnet.</p><div class="rows">${top.map(drow).join("")}</div>`:""}
+   ${top.length?`<h3 class="sec-h">Beste Kombi-Deals</h3><p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Angebot + App-Preis, Bonus-Guthaben und deine Coupons zusammengerechnet.</p><div class="rows">${top.map(drow).join("")}</div>`:""}
    <h3 class="sec-h">Weitere Top-Angebote</h3><div class="rows">${rest.map(drow).join("")}</div>
    <h3 class="sec-h">Dein Wochenplan</h3>
    ${plan.length?`<p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Für deine Merkliste lohnen sich ${plan.length} ${plan.length===1?"Markt":"Märkte"}:</p>
@@ -237,6 +255,30 @@ function renderList(){
    ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
    <div class="ractions"><button class="btn" id="copyList">Als Text kopieren</button><button class="btn ghost" id="clearList">Zettel leeren</button></div>`}
 
+function renderCoupons(){
+  const act=S.coupons.map((c,i)=>({c,i})).filter(x=>cpActive(x.c));
+  const wo=weekOffers();
+  const sopts=`<option value="all">Alle Märkte (z. B. Cashback-App)</option>`+Object.entries(STORES).map(([k,s])=>`<option value="${k}" ${k==="rewe"?"selected":""}>${esc(s.n)}</option>`).join("");
+  const popts=PROGS.map(p=>`<option ${p==="Rewe Bonus"?"selected":""}>${p}</option>`).join("");
+  const topts=Object.entries(CP_TYPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
+  const plus=7;const d=new Date(Date.now()+plus*864e5).toISOString().slice(0,10);
+  return `<section class="panel"><h3>Meine Coupons</h3>
+    <p>Coupon in Lidl Plus, der Rewe-App, bei Payback oder in einer Cashback-App aktiviert? Kurz hier eintragen. SparRadar rechnet ihn dann in alle passenden Angebote, den Kracher und den Einkaufszettel ein. Abgelaufene Coupons verschwinden von selbst.</p>
+    <form class="form" id="cpForm">
+     <div class="row"><label>Markt<select id="cpStore">${sopts}</select></label><label>Programm<select id="cpProg">${popts}</select></label></div>
+     <label>Gilt für (Artikel oder Marke)<input id="cpKw" required placeholder="z. B. Kaffee, Jacobs, Katzenfutter" autocomplete="off"></label>
+     <div class="row"><label>Art<select id="cpType">${topts}</select></label><label>Wert<input id="cpVal" required inputmode="decimal" placeholder="z. B. 1,00 oder 20"></label></div>
+     <div class="row"><label>Gültig bis<input id="cpTo" type="date" value="${d}"></label><label style="align-self:end"><button class="btn" type="submit">${IC.plus}Coupon speichern</button></label></div>
+    </form>
+    ${act.length?`<div class="rows">${act.map(({c,i})=>{const n=wo.filter(o=>couponsFor(o).includes(c)).length;
+      return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#7A3CF0"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#7A3CF0">%</span>`:sb(c.s,true)}</div>
+       <div class="t">${esc(c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?"bis "+fmtDate(c.to):"ohne Ende"}</small>
+        <div class="pills"><span class="pill ${n?"cb":""}">${n?`passt zu ${n} Angebot${n===1?"":"en"}`:"gerade kein passendes Angebot"}</span></div></div>
+       <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`
+      :'<div class="empty" style="padding:16px"><b>Noch keine Coupons</b>Trag oben deinen ersten aktivierten Coupon ein.</div>'}
+    ${S.useApp?"":`<p style="color:var(--alert)">„Apps &amp; Coupons einrechnen“ ist ausgeschaltet. Coupons werden gerade nicht berücksichtigt.</p>`}
+   </section>`}
+
 function renderTips(){
   const T=[
    ["lidl","Lidl Plus","Personalisierte Coupons, günstigere App-Preise und Belohnungen ab einem bestimmten Monatseinkauf. Coupons vor dem Einkauf aktivieren."],
@@ -254,7 +296,9 @@ function renderTips(){
    [IC.scale,"Grundpreis zählt","Vergleiche immer den Preis pro kg oder l. Die Großpackung ist nicht automatisch günstiger."],
    [IC.cal,"Montag und Donnerstag","An diesen Tagen starten bei Lidl und Aldi die neuen Aktionen. Unter „Demnächst“ siehst du sie schon vorher."],
    [IC.bag,"Too Good To Go","Bäcker und Märkte geben abends übrig gebliebene Lebensmittel als Überraschungstüte ab, meist für etwa ein Drittel des Werts."]];
-  return `<section class="panel"><h3>Geht „Extreme Couponing“ wie in den USA auch hier?</h3>
+  return `${renderCoupons()}
+   <h3 class="sec-h">Spartipps</h3>
+   <section class="panel"><h3>Geht „Extreme Couponing“ wie in den USA auch hier?</h3>
    <p>Nur teilweise. In Deutschland sind Coupons fast immer Händler-Coupons in Apps, oft auf ein Stück pro Einkauf begrenzt. Einen 200-€-Wagen für 0 € schaffst du hier nicht. Einzelne Artikel umsonst oder mit Plus gehen aber, wenn du Händler-App, Payback oder Rewe Bonus, Cashback-Apps und „Gratis testen“-Aktionen der Hersteller kombinierst.</p></section>
    <h3 class="sec-h">So holst du am meisten raus</h3>
    <div class="tips">${G.map(([i,h,p])=>`<div class="tip"><h4><span class="ico">${i}</span>${h}</h4><p>${p}</p></div>`).join("")}</div>
@@ -270,6 +314,7 @@ function render(){
   const hits=new Set(watchHits(null).flatMap(x=>x.hits.map(o=>o.id))).size;
   const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;
   const lb=document.getElementById("listBadge");lb.textContent=S.list.length;lb.hidden=!S.list.length;
+  const nc=S.coupons.filter(cpActive).length,cb=document.getElementById("cpBadge");cb.textContent=nc;cb.hidden=!nc;
   const counts={};OFFERS.forEach(o=>counts[o.s]=(counts[o.s]||0)+1);
   document.getElementById("storeChips").innerHTML=`<button class="chip plain" data-store="" aria-pressed="${!S.stores.size}">Alle Märkte</button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="chip" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k)}${esc(STORES[k].n)}</button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).map(([k,n])=>`<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
@@ -299,6 +344,8 @@ document.addEventListener("click",e=>{
   if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
   if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0)S.list.splice(i,1);else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);save();render();return}
+  if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
+  if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cat=null;S.limit=60;render();scrollTo({top:0});return}
   if(b.dataset.delman){const m=S.manual.splice(+b.dataset.delman,1)[0];OFFERS=OFFERS.filter(o=>!(o.manual&&o.id===m.id));save();render();return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();return}
@@ -313,6 +360,15 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.sheet){S.sheet=nu
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
+  if(e.target.id==="cpForm"){e.preventDefault();
+    const val=id=>document.getElementById(id).value.trim();
+    const v=parseNum(val("cpVal")),k=val("cpKw").replace(/\s+/g," ");
+    if(!k||!v){toast("Bitte Artikel und Wert eintragen.");return}
+    const c={s:val("cpStore"),prog:val("cpProg"),k,t:val("cpType"),v,to:val("cpTo")||null};
+    if(c.t==="pct"&&v>=100){toast("Ein Rabatt muss unter 100 % liegen.");return}
+    S.coupons.push(c);save();
+    const n=weekOffers().filter(o=>couponsFor(o).includes(c)).length;
+    toast(n?`Coupon gespeichert, passt zu ${n} Angebot${n===1?"":"en"}`:"Coupon gespeichert. Gerade passt kein Angebot dazu.");render();return}
   if(e.target.id==="addForm"){e.preventDefault();
     const val=id=>document.getElementById(id).value.trim();
     const p=parseNum(val("fPrice"));if(!p||!val("fName")){toast("Bitte Artikel und Preis eintragen.");return}
@@ -321,6 +377,8 @@ document.addEventListener("submit",e=>{
     m.id="m-"+norm(m.s+m.n)+"-"+Date.now();
     S.manual.push(m);OFFERS.push({...m,src:"selbst eingetragen",manual:true});save();toast(`${m.n} eingetragen`);render()}
 });
+// Programm passend zum gewählten Markt vorschlagen
+document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render()});
 document.getElementById("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
 load();
