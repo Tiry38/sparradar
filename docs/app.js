@@ -655,6 +655,15 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key=
 const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];
 function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));document.documentElement.style.zoom=ZOOM[i]>1?ZOOM[i]:"";
   const b=document.getElementById("zoomBtn");b.textContent=ZOOM_UI[i][0];b.setAttribute("aria-label",ZOOM_UI[i][1]);b.setAttribute("aria-pressed",i>0);return i}
+// Versteckter Zugang zu den Einstellungen: SparRadar-Logo oben links ca. 1 Sekunde gedrückt halten
+// (oder 5× schnell antippen). Bewusst ohne sichtbaren Knopf.
+(()=>{const el=document.querySelector(".logo");let t=null,taps=0,tt=null;
+  const open=()=>{S.sheet="settings";render();checkVersion()};
+  el.addEventListener("pointerdown",()=>{clearTimeout(t);t=setTimeout(()=>{t=null;open()},900)});
+  ["pointerup","pointerleave","pointercancel"].forEach(ev=>el.addEventListener(ev,()=>{clearTimeout(t);t=null}));
+  el.addEventListener("contextmenu",e=>e.preventDefault());
+  el.addEventListener("click",()=>{taps++;clearTimeout(tt);tt=setTimeout(()=>taps=0,1500);if(taps>=5){taps=0;open()}});
+  el.style.userSelect="none";el.style.webkitUserSelect="none";el.style.webkitTouchCallout="none"})();
 document.getElementById("zoomBtn").addEventListener("click",()=>{const i=(Math.max(0,ZOOM.indexOf(store.get("zoom",1)))+1)%ZOOM.length;store.set("zoom",ZOOM[i]);applyZoom();toast(["Normale Schriftgröße","Schrift größer","Schrift sehr groß"][i])});
 applyZoom();
 document.getElementById("stand").addEventListener("click",e=>{if(e.target.id!=="flyerBtn")return;const i=document.getElementById("flyerInfo");i.hidden=!i.hidden;e.target.setAttribute("aria-expanded",!i.hidden)});
