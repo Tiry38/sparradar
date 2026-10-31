@@ -276,7 +276,7 @@ function filtered(){
   // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
   const f=qt.length?(a,b)=>f0(a,b)||relevance(a,qt)-relevance(b,qt):f0;
   return r.sort(f)}
-const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o.rk&&o.rk.t==="ok"?3:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
+const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o.rk&&o.rk.t==="ok"?3:0)-(o.rk&&o.rk.t==="open"&&o.ou===1?20:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
 
@@ -457,6 +457,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  47:["Kracher der Woche: zählt jetzt nur belegte Rabatte. Rabatte gegenüber der UVP (Preisempfehlung des Herstellers) stehen in der Liste mit vollem Prozentwert, werden aber nicht mehr zum Kracher.","Bei UVP steht jetzt „UVP“ statt „statt“ am Preis."],
   46:["Scheck-In und Serpa sind entfernt, ebenso „Angebot eintragen“.","Genaue Rabatt-Prüfung: Ab 40 % wird jeder Rabatt geprüft. Echte Rabatte (Händler nennt eigenen 30-Tage-Preis, anderer Markt oder Preisverlauf bestätigt) bleiben oben. Grau wird nur, was nachweislich falsch ist. UVP wird als „UVP“ angezeigt."],
   45:["Automatische Rabatt-Prüfung: Jeder hohe Rabatt wird gegengecheckt (Packung, Grundpreis, andere Märkte, Preisverlauf). Zweifelhafte zeigen ein „?“ und stehen nicht mehr ganz oben.","Falsche Riesen-Rabatte aussortiert (z. B. Kilopreis oder Packungspreis als „statt“-Preis).","Suche findet jetzt immer etwas, auch wenn gerade eine andere Kategorie gewählt ist.","Preise unter 1 € stehen jetzt richtig da (z. B. 0.88 statt -.88).","Neue Prospekte zeigen den echten ersten Einkaufstag (Montag statt Sonntag).","App-Preise sauber benannt, z. B. „Netto App-Preis“.","Lange Artikelbeschreibungen machen die Karten nicht mehr riesig – alles Weitere in der Detailansicht."],
   44:["Kein Knopf führt mehr unnötig aus der App heraus – alle Infos stehen direkt in SparRadar."],
