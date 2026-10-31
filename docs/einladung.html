@@ -51,7 +51,8 @@
   @keyframes pulse{0%,100%{box-shadow:0 10px 30px rgba(30,158,90,.4)}50%{box-shadow:0 10px 44px rgba(74,222,128,.75)}}
   .steps{list-style:none;margin:0;padding:0;display:grid;gap:8px;text-align:left}
   .steps li{display:flex;gap:10px;align-items:center}
-  .steps li b:first-child{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--grad-brand);color:#fff}
+  [hidden]{display:none!important}
+  .steps li>b:first-child{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--grad-brand);color:#fff}
   .safe{margin:0;color:var(--green);font-weight:700;font-size:.92rem}
   .small a{color:var(--muted)}
   .open{color:var(--green);font-weight:700}
@@ -71,12 +72,13 @@
   </ul>
   <a class="install chrome" id="openChrome" hidden>🌐 In Chrome öffnen (zum Installieren)</a>
   <button class="install" id="install">📲 SparRadar installieren</button>
-  <ol class="steps" aria-label="So geht's">
+  <p class="safe" id="already" hidden>✅ SparRadar ist auf diesem Gerät schon installiert.</p>
+  <ol class="steps" id="steps" aria-label="So geht's">
     <li><b>1</b><span>Auf <b>„SparRadar installieren“</b> tippen</span></li>
     <li><b>2</b><span>Kurz mit <b>„Installieren“</b> bestätigen</span></li>
     <li><b>3</b><span><b>Fertig!</b> SparRadar ist auf deinem Startbildschirm</span></li>
   </ol>
-  <p class="safe">✅ Keine Warnung, nichts zu deaktivieren – Updates kommen von selbst.</p>
+  <p class="safe" id="safe">✅ Keine Warnung, nichts zu deaktivieren – Updates kommen von selbst.</p>
   <div class="help" id="help"></div>
   <p class="small">Kostenlos · ohne Anmeldung · ohne Werbung<br><a href="./" class="open">Erst mal nur ansehen →</a></p>
 </main>
@@ -94,19 +96,40 @@
   addEventListener("beforeinstallprompt", e => { e.preventDefault(); prompt = e; btn.classList.add("pulse"); });
   // In WhatsApp/Instagram/Facebook geöffnet (eingebauter Mini-Browser)? Dort kann man nicht installieren -> Chrome öffnen
   const inApp = /; wv\)|WhatsApp|FBAN|FBAV|Instagram/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
-  if (inApp) {
+  const inSparApk = /SparRadarAndroid/.test(navigator.userAgent);  // in der SparRadar-Android-App selbst geöffnet
+  if (inApp && !standalone) {
     const c = document.getElementById("openChrome");
-    c.href = "intent://" + location.host + location.pathname + location.search + "#Intent;scheme=https;package=com.android.chrome;end";
+    if (inSparApk) {
+      // die Android-App öffnet keine intent://-Links -> Link kopieren und in Chrome einfügen
+      c.textContent = "📋 Link kopieren (dann in Chrome einfügen)";
+      c.href = "#";
+      c.addEventListener("click", e => {
+        e.preventDefault();
+        const u = location.href.split("#")[0];
+        (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(
+          () => { c.textContent = "✅ Link kopiert – jetzt Chrome öffnen und oben einfügen"; },
+          () => { help.className = "help show"; help.innerHTML = "Diesen Link in Chrome öffnen:<br><b></b>"; help.querySelector("b").textContent = u; });
+      });
+    } else {
+      c.href = "intent://" + location.host + location.pathname + location.search + "#Intent;scheme=https;package=com.android.chrome;end";
+    }
     c.hidden = false;
     btn.hidden = true;
   }
   addEventListener("appinstalled", () => done());
-  if (standalone) { btn.textContent = "SparRadar öffnen"; }
+  if (standalone) {
+    // schon als App installiert und geöffnet: keine Installations-Schritte zeigen
+    btn.textContent = "SparRadar öffnen";
+    ["steps", "safe", "openChrome"].forEach(id => document.getElementById(id).hidden = true);
+    document.getElementById("already").hidden = false;
+    btn.hidden = false;
+  }
 
   function done() {
     help.className = "help show";
     help.innerHTML = "<b>Fertig! 🎉</b><br>SparRadar ist jetzt als App auf deinem Startbildschirm. Ab sofort einfach dort öffnen – Updates kommen automatisch.";
     btn.textContent = "SparRadar öffnen";
+    document.getElementById("steps").hidden = true;
     prompt = null;
   }
   btn.addEventListener("click", async () => {
