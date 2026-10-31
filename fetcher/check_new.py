@@ -1,6 +1,6 @@
 """SparRadar: Prospekt-Wächter (läuft Do–So alle 2 Stunden, .github/workflows/prospekte.yml).
 
-Schaut nur auf die 5 kaufDA-Händlerseiten und die Aldi-Angebotsseite (6 Seitenaufrufe) und meldet, ob dort
+Schaut nur auf die 5 kaufDA-Händlerseiten, 2 kaufDA-Sortimentseiten, prospektewoche.de/rewe und die Aldi-Angebotsseite und meldet, ob dort
 ein Prospekt bzw. Angebote mit Startdatum in der Zukunft stehen, die SparRadar noch nicht abgerufen hat.
 Nur dann startet der Workflow den kompletten Abruf (fetch_offers.py). So stehen die Angebote der nächsten
 Woche so früh wie möglich in der App, ohne die Quellen ständig komplett abzufragen.
@@ -55,6 +55,13 @@ def future_marks():
             start = str(it.get("validFrom") or "")[:10]
             if start > today and it.get("publisherId") == pub:
                 marks[f"{store}:{(it.get('parentContent') or {}).get('id')}"] = start
+    # Rewe-Vorschau: neue Woche bei prospektewoche.de (nur die Startseite mit den Wochen-Reitern)
+    h = f.http(f"{f.PW}/rewe") or ""
+    time.sleep(f.PAUSE)
+    for t in re.findall(r'tab-dates">([^<]+)<', h):
+        span = f.pw_dates(t, dt.date.today())
+        if span and span[0] > today:
+            marks[f"rewe-pw:{span[0]}"] = span[0]
     h = f.http("https://www.aldi-sued.de/de/angebote.html") or ""
     for day, _ in f.aldi_days(h):  # Aldi-Tagesseiten der nächsten Woche (z. B. /angebote/2026-11-02)
         if day > today:

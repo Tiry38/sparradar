@@ -60,7 +60,7 @@ CATS = [  # Reihenfolge = Priorität
     ("drogerie", DROGERIE),
     ("tk", r"tiefk[üu]hl|eisbecher|ice cream|magnum|langnese|cremissimo|h[äa]+gen[ -]?dazs|nuggets|vanilleeis|die ofenfrische|pizzeria|iglo\b|coppenrath|fischst|\btk\b|tk-|gefroren|fischst[äa]bchen|pommes|eiscreme|\beis\b|speiseeis|pizza"),
     ("kaffee", r"kaffee|matcha|caf[eéè] latte|caff[eèé] latte|kamille|pfefferminztee|kr[äa]utertee|fr[üu]chtetee|(?<!eis)tee\b|kr[öo]nung|tchibo|jacobs|dallmayr|lavazza|melitta|espresso|cappuccino|crema|kapseln|pads\b|\btee\b|teebeutel|kakao"),
-    ("getraenke", r"getr[äa]nk|(?<!-)bier\b|biermarken|biersorten|helles\b|lager\b|export\b|krombacher|warsteiner|spaten|rothaus|tannenz[äa]pfle|m[öo]nchshof|budweiser|tyskie|corona|guinness|desperados|heineken|sternburg|br[äa]u\b|brauspezial|aperitif|aperol|lillet|bacardi|tequila|\bkorn\b|doppelkorn|kornmarken|edelbrand|obstbrand|destillat|schnaps|pastis|brandy|weinbrand|berentzen|wilthener|goldkrone|piccolo|henkell|zweigelt|m[üu]ller-thurgau|cuv[ée]e|rebsorten|7 ?up|pepsi|schwip schwap|fassbrause|hohes c|capri-sun|saftmarken|softdrink|adelholzener|spreequell|shots?\b|wasser\b|mineralwasser|saft\b|s[äa]fte\b|fruchtsaft|nektar|ouzo|amaro|kr[äa]uterlik|obstbrand|volvic|gerolsteiner|\bcola\b|limo\b|limonade|schorle|\bbier\b|pils|radler|weizenbier|hefeweizen|(?<![a-zäöüß])weine?\b|rotwein\b|wei[ßs]wein\b|ros[ée]wein\b|gl[üu]hwein\b|punsch\b|riesling\b|sekt\b|prosecco\b|secco|spirituos|lik[öo]r|whisk|wodka|vodka|\bgin\b|\brum\b|energy|eistee|smoothie|sprudel"),
+    ("getraenke", r"getr[äa]nk|(?<!-)bier\b|biermarken|biersorten|helles\b|lager\b|export\b|krombacher|bitburger|veltins|paulaner|erdinger|beck'?s\b|radeberger|k[öo]nig pilsener|\blicher\b|jever|hasseröder|flensburger|franziskaner|hofbr[äa]u|warsteiner|pils\b|pilsener|radler\b|stubbi|weizenbier|weissbier|wei[ßs]bier|warsteiner|spaten|rothaus|tannenz[äa]pfle|m[öo]nchshof|budweiser|tyskie|corona|guinness|desperados|heineken|sternburg|br[äa]u\b|brauspezial|aperitif|aperol|lillet|bacardi|tequila|\bkorn\b|doppelkorn|kornmarken|edelbrand|obstbrand|destillat|schnaps|pastis|brandy|weinbrand|berentzen|wilthener|goldkrone|piccolo|henkell|zweigelt|m[üu]ller-thurgau|cuv[ée]e|rebsorten|7 ?up|pepsi|schwip schwap|fassbrause|hohes c|capri-sun|saftmarken|softdrink|adelholzener|spreequell|shots?\b|wasser\b|mineralwasser|saft\b|s[äa]fte\b|fruchtsaft|nektar|ouzo|amaro|kr[äa]uterlik|obstbrand|volvic|gerolsteiner|\bcola\b|limo\b|limonade|schorle|\bbier\b|pils|radler|weizenbier|hefeweizen|(?<![a-zäöüß])weine?\b|rotwein\b|wei[ßs]wein\b|ros[ée]wein\b|gl[üu]hwein\b|punsch\b|riesling\b|sekt\b|prosecco\b|secco|spirituos|lik[öo]r|whisk|wodka|vodka|\bgin\b|\brum\b|energy|eistee|smoothie|sprudel"),
     ("suess", r"s[üu][ßs]waren|s[üu][ßs]igkeiten|geb[äa]ck|knusperflocken|cashew|mandeln|macadamia|pistazie|pinienkern|studentenfutter|maronen|nougat|toffifee|[üu]berraschungs ?ei|marzipan|pl[äa]tzchen|kipferl|soft cake|jaffa|kinder country|kinder bueno|oreo|schoko|praline|bonbon|gummi|fruchtgummi|chips|snack|keks|cookie|riegel|waffel|lebkuchen|spekulatius|stollen|n[üu]sse\b|(?<!ge)n[üu]ss(?!ig)|erdn[üu]ss|popcorn|cracker|salzst"),
     ("fleisch", r"fleisch|chorizo|corned beef|serrano|jam[óo]n|landj[äa]ger|peitsche|pfefferbei[ßs]er|wagyu|patties|\bburger|-burger|griller|r[äa]ucherling|wurst|w[üu]rstchen|schinken|h[äa]hnchen|huhn|gefl[üu]gel|pute\b|puten|\brind(?!e\b|en\b)|rinder|schwein|\bhack|hackfleisch|steak|schnitzel|gulasch|salami|aufschnitt|leberk[äa]se|lachs|fisch(?!er)|forelle|thunfisch|garnele|shrimps|hering|kassler|filet|bacon|speck|saumagen|frikadell|braten\b|tafelspitz|nacken|kotelett|schweinehals|spareribs|ribs\b|\bleber\b|\bwade\b|\bente\b|entenbrust|entenkeule|entenpfanne|\bgans\b|cordon bleu"),
     ("kuehl", r"milch|gr[üu]nl[äa]nder|cheddar|tilsiter|cr[eè]me fra[iî]che|gr[üu]tze|milkana|schmelzk|leerdammer|babybel|burlander|milram|k[äa]se|gouda|emmentaler|camembert|mozzarella|feta|joghurt|jogurt|quark|skyr|sahne|butter|margarine|\beier?\b|pudding|dessert|frischk[äa]se|kefir|molke|ziegen|\brama\b|sanella|l[äa]tta|schmand|buttermilch"),
@@ -650,6 +650,68 @@ def fetch_sortiment(regional=None):
 
 
 # ---------- Zusammenführen und Preisverlauf ----------
+# ---------- Vorschau Rewe: prospektewoche.de ----------
+# Rewe stellt den Prospekt der nächsten Woche erst spät zu kaufDA. prospektewoche.de zeigt ihn meist schon am
+# Wochenende, mit Seitendaten als JSON (/images/prospekte/rewe/weekN/<Seite>.json, robots.txt erlaubt es).
+# Achtung: Deren schema.org-Liste trägt das falsche Datum (immer Woche 1) -> nur die Seiten-JSONs nutzen.
+# Es ist der allgemeine Rewe-Prospekt, nicht der des Markts in Wörth -> nur als Vorschau (pv), bis kaufDA ihn hat.
+PW = "https://prospektewoche.de"
+
+
+def pw_dates(txt, today):
+    m = re.match(r"\s*(\d\d)\.(\d\d)\.?\s*[–-]\s*(\d\d)\.(\d\d)", txt)
+    if not m:
+        return None
+    d1, m1, d2, m2 = map(int, m.groups())
+    y = today.year + (1 if m1 < today.month - 6 else 0)
+    a = dt.date(y, m1, d1)
+    b = dt.date(y + (1 if m2 < m1 else 0), m2, d2)
+    return a.isoformat(), b.isoformat()
+
+
+def fetch_prospektewoche(shop="rewe", store="rewe"):
+    today = dt.date.today()
+    h = http(f"{PW}/{shop}") or ""
+    tabs = [pw_dates(t, today) for t in re.findall(r'tab-dates">([^<]+)<', h)]
+    out = []
+    for wk, span in enumerate(tabs, 1):
+        if not span or span[0] <= today.isoformat():
+            continue  # nur Wochen, die noch nicht begonnen haben
+        time.sleep(PAUSE)
+        hw = http(f"{PW}/{shop}?week={wk}") or ""
+        pages = sorted(set(re.findall(rf'data-json-url="(/images/prospekte/{re.escape(shop)}/week{wk}/(\d+)\.json)"', hw)), key=lambda x: int(x[1]))
+        log(f"  prospektewoche {shop} Woche {wk} ({span[0]} – {span[1]}): {len(pages)} Seiten")
+        for path, pg in pages:
+            time.sleep(PAUSE)
+            try:
+                items = json.loads(http(PW + path) or "{}").get("items") or []
+            except ValueError:
+                continue
+            for it in items:
+                title = clean_text((it.get("title") or "").replace("\xad", "")).strip(" ,")
+                desc = clean_text(it.get("subtitle") or "")
+                m = re.match(r"([A-ZÄÖÜ][a-zäöüß]+(?:\s[A-ZÄÖÜ][a-zäöüß]+)?):\s+(.+)", title)
+                if m and m.group(1) not in ("REWE",):
+                    title, desc = m.group(2), f"{m.group(1)}, {desc}".strip(", ")  # „Niederlande: Rispentomaten“
+                try:
+                    price = float(str(it.get("price") or "0").replace(",", "."))
+                    old = float(str(it.get("old_price") or "0").replace(",", ".")) or None
+                except ValueError:
+                    continue
+                up = str(it.get("unit_price") or "")
+                base = up if "=" in up else desc
+                img = it.get("image")
+                o = offer(store, title, price, desc=desc, old=old, base=base,
+                          img=f"{PW}/images/prospekte/{shop}/week{wk}/{img}" if img else None,
+                          start=span[0], end=span[1], src="prospektewoche.de", page=int(pg))
+                if o:
+                    o["pv"] = 1
+                    out.append(o)
+                    SEEN_NAMES.setdefault(title, o["img"])
+    log(f"  prospektewoche {shop}: {len(out)} Vorschau-Angebote")
+    return out
+
+
 def load(name, default):
     try:
         with open(os.path.join(DATA, name), encoding="utf-8") as f:
@@ -687,6 +749,25 @@ def merge(offers):
         if o.get("x") and not cur.get("x"):
             cur["x"] = o["x"]
     return list(by.values())
+
+
+def drop_previews(offers):
+    """Vorschau (pv) eines Markts komplett entfernen, sobald dessen echter Prospekt für dieselbe Woche da ist
+    (Kevins Wunsch: echte Daten sofort rein, Vorschau weg). Echt = mind. 10 Angebote ohne pv, die in derselben
+    Woche starten wie die Vorschau."""
+    out = offers
+    for s in {o["s"] for o in offers if o.get("pv")}:
+        froms = sorted(o["from"][:10] for o in offers if o["s"] == s and o.get("pv") and o.get("from"))
+        if not froms:
+            continue
+        start = dt.date.fromisoformat(froms[0])
+        lo, hi = (start - dt.timedelta(days=2)).isoformat(), (start + dt.timedelta(days=6)).isoformat()
+        real = sum(1 for o in offers if o["s"] == s and not o.get("pv") and lo <= (o.get("from") or "")[:10] <= hi)
+        if real >= 10:
+            n = sum(1 for o in out if o["s"] == s and o.get("pv"))
+            out = [o for o in out if not (o["s"] == s and o.get("pv"))]
+            log(f"  {s}: echter Prospekt ab {froms[0]} da ({real} Angebote) -> {n} Vorschau-Angebote entfernt")
+    return out
 
 
 def update_history(offers, today):
@@ -729,12 +810,12 @@ def update_names(offers, today):
 def main():
     today = dt.date.today().isoformat()
     offers = []
-    for name, fn in (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("kaufDA", fetch_kaufda)):
+    for name, fn in (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("kaufDA", fetch_kaufda), ("Rewe-Vorschau", fetch_prospektewoche)):
         try:
             offers += fn()
         except Exception as e:  # eine kaputte Quelle soll die anderen nicht stoppen
             log(f"  ! {name} fehlgeschlagen: {e!r}")
-    offers = merge(offers)
+    offers = drop_previews(merge(offers))
     # abgelaufene Angebote raus
     offers = [o for o in offers if not o.get("to") or o["to"] >= today]
     offers.sort(key=lambda o: (o["s"], o["c"], o["n"]))

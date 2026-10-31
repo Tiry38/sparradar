@@ -58,7 +58,7 @@ const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),saved:store.get("saved",[]),sheet:null,limit:60};
-let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {};
+let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
 // Einkaufstag: Samstag ab 22 Uhr und sonntags hat kein Markt mehr offen -> die Hauptseite zeigt schon die
@@ -330,7 +330,7 @@ async function load(){
     NAMES=Object.keys(nm||{});
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
-    RAW=o.offers.filter(x=>!x.to||x.to>=SHOP);OFFERS=RAW.map(checkDeal);PERK.clear();
+    RAW=o.offers.filter(x=>!x.to||x.to>=SHOP);OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
@@ -427,7 +427,7 @@ function card(o,bestIds){
   const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} ${cl.length===1?esc(cl[0]):"Mit Kombi"}<b>${eur(fin(o))}</b></div>${cl.length>1?`<div class="src">${cl.map(esc).join(" + ")}</div>`:""}</div>`:"";
   return `<article class="card" data-detail="${esc(o.id)}" tabindex="0" aria-label="${esc(o.n)}: Details anzeigen">${thumb(o)}
    <div class="body">
-   <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}${o.pv?' <em class="pvtag" title="Vorschau aus dem regionalen Prospekt">Vorschau</em>':""}</span>
+   <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}${o.pv?' <em class="pvtag" title="Vorschau – der Prospekt deines Markts ist noch nicht online">Vorschau</em>':""}</span>
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
@@ -445,6 +445,11 @@ function kracherBtn(){const k=ranked()[0];if(!k)return"";
    <span><span class="eyebrow">Kracher ${S.week?nextShort():"der Woche"}</span><span class="what" style="display:block">${esc(k.n)} bei ${esc(sname(k.s))}</span><span class="how" style="display:block">${comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).fresh?[ref(k)>fin(k)?"statt "+eur(ref(k)):"",validTxt(k)].filter(Boolean).join(" · "):verdict(k).l} · antippen für Details</span></span>
    <span class="big"><b>${eur(fin(k))}</b>${offPct(k)?`<span>−${offPct(k)} %</span>`:""}</span></button>`}
 
+// Märkte ohne Angebote in der gewählten Woche (z. B. Prospekt für nächste Woche noch nicht veröffentlicht)
+function missingHTML(){if(!(S.week||WEEKEND)||S.q.trim())return "";
+  const have=new Set(weekOffers().map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s));
+  if(!miss.length)return "";
+  return `<p class="catoff miss">Noch kein Prospekt ${S.week?"dafür":"für nächste Woche"} online: <b>${miss.map(s=>esc(sname(s))).join(", ")}</b>. Sobald er veröffentlicht ist, holt SparRadar ihn automatisch.</p>`}
 function renderOffers(){
   if(!OFFERS.length)return `<div class="empty"><b>Noch keine Angebote</b>Sobald der tägliche Abruf gelaufen ist, erscheinen hier die Angebote.</div>`;
   const r=filtered(),bestIds=new Set();
@@ -455,11 +460,12 @@ function renderOffers(){
   return `${kracherBtn()}
    ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
+   ${missingHTML()}
    ${S._catOff?`<p class="catoff">In „${esc(CATS[S.cat])}“ nichts gefunden – hier die Treffer aus allen Kategorien.</p>`:""}
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
    ${S.q.trim()?moreArticles(r):""}
-   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
+   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Ist der Prospekt deines Markts für nächste Woche noch nicht online, zeigt SparRadar eine „Vorschau“ (Edeka aus dem regionalen Prospekt bei kaufDA, Rewe aus dem allgemeinen Prospekt bei prospektewoche.de). Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
 
 // Suche: auch Artikel zeigen, die gerade nicht im Angebot sind, damit man sie auf die Merkliste setzen kann
 function moreArticles(shown){
@@ -567,7 +573,7 @@ function renderDetail(){
     <dl class="dfacts">
      <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(shopDay(o.from))+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
      <dt>Markt</dt><dd>${esc(sname(o.s))}</dd>
-     ${o.pv?`<dt>Vorschau</dt><dd>Aus dem ${esc(sname(o.s).split(" ")[0])}-Prospekt der Region für nächste Woche. Der Prospekt deines Markts ist noch nicht online – sobald er da ist, gleicht SparRadar automatisch ab. Einzelne Preise können abweichen.</dd>`:""}
+     ${o.pv?`<dt>Vorschau</dt><dd>Aus dem ${o.src==="prospektewoche.de"?"allgemeinen "+esc(sname(o.s).split(" ")[0])+"-Prospekt (prospektewoche.de)":esc(sname(o.s).split(" ")[0])+"-Prospekt der Region"} für nächste Woche. Der Prospekt deines Markts ist noch nicht online – sobald er da ist, gleicht SparRadar automatisch ab. Einzelne Preise können abweichen.</dd>`:""}
      ${o.pg?`<dt>Prospekt</dt><dd>Seite ${esc(o.pg)}</dd>`:""}
      ${o.cat?.length?`<dt>Kategorie</dt><dd>${o.cat.map(esc).join(" › ")}</dd>`:`<dt>Kategorie</dt><dd>${esc(CATS[o.c]||"")}</dd>`}
      <dt>Quelle</dt><dd>${esc(o.src||"")}</dd>
@@ -587,7 +593,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  52:["Samstag ab 22 Uhr und sonntags zeigt die Startseite automatisch schon die Angebote ab Montag – dann hat eh kein Markt mehr offen."],
+  53:["Rewe: Angebote der nächsten Woche als „Vorschau“ aus dem Rewe-Prospekt, sobald er veröffentlicht ist. Kommt der Prospekt deines Markts, ersetzt er die Vorschau sofort.","Einkaufszettel: abgelaufene Angebote verschwinden nicht mehr still, sondern stehen unter „Abgelaufen“ – mit Tausch-Knopf, wenn es den Artikel wieder gibt.","Fehlt ein Markt in der nächsten Woche, steht oben, dass sein Prospekt noch nicht online ist."],
+  52:["Samstag ab 22 Uhr und sonntags zeigt die ganze App automatisch schon die Angebote ab Montag – dann hat eh kein Markt mehr offen."],
   51:["Nächste Woche früher: Aldi-Angebote der kommenden Woche kommen jetzt direkt von den Aldi-Tagesseiten, Edeka als „Vorschau“ aus dem regionalen Prospekt, sobald es ihn gibt.","Ein Prospekt-Wächter schaut Do–So alle 2 Stunden nach neuen Prospekten aller Märkte."],
   50:["Vorschläge beim Tippen (Suche und Merkliste) zeigen jetzt kleine Produktbilder."],
   49:["Der Knopf „Demnächst“ heißt jetzt „Nächste Woche“ (bzw. „Ab Donnerstag“, wenn noch diese Woche etwas startet).","Neu: Angebote ohne „statt“-Preis zeigen jetzt ihren Vorteil – blau markiert: günstiger als zuletzt, Großpackung günstiger pro Kilo oder günstigster Markt.","Filter überarbeitet: Kategorien richten sich nur noch nach Artikelname, Marke und Warengruppe, nicht mehr nach der Beschreibung."],
@@ -713,8 +720,16 @@ function swapTips(items){
   if(!t.length)return "";
   return `<section class="panel swaps"><h3>Woanders günstiger</h3><p>Derselbe Artikel in gleicher Menge kostet bei einem anderen Markt weniger.</p>
    <div class="rows">${t.map(({o,x})=>`<div class="swap"><span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} ${eur(fin(o))} → ${esc(sname(x.s))} ${eur(fin(x))} · ${eur(fin(o)-fin(x))} weniger</small></span><button class="btn ghost sm" data-swap="${esc(o.id)}|${esc(x.id)}">Tauschen</button></div>`).join("")}</div></section>`}
+// Zettel-Einträge, deren Angebot abgelaufen ist: nicht still verschwinden lassen, sondern zeigen + neues Angebot vorschlagen
+function goneHTML(){const g=S.list.filter(id=>!byId(id)&&OLD.has(id)).map(id=>OLD.get(id));if(!g.length)return "";
+  const wo=weekOffers().filter(x=>!S.list.includes(x.id));
+  const alt=o=>{const k=tokKey(o),nn=norm(o.n),same=wo.filter(x=>tokKey(x)===k||(x.s===o.s&&norm(x.n)===nn)).sort((a,b)=>fin(a)-fin(b));
+    if(same.length)return same.find(x=>x.s===o.s)||same[0];const c=sameElsewhere(o,wo).sort((a,b)=>fin(a.x)-fin(b.x))[0];return c?c.x:null};
+  return `<section class="panel swaps gone"><h3>Abgelaufen</h3><p>Diese Angebote gelten nicht mehr.${g.some(alt)?" Wo es denselben Artikel wieder im Angebot gibt, kannst du ihn tauschen.":""}</p>
+   <div class="rows">${g.map(o=>{const x=alt(o);return `<div class="swap"><span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} ${eur(fin(o))} · abgelaufen am ${fmtDate(o.to)}${x?` → jetzt ${esc(sname(x.s))} ${eur(fin(x))}`:" · gerade nirgends im Angebot"}</small></span>${x?`<button class="btn ghost sm" data-swap="${esc(o.id)}|${esc(x.id)}">Tauschen</button>`:""}<button class="ibtn" data-add="${esc(o.id)}" aria-label="${esc(o.n)} entfernen">${IC.x}</button></div>`}).join("")}</div></section>`}
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;
+  if(!items.length&&!extra.length&&goneHTML())return `${savedHTML()}${goneHTML()}`;
   const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Eigener Eintrag, z. B. Brot, Eier, Spülmittel" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form>`;
   if(!items.length&&!extra.length)return `${addRow}${savedHTML()}<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder schreib oben selbst etwas dazu. SparRadar sortiert alles nach Markt.</div>`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
@@ -725,7 +740,7 @@ function renderList(){
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"nicht mehr abhaken":"abhaken"}"><i></i><span>${esc(name)}${label||""}</span></button><span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+fin(o),0),r=os.reduce((a,o)=>a+ref(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
-  return `${addRow}${savedHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} erledigt`:""}</div>
+  return `${addRow}${savedHTML()}${goneHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} erledigt`:""}</div>
    <div class="rhint">Tipp: Beim Einkaufen auf einen Artikel tippen, um ihn abzuhaken.</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>
      ${os.map(o=>line(o.id,o.n,eur(fin(o)),comboLabels(o).length?" *":"")).join("")}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
