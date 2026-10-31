@@ -351,6 +351,7 @@ def kd_page(url):
     KD_INFO[url] = {
         "brochures": _ids([br.get("viewer"), br.get("publisher")], set()) | {str((it.get("parentContent") or {}).get("id")) for it in items},
         "links": [l.get("link_href") for l in links if isinstance(l, dict) and l.get("link_href")],
+        "known": {(norm(it.get("title")), round(float((it.get("prices") or {}).get("mainPrice") or 0), 2)) for it in items},
     }
     return items, int(main.get("totalItems") or 0)
 
@@ -428,22 +429,21 @@ def fetch_kaufda():
         for a, b in (("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
             slug = slug.replace(a, b)  # kaufDA schreibt Umlaute aus: Käse -> Kaese
         pages.append(f"https://www.kaufda.de/{KD_CITY}/Angebote/{urllib.parse.quote(slug)}")
-    edeka_br = None
+    regional = {"rewe": [], "edeka": []}  # Angebote regionaler Händler aus Karlsruhe: erst prüfen, ob gleicher Prospekt
     for n, url in enumerate(pages, 1):
         items = kd_items(url)
-        if url not in KD_STORES.values() and edeka_br is None:
-            # Prospekte von Edeka Jockgrim (Edeka Südwest) – nur diese Edeka-Angebote aus Karlsruhe übernehmen
-            edeka_br = {b for b in KD_INFO.get(KD_STORES["edeka"], {}).get("brochures", set()) if b and b != "None"}
         for it in items:
-            if (edeka_br and KD_PUBLISHER.get(it.get("publisherName")) == "edeka"
-                    and str((it.get("parentContent") or {}).get("id")) not in edeka_br):
-                continue  # Edeka-Angebot aus einem anderen Regional-Prospekt
+            st = KD_PUBLISHER.get(it.get("publisherName"))
+            if url not in KD_STORES.values() and st in regional:
+                regional[st].append(it)
+                continue
             o = kd_offer(it)
             if o:
                 out.append(o)
         if n % 20 == 0:
             log(f"  kaufDA: {n}/{len(pages)} Seiten")
-    out += fetch_sortiment()
+    more, accepted = fetch_sortiment(regional)
+    out += more
     log("kaufDA:", len(out), "(vor Duplikat-Bereinigung)")
     return out
 
@@ -451,8 +451,8 @@ def fetch_kaufda():
 # kaufDA zeigt auf der Händlerseite nur 16 Angebote. Die öffentlichen Sortiment-Seiten
 # (kaufda.de/<Händler>/Sortiment/<Begriff>) zeigen je Begriff alle passenden Angebote des Händlers.
 # Sie sind bundesweit -> nur Angebote aus Prospekten behalten, die auch für Wörth/Jockgrim gelten.
-KD_SLUGS = {"lidl": ["Lidl"], "netto": ["Netto-Marken-Discount"], "rewe": ["REWE"], "edeka": ["Edeka", "EDEKA-Center"],
-            "dm": ["dm", "dm-drogerie"]}
+KD_SLUGS = {"lidl": ["Lidl"], "netto": ["Netto-Marken-Discount"], "rewe": ["REWE"], "edeka": ["Edeka"],
+            "dm": ["dm-drogerie-markt", "Dm"]}
 SORTIMENT = """Butter Milch Kaese Joghurt Quark Sahne Eier Mozzarella Margarine Pudding Skyr Frischkaese Gouda
 Hackfleisch Haehnchen Putenbrust Schweinefleisch Rindfleisch Steak Schnitzel Bratwurst Wuerstchen Salami Schinken Wurst Lachs Fisch Garnelen Thunfisch
 Obst Gemuese Tomaten Aepfel Bananen Kartoffeln Paprika Zwiebeln Salat Trauben Mandarinen Beeren Pilze
@@ -467,12 +467,24 @@ Kleidung Schuhe Jacke Socken Unterwaesche Bettwaesche Handtuch Kissen Decke Pfan
 Werkzeug Akkuschrauber Garten Pflanzen Blumen Grill Fahrrad Spielzeug Lego Fernseher Kopfhoerer Staubsauger Kaffeemaschine Kuechengeraete""".split()
 
 
-def fetch_sortiment():
-    out = []
+def same_flyer(items, known, base_ids):
+    """Welche Prospekte entsprechen dem lokalen Prospekt? Jeder Edeka-/Rewe-Markt hat eine eigene Prospekt-ID,
+    der Inhalt ist in der Region aber gleich. Ein Prospekt zählt als „unserer“, wenn er mindestens 2 Angebote
+    mit gleichem Artikel und gleichem Preis wie die lokale Händlerseite enthält."""
+    hits = {}
+    for it in items:
+        b = str((it.get("parentContent") or {}).get("id"))
+        key = (norm(it.get("title")), round(float((it.get("prices") or {}).get("mainPrice") or 0), 2))
+        if key in known:
+            hits[b] = hits.get(b, 0) + 1
+    return set(base_ids) | {b for b, n in hits.items() if n >= 2}
+
+
+def fetch_sortiment(regional=None):
+    regional = regional or {}
+    out, accepted = [], {}
     for store, slugs in KD_SLUGS.items():
         local = KD_INFO.get(KD_STORES.get(store), {})
-        # Rewe und Edeka haben regionale Prospekte -> nur die für Wörth/Jockgrim; Lidl, Netto, dm sind bundesweit gleich
-        allowed = {b for b in local.get("brochures", set()) if b and b != "None"} if store in ("rewe", "edeka") else set()
         terms = list(dict.fromkeys(SORTIMENT + [l.rstrip("/").split("/")[-1] for l in local.get("links", [])]))
         slug = None
         for sl in slugs:  # gibt es für diesen Händler Sortiment-Seiten?
@@ -480,25 +492,28 @@ def fetch_sortiment():
             if items or total:
                 slug = sl
                 break
-        if not slug:
-            log(f"  Sortiment {store}: keine Seiten")
-            continue
-        seen, kept, other = set(), 0, 0
-        for t in terms:
-            items, _ = kd_page(f"https://www.kaufda.de/{slug}/Sortiment/{urllib.parse.quote(t)}")
-            for it in items:
-                if it.get("id") in seen:
-                    continue
-                seen.add(it.get("id"))
-                if allowed and str((it.get("parentContent") or {}).get("id")) not in allowed:
-                    other += 1  # Prospekt aus einer anderen Region
-                    continue
-                o = kd_offer(it)
-                if o:
-                    out.append(o)
-                    kept += 1
-        log(f"  Sortiment {store}: {kept} Angebote ({other} aus anderen Regionen ausgelassen, {len(terms)} Begriffe)")
-    return out
+        found, seen = list(regional.get(store, [])), set()
+        if slug:
+            for t in terms:
+                items, _ = kd_page(f"https://www.kaufda.de/{slug}/Sortiment/{urllib.parse.quote(t)}")
+                found += items
+        found = [it for it in found if not (it.get("id") in seen or seen.add(it.get("id")))]
+        if store in ("rewe", "edeka"):
+            # regionale Händler: nur Prospekte mit gleichem Inhalt wie die lokale Händlerseite
+            base = {b for b in local.get("brochures", set()) if b and b != "None"}
+            ok = same_flyer(found, local.get("known", set()), base)
+            accepted[store] = ok
+            kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in ok]
+        else:
+            kept_items = found
+        n0 = len(out)
+        for it in kept_items:
+            o = kd_offer(it)
+            if o:
+                out.append(o)
+        log(f"  Sortiment {store}: {len(out) - n0} Angebote übernommen von {len(found)} gefundenen"
+            f" ({'keine Sortiment-Seiten, nur Stichwortseiten' if not slug else str(len(terms)) + ' Begriffe'})")
+    return out, accepted
 
 
 # ---------- Zusammenführen und Preisverlauf ----------
