@@ -100,6 +100,14 @@ def http(url, cookie=None):
         return None
 
 
+def clean_text(t):
+    """HTML-Reste entfernen, Leerraum zusammenfassen"""
+    t = re.sub(r"<br\s*/?>|</li>|</p>", ". ", str(t or ""), flags=re.I)
+    t = re.sub(r"<[^>]+>", " ", t)
+    t = t.replace("&nbsp;", " ").replace("&amp;", "&").replace("&quot;", '"')
+    return re.sub(r"\s+", " ", t).strip(" .")
+
+
 def norm(s):
     s = (s or "").lower()
     for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
@@ -140,7 +148,7 @@ def unit_price(text):
 
 
 def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=None, start=None, end=None,
-          app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None):
+          app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None, img_large=None, info=None, cats=None, page=None, images=None):
     title = re.sub(r"\s+", " ", (title or "").strip())
     if not title or ((not price or price <= 0) and not bonus_only):
         return None
@@ -150,7 +158,7 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         "s": store,
         "n": title,
         "b": (brand or "").strip() or None,
-        "d": re.sub(r"\s+", " ", (desc or "").strip())[:140],
+        "d": re.sub(r"\s+", " ", (desc or "").strip())[:300],
         "c": classify(title, " ".join([title, desc or "", cat_text, brand or ""]), food),
         "p": round(float(price), 2),
         "o": round(float(old), 2) if old and old > price else None,
@@ -163,6 +171,19 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         "src": src,
         "url": url,
     }
+    if img_large and img_large != img:
+        o["il"] = img_large       # großes Bild für die Detailansicht
+    ims = [u for u in dict.fromkeys(images or []) if isinstance(u, str) and u.startswith("http") and u not in (img, img_large)]
+    if ims:
+        o["ims"] = ims[:8]        # weitere Produktbilder
+    inf = clean_text(info)
+    if inf and inf != o["d"]:
+        o["inf"] = inf[:900]      # vollständige Beschreibung / Produktmerkmale
+    cl = [c for c in dict.fromkeys(cats or []) if isinstance(c, str) and c.strip()]
+    if cl:
+        o["cat"] = cl[:6]         # Kategorien laut Quelle
+    if page:
+        o["pg"] = page            # Seite im Prospekt
     if app_only:
         o["ao"] = app_only        # Preis gilt nur mit dieser App/Karte
     if bonus_only:
@@ -218,8 +239,18 @@ def fetch_lidl():
                       base=(bp.get("price"), (bp.get("unit") or "").lower()) if bp.get("price") else None,
                       img=g.get("image"), start=pr.get("startDate"), end=pr.get("endDate"), app=plus,
                       src="lidl.de", url="https://www.lidl.de" + (g.get("canonicalUrl") or ""), cat_text=text,
+                      info=" ".join(v for v in (kf.values() if isinstance(kf, dict) else []) if isinstance(v, str)),
+                      cats=[g.get("category")] if g.get("category") else None,
                       food=q == "&category.id=10068374")
             if o:
+                # weitere Produktbilder (Lidl liefert oft mehrere Ansichten)
+                more = []
+                for im in (g.get("imageList") or [])[:8]:
+                    u = im if isinstance(im, str) else (im or {}).get("image") or (im or {}).get("url") if isinstance(im, dict) else None
+                    if isinstance(u, str) and u.startswith("http") and u != o.get("img") and u not in more:
+                        more.append(u)
+                if more:
+                    o["ims"] = more
                 out.append(o)
     log("Lidl:", len(out))
     return out
@@ -263,15 +294,20 @@ def fetch_aldi():
         if pr.get("wasPriceDisplay"):
             mm = re.search(r"(\d+),(\d\d)", pr["wasPriceDisplay"])
             old = float(f"{mm.group(1)}.{mm.group(2)}") if mm else None
-        img = None
+        img = img_l = None
+        all_imgs = [a["url"].replace("{width}", "1200").replace("{slug}", it.get("urlSlugText") or "bild")
+                    for a in it.get("assets") or [] if isinstance(a, dict) and a.get("url")]
         for a in it.get("assets") or []:
             if isinstance(a, dict) and a.get("url"):
                 img = a["url"].replace("{width}", "500").replace("{slug}", it.get("urlSlugText") or "bild")
+                img_l = a["url"].replace("{width}", "1200").replace("{slug}", it.get("urlSlugText") or "bild")
                 break
         brand = it.get("brandName")
         o = offer("aldi", it.get("name"), amount / 100, brand=None if brand in ("BIO", "no-brand") else brand,
                   desc=it.get("sellingSize") or "", old=old, base=pr.get("comparisonDisplay"), img=img,
-                  start=it.get("onSaleDate"), src="aldi-sued.de",
+                  start=it.get("onSaleDate"), src="aldi-sued.de", img_large=img_l if img else None, images=all_imgs,
+                  info=" ".join(str(it.get(k)) for k in ("shortDescription", "description", "longDescription") if isinstance(it.get(k), str)),
+                  cats=[c.get("name") for c in it.get("categories") or [] if isinstance(c, dict)],
                   url=f"https://www.aldi-sued.de/de/produkt/{it.get('urlSlugText')}-{it.get('sku')}.html", cat_text=cats,
                   food=food_hint)
         if o:
@@ -370,10 +406,12 @@ def kd_offer(it):
             app = v
     imgs = ((it.get("offerImages") or {}).get("url") or {})
     return offer(store, it.get("title"), p, brand=it.get("brand"), desc=it.get("description") or "", old=old,
-                 base=pr.get("priceByBaseUnit"), img=imgs.get("normal") or imgs.get("large"),
+                 base=pr.get("priceByBaseUnit"), img=imgs.get("normal") or imgs.get("large"), img_large=imgs.get("large"),
                  start=it.get("validFrom"), end=it.get("validUntil"), app=app, extra=extra,
                  src="kaufda.de", cat_text=cat_names + " " + " ".join(it.get("categories") or []), food=food_hint,
-                 app_only=app_only, bonus_only=bonus_only)
+                 app_only=app_only, bonus_only=bonus_only, info=it.get("description"),
+                 cats=[n.get("name") for p in paths for n in p if isinstance(n, dict)][-3:] + list(it.get("categories") or []),
+                 page=((it.get("parentContent") or {}).get("page") or {}).get("number"))
 
 
 def fetch_kaufda():
@@ -489,7 +527,7 @@ def merge(offers):
             by[k] = o
             continue
         # das vollständigere Angebot behalten, fehlende Felder ergänzen
-        for f in ("b", "o", "gp", "img", "from", "to", "ap", "url"):
+        for f in ("b", "o", "gp", "img", "il", "ims", "inf", "cat", "pg", "from", "to", "ap", "ao", "url"):
             if not cur.get(f) and o.get(f):
                 cur[f] = o[f]
         if o.get("x") and not cur.get("x"):

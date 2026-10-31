@@ -303,11 +303,11 @@ function card(o,bestIds){
   const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o);
   // App-Preis direkt beim Preis: „Lidl Plus App-Preis 1,49 €“; mehrere Vorteile zusammen = „Mit Kombi“
   const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} ${cl.length===1?esc(cl[0]):"Mit Kombi"}<b>${eur(fin(o))}</b></div>${cl.length>1?`<div class="src">${cl.map(esc).join(" + ")}</div>`:""}</div>`:"";
-  return `<article class="card">${thumb(o)}
+  return `<article class="card" data-detail="${esc(o.id)}" tabindex="0" aria-label="${esc(o.n)}: Details anzeigen">${thumb(o)}
    <div class="body">
    <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}</span>
    ${o.manual?'<span class="manual">selbst eingetragen</span>':""}
-   <div class="name">${safeUrl(o.url)?`<a href="${esc(o.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(o.n)}</a>`:esc(o.n)}<small>${esc(o.d||"")}</small></div>
+   <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
      <div class="was">${o.o?`<s>statt ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
@@ -351,9 +351,50 @@ function moreArticles(shown){
    <div class="rows">${cand.slice(0,15).map(n=>{const on=S.watch.some(w=>norm(w.k)===norm(n));
     return `<div class="mrow"><span>${esc(n)}</span>${on?`<em>✓ auf der Merkliste</em>`:`<button class="btn ghost sm" data-watchname="${esc(n)}">${IC.star}Merken</button>`}</div>`}).join("")}</div></section>`}
 
+// ---------- Detailansicht eines Artikels ----------
+const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)))];
+function renderDetail(){
+  const o=byId(S.detail);if(!o)return `<div class="sheet"><div class="sheet-h"><h2>Artikel</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div><div class="empty"><b>Nicht mehr im Angebot</b></div></div>`;
+  const ims=dImages(o),cur=ims[Math.min(S.dImg||0,ims.length-1)],inL=S.list.includes(o.id),fav=S.watch.some(w=>norm(w.k)===norm(o.n)),vd=verdict(o),st=steps(o);
+  const hist=(HIST[o.s+"|"+norm(o.n).slice(0,40)]||[]).slice(-8).reverse();
+  const share=`${o.n}${o.b?" ("+o.b+")":""} bei ${sname(o.s)}: ${o.bo?eur(o.bo)+" Bonus":eur(fin(o))}${offPct(o)?` (−${offPct(o)} %)`:""}${validTxt(o)?", "+validTxt(o):""}\n\nGefunden mit SparRadar: ${APP_URL}`;
+  const link=safeUrl(o.url)||STORES[o.s]?.link||"";
+  return `<div class="sheet detail" role="dialog" aria-modal="true" aria-label="${esc(o.n)}">
+   <div class="sheet-h">${sb(o.s,true)}<h2>${esc(sname(o.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off">−${offPct(o)} %</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span>`:""}</div>
+   ${ims.length>1?`<div class="dthumbs">${ims.map((u,i)=>`<button data-dimg="${i}" aria-pressed="${u===cur}" aria-label="Bild ${i+1}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb="1"></button>`).join("")}</div>`:""}
+   <div class="dinfo">
+    ${o.b?`<span class="store">${esc(o.b)}</span>`:""}
+    <h3 class="dtitle">${esc(o.n)}</h3>
+    ${o.d?`<p class="dsub">${esc(o.d)}</p>`:""}
+    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
+    <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
+     <div>${ref(o)>fin(o)&&!o.bo?`<s>statt ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
+    ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
+    <dl class="dfacts">
+     <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(o.from)+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
+     <dt>Markt</dt><dd>${esc(sname(o.s))}</dd>
+     ${o.pg?`<dt>Prospekt</dt><dd>Seite ${esc(o.pg)}</dd>`:""}
+     ${o.cat?.length?`<dt>Kategorie</dt><dd>${o.cat.map(esc).join(" › ")}</dd>`:`<dt>Kategorie</dt><dd>${esc(CATS[o.c]||"")}</dd>`}
+     <dt>Quelle</dt><dd>${esc(o.src||"")}</dd>
+    </dl>
+    ${o.inf?`<div class="dtext"><h4>Beschreibung</h4><p>${esc(o.inf)}</p></div>`:""}
+    <div class="verdict ${vd.t}">${spark(o,90,24)}<span>${esc(vd.l)}</span></div>
+    ${hist.length?`<div class="dtext"><h4>Preisverlauf</h4><ul class="dhist">${hist.map(([d,p])=>`<li><span>${fmtDate(d)}</span><b>${eur(p)}</b></li>`).join("")}</ul></div>`:""}
+    <div class="dactions">
+     <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>
+     <button class="btn ghost" data-fav="${esc(o.id)}">${IC.star}${fav?"Gemerkt":"Merken"}</button>
+     <a class="btn wa" href="${waLink(share)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a>
+     ${link?`<a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">Beim Händler ansehen</a>`:""}
+    </div>
+   </div>
+  </div>`}
+function renderLightbox(){const u=S.lightbox;return u?`<div class="lightbox" id="lightbox" role="dialog" aria-label="Bild groß"><img src="${esc(u)}" alt="" referrerpolicy="no-referrer"><button class="ibtn lbclose" id="lbClose" aria-label="Schließen">${IC.x}</button></div>`:""}
+
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  35:["Jeden Artikel antippen: Detailansicht mit großem Bild, Beschreibung, Preisrechnung und Preisverlauf. Bild antippen zum Vergrößern."],
   34:["Angebote stehen immer nach dem stärksten Rabatt sortiert, auch bei der Suche.","Die Einstellungen findest du jetzt ganz unten im Tab „Coupons“."],
   32:["Viel mehr Angebote: Vorher fehlten bei jedem Markt viele Angebote (z. B. bei Lidl), jetzt kommen alle aus den Prospekten.","Lidl-Plus-Preise, App-Preise und Rewe-Bonus stehen direkt beim Angebot."],
   31:["Suche und Merkliste kennen jetzt zehntausende Artikel (z. B. alle Tassimo-Sorten) zum gezielten Merken.","Merkliste erkennt auch Prospekt-Angebote wie „Tassimo, versch. Sorten“."],
@@ -412,7 +453,7 @@ function renderKracher(){
   const rest=r.filter(o=>o!==k&&!top.includes(o)).slice(0,8-top.length);
   const lows=r.filter(o=>verdict(o).t==="low").slice(0,5),fakes=weekOffers().filter(o=>verdict(o).t==="fake").slice(0,5);
   const plan=weekPlan();
-  const drow=o=>`<div class="drow"><div class="mini" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}</div>
+  const drow=o=>`<div class="drow" data-detail="${esc(o.id)}"><div class="mini" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}</div>
     <div class="t">${esc(o.n)}<small>${esc(sname(o.s))}${o.b?" · "+esc(o.b):""} · ${esc(o.d||"")}</small><div class="pills">${offPct(o)?`<span class="pill of">−${offPct(o)} %</span>`:""}${steps(o).filter(s=>!["base","of"].includes(s.t)).map(s=>`<span class="pill ${s.t==="cb"?"cb":""}">${esc(s.l)}</span>`).join("")}</div></div>
     <div class="pr"><b>${eur(fin(o))}</b>${ref(o)>fin(o)?`<s>${eur(ref(o))}</s>`:""}</div></div>`;
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kracher">
@@ -622,13 +663,13 @@ function renderFilter(){
 // Zurück-Taste/-Wischgeste (Handy) und Browser-Zurück: schließt zuerst ein offenes Fenster,
 // dann geht es zurück zu „Angebote“, erst danach wird die App verlassen.
 let NAV=0,IGNORE_POP=0;
-function navSync(){const want=(S.tab!=="offers"?1:0)+(S.sheet?1:0);
+function navSync(){const want=(S.tab!=="offers"?1:0)+(S.sheet?1:0)+(S.lightbox?1:0);
   while(NAV<want){history.pushState({sr:NAV+1},"");NAV++}
   if(NAV>want){const n=NAV-want;NAV=want;IGNORE_POP++;history.go(-n)}}
 addEventListener("popstate",()=>{
   if(IGNORE_POP>0){IGNORE_POP--;return}
   NAV=Math.max(0,NAV-1);
-  if(S.sheet)S.sheet=null;else if(S.tab!=="offers"){S.tab="offers";scrollTo({top:0})}
+  if(S.lightbox)S.lightbox=null;else if(S.sheet)S.sheet=null;else if(S.tab!=="offers"){S.tab="offers";scrollTo({top:0})}
   render()});
 
 function render(){
@@ -653,18 +694,25 @@ function render(){
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
-  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,detail:renderDetail}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
+  let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
+  lbh.innerHTML=renderLightbox();
   navSync();
 }
 
 // kaputte Fotos durch Illustration ersetzen
-document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.dataset.logo){t.remove();return}if(t.tagName==="IMG"&&t.dataset.cat){t.outerHTML=ILL[t.dataset.cat]||ILL.sonstiges}},true);
+document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.dataset.logo){t.remove();return}
+  if(t.tagName==="IMG"&&t.dataset.thumb){t.closest("button")?.remove();return}if(t.tagName==="IMG"&&t.dataset.cat){t.outerHTML=ILL[t.dataset.cat]||ILL.sonstiges}},true);
 
 document.addEventListener("click",e=>{
   if(e.target.id==="sheet"){S.sheet=null;render();return}
+  if(e.target.closest("#lightbox")){S.lightbox=null;render();return}
   const b=e.target.closest("button");
   if(!e.target.closest(".sugg,#q,#kwIn"))hideSugg();
+  // Artikel antippen (nicht auf Knöpfe/Links) = Detailansicht
+  const det=!b&&!e.target.closest("a")&&e.target.closest("[data-detail]");
+  if(det){S.detail=det.dataset.detail;S.dImg=0;S.sheet="detail";render();return}
   if(!b)return;
   if(b.dataset.sugg==="q"){const v=b.dataset.v;S.q=v;document.getElementById("q").value=v;S.limit=60;hideSugg();S.tab="offers";render();return}
   if(b.dataset.sugg==="kw"){const v=b.dataset.v;document.getElementById("kwIn").value=v;hideSugg();document.getElementById("kwForm").requestSubmit();return}
@@ -673,6 +721,8 @@ document.addEventListener("click",e=>{
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
   if(b.id==="openFilter"){S.sheet="filter";render();return}
+  if(b.dataset.zoom){S.lightbox=b.dataset.zoom;render();return}
+  if(b.dataset.dimg!==undefined){S.dImg=+b.dataset.dimg;render();return}
   if(b.id==="openSettings"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="settingsBtn"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="reloadApp"){location.reload();return}
@@ -710,7 +760,8 @@ document.addEventListener("click",e=>{
   if(b.dataset.newsdone){S.sheet=null;if(b.dataset.newsdone==="watch")S.tab="watch";render();return}
 });
 function copy(txt,ok){const fail=()=>toast("Kopieren hat nicht geklappt. Bitte Text markieren und von Hand kopieren.");try{navigator.clipboard.writeText(txt).then(()=>toast(ok),fail)}catch(e){fail()}}
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.sheet){S.sheet=null;render()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.lightbox){S.lightbox=null;render()}else if(e.key==="Escape"&&S.sheet){S.sheet=null;render()}
+  if(e.key==="Enter"&&e.target.matches?.(".card[data-detail]")){S.detail=e.target.dataset.detail;S.dImg=0;S.sheet="detail";render()}});
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
