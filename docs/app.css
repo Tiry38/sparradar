@@ -120,3 +120,8 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 @media (hover:hover){.mtile:hover{transform:translateY(-2px)}}
 .sb{position:relative;overflow:hidden}
 .sb img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;padding:12%}
+/* Hinweis: neue App-/Programm-Version */
+#appUpd:empty{display:none}
+.appupd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--grad-brand);color:#fff;border-radius:14px;padding:10px 12px;font-size:.88rem;box-shadow:0 6px 18px rgba(30,122,71,.3)}
+.appupd span{flex:1 1 180px;min-width:0}
+.appupd .btn{background:#fff;color:#1C2023;box-shadow:none}

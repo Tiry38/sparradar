@@ -10,6 +10,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.provider.Settings;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -32,7 +33,7 @@ public class MainActivity extends Activity {
     // Updates der App selbst: der Build legt version.json und die APK in den Release "apps"
     private static final String REL = "https://github.com/Tiry38/sparradar/releases/download/apps/";
     private static final String ACTION_INSTALL_STATUS = "de.sparradar.app.INSTALL_STATUS";
-    private static final long CHECK_EVERY_MS = 6 * 60 * 60 * 1000;
+    private static final long CHECK_EVERY_MS = 10 * 60 * 1000; // beim Öffnen prüfen, höchstens alle 10 Minuten
 
     private WebView web;
     private long pausedAt = 0;
@@ -53,6 +54,16 @@ public class MainActivity extends Activity {
         s.setDatabaseEnabled(true);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setSupportMultipleWindows(false);
+        // Knopf „Nach App-Update suchen“ in der Web-App ruft SparRadarApp.checkUpdate() auf
+        web.addJavascriptInterface(new Object() {
+            @JavascriptInterface
+            public void checkUpdate() {
+                runOnUiThread(() -> {
+                    lastCheck = SystemClock.elapsedRealtime();
+                    checkForUpdate(true);
+                });
+            }
+        }, "SparRadarApp");
         // Versionsnummer für die Anzeige in den Einstellungen der Web-App
         s.setUserAgentString(s.getUserAgentString() + " SparRadarAndroid/" + installedVersion());
 
@@ -107,7 +118,7 @@ public class MainActivity extends Activity {
             else toast("Update abgebrochen: Installation wurde nicht erlaubt.");
         } else if (!updateRunning && (lastCheck == 0 || SystemClock.elapsedRealtime() - lastCheck > CHECK_EVERY_MS)) {
             lastCheck = SystemClock.elapsedRealtime();
-            checkForUpdate();
+            checkForUpdate(false);
         }
     }
 
@@ -132,16 +143,20 @@ public class MainActivity extends Activity {
     }
 
     /** Fragt im Hintergrund version.json ab, z. B. {"code":12}. Kein Netz = kein Hinweis. */
-    private void checkForUpdate() {
+    private void checkForUpdate(boolean manual) {
+        if (manual) toast("Suche nach Updates …");
         new Thread(() -> {
             try {
                 String json = new String(get(REL + "version.json"), "UTF-8");
                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"code\"\\s*:\\s*(\\d+)").matcher(json);
                 if (m.find() && Integer.parseInt(m.group(1)) > installedVersion()) {
                     runOnUiThread(this::askForUpdate);
+                } else if (manual) {
+                    runOnUiThread(() -> toast("Du hast schon die neueste App-Version."));
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
                 // offline oder Release noch ohne version.json
+                if (manual) runOnUiThread(() -> toast("Keine Verbindung. Bitte später noch einmal versuchen."));
             }
         }).start();
     }

@@ -60,7 +60,7 @@ const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   manual:store.get("manual",[]),coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),sheet:null,limit:60};
-let OFFERS = [], HIST = {}, META = {}, NAMES = [];
+let OFFERS = [], HIST = {}, META = {}, NAMES = [], APPV = {};
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
 
@@ -205,6 +205,7 @@ async function load(){
   try{
     const [o,h,nm]=await Promise.all([fetch("data/offers.json",{cache:"no-store"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({})),fetch("data/names.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({}))]);
     NAMES=Object.keys(nm||{});
+    fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
     OFFERS=o.offers.filter(x=>!x.to||x.to>=TODAY).concat(manualOffers());
     const g=new Date(o.generated);
@@ -484,13 +485,25 @@ function renderSettings(){
    <section class="panel"><h3>SparRadar als App</h3><p>Android: APK aufs Handy laden und öffnen. Windows: Setup starten. Beide aktualisieren sich danach selbst und zeigen immer die neueste Version.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
    <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen gegen 5:15 Uhr neu abgerufen${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
-    <div class="links"><button class="btn ghost sm" id="reloadApp">App neu laden</button></div></section>
+    <div class="links"><button class="btn ghost sm" id="reloadApp">App neu laden</button>${window.SparRadarApp?'<button class="btn ghost sm" id="appUpdNow">Nach App-Update suchen</button>':""}</div></section>
    <div class="verline">${versionText()} · <span id="verState">wird geprüft …</span></div>
   </div>`}
+// ---------- App-Update-Hinweis (Android-App / Windows-Programm) ----------
+const UA=navigator.userAgent, AND_V=+(UA.match(/SparRadarAndroid\/(\d+)/)||[])[1]||0;
+const IN_ANDROID_APP = !!AND_V || (/Android/.test(UA) && /; wv\)/.test(UA));   // auch alte App-Versionen ohne Versionsnummer
+const verCmp=(a,b)=>{const x=String(a).split(".").map(Number),y=String(b).split(".").map(Number);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)-(y[i]||0)}return 0};
+function appUpdateHTML(){
+  if(IN_ANDROID_APP&&APPV.code&&(!AND_V||AND_V<APPV.code))
+    return `<div class="appupd">${IC.bell}<span><b>Neue App-Version da.</b> Kurz aktualisieren, dann ist alles auf dem neuesten Stand.</span>${window.SparRadarApp?'<button class="btn sm" id="appUpdNow">Aktualisieren</button>':`<a class="btn sm" href="${APK_URL}">Aktualisieren</a>`}</div>`;
+  const w=window.__SR_DESKTOP__;
+  if(w&&APPV.desktop&&verCmp(w,APPV.desktop)<0)
+    return `<div class="appupd">${IC.bell}<span><b>Neue Programm-Version da.</b> SparRadar einmal schließen und wieder öffnen, dann aktualisiert es sich von selbst.</span></div>`;
+  return ""}
+
 // Versionsnummern: Web-App (app.js?v=) und, falls vorhanden, Android-App bzw. Windows-Programm
 function versionText(){
-  const a=navigator.userAgent.match(/SparRadarAndroid\/(\d+)/),w=window.__SR_DESKTOP__;
-  return `SparRadar Version ${MYV||"?"}${a?` · Android-App 1.${a[1]}`:""}${w?` · Windows-Programm ${esc(w)}`:""}`}
+  const w=window.__SR_DESKTOP__;
+  return `SparRadar Version ${MYV||"?"}${AND_V?` · Android-App 1.${AND_V}`:IN_ANDROID_APP?" · Android-App (ältere Version)":""}${w?` · Windows-Programm ${esc(w)}`:""}`}
 async function checkVersion(){const el=document.getElementById("verState");if(!el)return;
   try{const v=(await (await fetch("index.html",{cache:"no-store"})).text()).match(/app\.js\?v=(\d+)/)?.[1];
     el.innerHTML=v&&v!==MYV?`<b style="color:var(--alert)">neue Version ${v} da</b> – „App neu laden“ tippen`:`<b style="color:var(--save)">✓ neueste Version</b>`}
@@ -580,6 +593,7 @@ function render(){
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  document.getElementById("appUpd").innerHTML=appUpdateHTML();
   navSync();
 }
 
@@ -600,6 +614,7 @@ document.addEventListener("click",e=>{
   if(b.id==="openFilter"){S.sheet="filter";render();return}
   if(b.id==="settingsBtn"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="reloadApp"){location.reload();return}
+  if(b.id==="appUpdNow"){try{window.SparRadarApp.checkUpdate()}catch(e){location.href=APK_URL}return}
   if(b.id==="syncCopy"){copy(Sync.cfg().token,"Code kopiert. Jetzt an dich selbst schicken und auf dem anderen Gerät einfügen.");return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}

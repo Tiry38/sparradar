@@ -93,10 +93,13 @@ jobs:
     needs: [android, windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
+          path: dist
       - name: Zum Download bereitstellen
+        working-directory: dist
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -112,3 +115,14 @@ jobs:
           printf '{"code":%s,"desktop":"%s"}' "$(cat android-code.txt 2>/dev/null || echo 0)" "$(cat desktop-version.txt)" > version.json
           cat version.json
           gh release upload apps version.json --repo "$REPO" --clobber
+      - name: Versionsnummer für die Web-App veröffentlichen
+        # Die Web-App kann den Release wegen CORS nicht lesen, deshalb liegt die Nummer auch in docs/
+        run: |
+          cp dist/version.json docs/app-version.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/app-version.json
+          git diff --cached --quiet && exit 0
+          git commit -m "App-Version $(cat docs/app-version.json)"
+          for i in 1 2 3 4; do git pull --rebase -q origin main && git push -q origin HEAD:main && exit 0; sleep $((i*3)); done
+          exit 1
