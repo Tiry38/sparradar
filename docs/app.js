@@ -197,7 +197,10 @@ function verdict(o){const h=histOf(o);
 function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.length<2)return"";
   const mx=Math.max(...pts),mn=Math.min(...pts)*0.95,sx=w/(pts.length-1),y=v=>h-2-(v-mn)/(mx-mn||1)*(h-4);
   return `<svg width="${w}" height="${h}" viewBox="-3 -3 ${w+6} ${h+6}" aria-hidden="true"><polyline points="${pts.map((v,i)=>`${(i*sx).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" opacity=".55"/><circle cx="${w}" cy="${y(o.p).toFixed(1)}" r="3" fill="currentColor"/></svg>`}
-const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(o.img)}" alt="${esc(o.n)}" loading="lazy" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
+// Scharfe Bilder: kaufDA liefert unter derselben Adresse ohne „?impolicy=…“ die volle Auflösung,
+// Aldi in größerer Breite. Gilt auch für schon gespeicherte Angebote.
+const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails)$/,"").replace(/\/scaleWidth\/500\//,"/scaleWidth/1000/");
+const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
 function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off">−${offPct(o)} %</span>`:""}</div>`}
 
 // ---------- Daten ----------
@@ -352,7 +355,7 @@ function moreArticles(shown){
     return `<div class="mrow"><span>${esc(n)}</span>${on?`<em>✓ auf der Merkliste</em>`:`<button class="btn ghost sm" data-watchname="${esc(n)}">${IC.star}Merken</button>`}</div>`}).join("")}</div></section>`}
 
 // ---------- Detailansicht eines Artikels ----------
-const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)))];
+const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
 function renderDetail(){
   const o=byId(S.detail);if(!o)return `<div class="sheet"><div class="sheet-h"><h2>Artikel</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div><div class="empty"><b>Nicht mehr im Angebot</b></div></div>`;
   const ims=dImages(o),cur=ims[Math.min(S.dImg||0,ims.length-1)],inL=S.list.includes(o.id),fav=S.watch.some(w=>norm(w.k)===norm(o.n)),vd=verdict(o),st=steps(o);
@@ -394,6 +397,7 @@ function renderLightbox(){const u=S.lightbox;return u?`<div class="lightbox" id=
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  39:["Alle Produktbilder jetzt in voller Auflösung – scharf statt verpixelt."],
   38:["Neues Logo in Anthrazit und Grün – mit Prozentzeichen."],
   37:["Zurück-Taste: geht immer nur einen Schritt zurück, ganz am Ende fragt SparRadar, ob du die App schließen willst."],
   36:["SparRadar verschenken: schöne Einladung mit Logo per WhatsApp, Installation ohne Warnungen."],

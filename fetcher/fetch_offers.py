@@ -299,7 +299,7 @@ def fetch_aldi():
                     for a in it.get("assets") or [] if isinstance(a, dict) and a.get("url")]
         for a in it.get("assets") or []:
             if isinstance(a, dict) and a.get("url"):
-                img = a["url"].replace("{width}", "500").replace("{slug}", it.get("urlSlugText") or "bild")
+                img = a["url"].replace("{width}", "1000").replace("{slug}", it.get("urlSlugText") or "bild")
                 img_l = a["url"].replace("{width}", "1200").replace("{slug}", it.get("urlSlugText") or "bild")
                 break
         brand = it.get("brandName")
@@ -407,7 +407,7 @@ def kd_offer(it):
             app = v
     imgs = ((it.get("offerImages") or {}).get("url") or {})
     return offer(store, it.get("title"), p, brand=it.get("brand"), desc=it.get("description") or "", old=old,
-                 base=pr.get("priceByBaseUnit"), img=imgs.get("normal") or imgs.get("large"), img_large=imgs.get("large"),
+                 base=pr.get("priceByBaseUnit"), img=imgs.get("large") or imgs.get("normal"), img_large=imgs.get("large"),
                  start=it.get("validFrom"), end=it.get("validUntil"), app=app, extra=extra,
                  src="kaufda.de", cat_text=cat_names + " " + " ".join(it.get("categories") or []), food=food_hint,
                  app_only=app_only, bonus_only=bonus_only, info=it.get("description"),
