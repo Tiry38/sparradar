@@ -37,7 +37,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 | Markt | Quelle |
 |---|---|
 | Lidl | lidl.de Such-API (`fetchsize` max. 60, mit `offset` blättern) + kaufDA Händlerseite + kaufDA-Sortiment-Seiten |
-| Aldi Süd | aldi-sued.de/de/angebote.html, Daten aus `__NUXT_DATA__` |
+| Aldi Süd | aldi-sued.de/de/angebote.html + alle verlinkten **Tagesseiten** `/angebote/JJJJ-MM-TT` (dort steht die nächste Woche schon Tage vorher; robots.txt erlaubt es), Daten aus `__NUXT_DATA__` |
 | Rewe | kaufDA `Woerth-am-Rhein/REWE/p-r101` |
 | Netto Marken-Discount | kaufDA `Woerth-am-Rhein/Netto-Marken-Discount/p-r9` |
 | Edeka **Jockgrim** | kaufDA `Jockgrim/EDEKA/p-r107` + Sortiment-Seiten `Edeka/Sortiment/…` + Stichwortseiten Karlsruhe, nur Prospekte mit gleichem Inhalt wie Jockgrim (`same_flyer`). edeka.de sperrt automatische Abrufe (403). |

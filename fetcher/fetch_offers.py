@@ -349,20 +349,56 @@ def nuxt_resolve(data, i, depth=0):
     return v
 
 
-def fetch_aldi():
-    out = []
-    h = http("https://www.aldi-sued.de/de/angebote.html")
-    if not h:
-        return out
-    m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
+ALDI_DAY = re.compile(r'href="(?:https://www\.aldi-sued\.de)?(/(?:de/)?angebote/(20\d\d-\d\d-\d\d))(?:\.html)?"')
+
+
+def aldi_days(html):
+    """Tagesseiten mit Aktionen („/angebote/2026-11-02“) – darüber stehen auch die Angebote der nächsten Woche."""
+    return sorted({(m.group(2), m.group(1)) for m in ALDI_DAY.finditer(html or "")})
+
+
+def aldi_items(html, day=None):
+    m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', html or "", re.S)
     if not m:
-        log("  ! Aldi: keine Daten in der Seite gefunden")
-        return out
+        return []
     data = json.loads(m.group(1))
+    out = []
     for i, v in enumerate(data):
         if not (isinstance(v, dict) and "price" in v and "name" in v and "sku" in v):
             continue
         it = nuxt_resolve(data, i)
+        if day and not it.get("onSaleDate"):
+            it["onSaleDate"] = day  # Tagesseite: Starttag aus der Adresse
+        out.append(it)
+    return out
+
+
+def fetch_aldi():
+    out, seen = [], set()
+    h = http("https://www.aldi-sued.de/de/angebote.html")
+    if not h:
+        return out
+    items = aldi_items(h)
+    if not items:
+        log("  ! Aldi: keine Daten in der Seite gefunden")
+    # zusätzlich jede verlinkte Tagesseite, vor allem die künftigen (nächste Woche)
+    today = dt.date.today().isoformat()
+    for day, path in aldi_days(h):
+        if day < today:
+            continue
+        time.sleep(PAUSE)
+        got = []
+        for url in (f"https://www.aldi-sued.de{path}", f"https://www.aldi-sued.de/de/angebote/{day}.html"):
+            got = aldi_items(http(url), day)
+            if got:
+                break
+        log(f"  Aldi Tagesseite {day}: {len(got)} Artikel")
+        items += got
+    for it in items:
+        key = (it.get("sku"), str(it.get("onSaleDate"))[:10])
+        if key in seen:
+            continue
+        seen.add(key)
         pr = it.get("price") or {}
         amount = pr.get("amountRelevant") or pr.get("amount")
         if not amount:

@@ -44,6 +44,9 @@ def future_marks():
                 if pc:
                     marks[f"{store}:{pc}"] = start
     h = f.http("https://www.aldi-sued.de/de/angebote.html") or ""
+    for day, _ in f.aldi_days(h):  # Aldi-Tagesseiten der nächsten Woche (z. B. /angebote/2026-11-02)
+        if day > today:
+            marks[f"aldi:{day}"] = day
     m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
     if m:
         data = json.loads(m.group(1))
