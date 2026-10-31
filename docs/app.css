@@ -90,3 +90,19 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .mrow span{min-width:0;font-weight:600}
 .mrow em{flex:none;font-style:normal;font-size:.8rem;color:var(--save);font-weight:700}
 .newsico{width:38px;height:38px;border-radius:11px;background:var(--grad-brand,#7A3CF0);color:#fff;display:grid;place-items:center;flex:none}
+/* Zahnrad: dezent, öffnet die Einstellungen */
+.gearbtn{flex:none;width:36px;height:36px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--muted);display:grid;place-items:center;opacity:.7}
+.gearbtn:hover{opacity:1;background:var(--surface)}
+/* Einkaufszettel: abhaken und eigene Einträge */
+#extraForm{max-width:460px;width:100%;justify-self:center}
+.rline .rcheck{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;min-width:0;width:auto;height:auto;color:var(--fg)}
+.rline .rcheck i{flex:none;width:18px;height:18px;border:2px solid var(--muted);border-radius:5px;display:grid;place-items:center}
+.rline.done .rcheck i{background:var(--save);border-color:var(--save)}
+.rline.done .rcheck i::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
+.rline.done .rcheck span,.rline.done>span{text-decoration:line-through;color:var(--muted)}
+.rline .rcheck span{min-width:0;overflow-wrap:anywhere}
+.rs svg{width:16px;height:16px}
+.rhint{text-align:center;color:var(--muted);font-size:.72rem;margin:-8px 0 12px}
+.valid.last{color:var(--alert);font-weight:800}
+.totop{position:fixed;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:7;width:46px;height:46px;border-radius:50%;border:0;background:var(--grad-brand,#3552F5);color:#fff;display:grid;place-items:center;box-shadow:0 6px 20px rgba(53,82,245,.35)}
+@media (min-width:721px){.totop{bottom:24px}}

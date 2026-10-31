@@ -51,6 +51,7 @@ const IC = {
  chart:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
  scale:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M5 7h14M5 7l-3 7h6zM19 7l-3 7h6z"/></svg>',
  box:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m3 7 9-4 9 4v10l-9 4-9-4z"/><path d="m3 7 9 4 9-4M12 11v10"/></svg>',
+ gear:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>',
  bag:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M5 8h14l-1 13H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>'
 };
 
@@ -58,7 +59,7 @@ const IC = {
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
-  manual:store.get("manual",[]),coupons:store.get("coupons",[]),sheet:null,limit:60};
+  manual:store.get("manual",[]),coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),sheet:null,limit:60};
 let OFFERS = [], HIST = {}, META = {}, NAMES = [];
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
@@ -74,7 +75,7 @@ const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{wee
 const sb = (s,lg) => `<span class="sb${lg?" lg":""}" style="--c:${(STORES[s]||{}).c||"#888"}" aria-hidden="true">${(STORES[s]||{}).m||"?"}</span>`;
 const sname = s => (STORES[s]||{}).n || s;
 let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
-const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual);store.set("coupons",S.coupons);Sync.changed()};
+const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);Sync.changed()};
 
 // ---------- Geräte verbinden (Handy <-> PC) ----------
 // Merkliste, Einkaufszettel, Coupons und eigene Angebote liegen zusätzlich in einem geheimen Gist im
@@ -82,17 +83,19 @@ const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.s
 const Sync = {
   API:"https://api.github.com", FILE:"sparradar-sync.json", DESC:"SparRadar-Sync (Merkliste, Einkaufszettel, Coupons)",
   cfg(){return store.get("sync",null)}, timer:null, busy:false, status:"",
-  data(){return {watch:S.watch,list:S.list,manual:S.manual,coupons:S.coupons}},
+  data(){return {watch:S.watch,list:S.list,manual:S.manual,coupons:S.coupons,extra:S.extra,checked:S.checked}},
   snap(){return JSON.stringify(this.data())},
   async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
     if(r.status===401)throw new Error("Schlüssel ungültig oder abgelaufen");if(!r.ok)throw new Error("GitHub antwortet nicht ("+r.status+")");return r.json()},
-  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.manual=d.manual||[];S.coupons=d.coupons||[];
+  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.manual=d.manual||[];S.coupons=d.coupons||[];S.extra=d.extra||[];S.checked=d.checked||[];
+    store.set("extra",S.extra);store.set("checked",S.checked);
     store.set("watch2",S.watch);store.set("list",S.list);store.set("manual",S.manual);store.set("coupons",S.coupons);
     OFFERS=OFFERS.filter(o=>!o.manual).concat(manualOffers())},
   // beide Seiten geändert: nichts verlieren, alles zusammenführen
   merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
     return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
-      manual:u(a.manual||[],b.manual||[],m=>m.id),coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|"))}},
+      manual:u(a.manual||[],b.manual||[],m=>m.id),coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|")),
+      extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])]}},
   async connect(token){store.set("sync",{token});
     try{const gs=await this.req("/gists?per_page=100");let g=gs.find(x=>x.description===this.DESC&&x.files[this.FILE]);
       if(!g)g=await this.req("/gists",{method:"POST",body:JSON.stringify({description:this.DESC,public:false,files:{[this.FILE]:{content:JSON.stringify({updatedAt:Date.now(),data:this.data()})}}})});
@@ -164,7 +167,8 @@ function searchOffers(list,q){const t=q.trim().split(/\s+/).filter(Boolean);if(!
   if(!r.length)r=list.filter(o=>t.every(x=>matches(o,x)||hayD(o).includes(norm(x))));
   return r}
 const hitW = (o,w) => matches(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
-const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(o.from) : o.to ? "bis "+fmtDate(o.to) : "";
+const TOMORROW=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date(Date.now()+864e5));
+const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(o.from) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
 const tagHTML = v => {v=Math.max(v,0);const e=Math.floor(v+1e-9),c=Math.round((v-e)*100);return `<span class="eu">${e||"-"}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
 const comboLabels = o => steps(o).filter(s=>s.t!=="base"&&s.t!=="of").map(s=>s.l);
 function verdict(o){const h=histOf(o);
@@ -262,7 +266,8 @@ const APP_URL="https://tiry38.github.io/sparradar/",APK_URL="https://github.com/
 const waLink = t => "https://wa.me/?text="+encodeURIComponent(t);
 const SHARE_TXT = `Schau mal: SparRadar zeigt alle Angebote rund um Wörth am Rhein (Lidl, Aldi, Rewe, Netto, Edeka, dm) 🛒\n${APP_URL}\n\nAls Android-App zum Installieren:\n${APK_URL}`;
 function listText(){const items=S.list.map(byId).filter(Boolean),g={};items.forEach(o=>(g[o.s]=g[o.s]||[]).push(o));
-  return "🛒 Einkaufszettel\n\n"+Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${o.n}${o.d?" ("+o.d+")":""} ${eur(fin(o))}${comboLabels(o).length?" mit "+comboLabels(o).join(" + "):""}`).join("\n")).join("\n\n")}
+  const ex=S.extra.length?"\n\nSONSTIGES\n"+S.extra.map(x=>"- "+x.n).join("\n"):"";
+  return "🛒 Einkaufszettel\n\n"+Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${o.n}${o.d?" ("+o.d+")":""} ${eur(fin(o))}${comboLabels(o).length?" mit "+comboLabels(o).join(" + "):""}`).join("\n")).join("\n\n")+ex}
 const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
 
 // ---------- Ansichten ----------
@@ -278,7 +283,7 @@ function card(o,bestIds){
      <div class="was">${o.o?`<s>statt ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
    ${combo}
-   <div class="card-foot"><span class="valid">${validTxt(o)}</span>
+   <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}">${validTxt(o)}</span>
      <button class="ibtn" data-fav="${esc(o.id)}" aria-pressed="${fav}" aria-label="${fav?"Von Merkliste entfernen":"Auf Merkliste setzen"}" title="Merken">${IC.star}</button>
      <button class="ibtn add" data-add="${esc(o.id)}" aria-pressed="${inL}" aria-label="${inL?"Vom Einkaufszettel nehmen":"Auf den Einkaufszettel"}" title="Einkaufszettel">${inL?IC.check:IC.plus}</button></div>
    </div></article>`}
@@ -402,17 +407,24 @@ function renderWatch(){
    ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis.</div>'}`}
 
 function renderList(){
-  const items=S.list.map(byId).filter(Boolean);
-  if(!items.length)return `<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus oder übernimm im Kracher-Fenster deinen Wochenplan. SparRadar sortiert alles nach Markt.</div>`;
+  const items=S.list.map(byId).filter(Boolean),extra=S.extra;
+  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Eigener Eintrag, z. B. Brot, Eier, Spülmittel" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form>`;
+  if(!items.length&&!extra.length)return `${addRow}<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder schreib oben selbst etwas dazu. SparRadar sortiert alles nach Markt.</div>`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
-  const sum=items.reduce((a,o)=>a+fin(o),0),reg=items.reduce((a,o)=>a+ref(o),0);
+  const open=items.filter(o=>!S.checked.includes(o.id));
+  const sum=items.reduce((a,o)=>a+fin(o),0),reg=items.reduce((a,o)=>a+ref(o),0),rest=open.reduce((a,o)=>a+fin(o),0);
   const todo=[...new Set(items.flatMap(comboLabels))];
-  return `<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length} Märkte · ${items.length} Artikel</div>
+  const done=id=>S.checked.includes(id);
+  const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"nicht mehr abhaken":"abhaken"}"><i></i><span>${esc(name)}${label||""}</span></button><span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
+  const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
+  return `${addRow}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} erledigt`:""}</div>
+   <div class="rhint">Tipp: Beim Einkaufen auf einen Artikel tippen, um ihn abzuhaken.</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>
-     ${os.map(o=>`<div class="rline"><span>${esc(o.n)}${comboLabels(o).length?" *":""}</span><span>${eur(fin(o))}</span><button data-add="${esc(o.id)}" aria-label="${esc(o.n)} entfernen">${IC.x}</button></div>`).join("")}</div>`).join("")}
-   <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
+     ${os.map(o=>line(o.id,o.n,eur(fin(o)),comboLabels(o).length?" *":"")).join("")}</div>`).join("")}
+   ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${extra.map(x=>line(x.id,x.n,"")).join("")}</div>`:""}
+   ${items.length?`<div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>`:""}
    ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
-   <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button><button class="btn ghost" id="clearList">Zettel leeren</button></div>`}
+   <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>`}
 
 function renderCoupons(){
   const act=S.coupons.map((c,i)=>({c,i})).filter(x=>cpActive(x.c));
@@ -459,6 +471,19 @@ function renderShare(){
    <div class="links"><a class="btn wa" href="${waLink(SHARE_TXT)}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp teilen</a>${navigator.share?'<button class="btn ghost" id="shareOther">Anders teilen …</button>':""}</div>
   </section>`}
 
+// Verstecktes Einstellungs-Menü (Zahnrad oben): Teilen, Geräte verbinden, Apps, Infos
+function renderSettings(){
+  const g=META.generated?new Date(META.generated):null;
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Einstellungen">
+   <div class="sheet-h"><span class="newsico">${IC.gear}</span><h2>Einstellungen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   ${renderShare()}
+   ${renderSync()}
+   <section class="panel"><h3>SparRadar als App</h3><p>Android: APK aufs Handy laden und öffnen. Windows: Setup starten. Beide aktualisieren sich danach selbst und zeigen immer die neueste Version.</p>
+    <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
+   <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen gegen 5:15 Uhr neu abgerufen${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
+    <div class="links"><button class="btn ghost sm" id="reloadApp">App neu laden</button></div></section>
+  </div>`}
+
 function renderTips(){
   const T=[
    ["lidl","Lidl Plus","Personalisierte Coupons, günstigere App-Preise und Belohnungen ab einem bestimmten Monatseinkauf. Coupons vor dem Einkauf aktivieren."],
@@ -476,7 +501,7 @@ function renderTips(){
    [IC.scale,"Grundpreis zählt","Vergleiche immer den Preis pro kg oder l. Die Großpackung ist nicht automatisch günstiger."],
    [IC.cal,"Montag und Donnerstag","An diesen Tagen starten bei Lidl und Aldi die neuen Aktionen. Unter „Demnächst“ siehst du sie schon vorher."],
    [IC.bag,"Too Good To Go","Bäcker und Märkte geben abends übrig gebliebene Lebensmittel als Überraschungstüte ab, meist für etwa ein Drittel des Werts."]];
-  return `${renderCoupons()}${renderShare()}${renderSync()}
+  return `${renderCoupons()}
    <h3 class="sec-h">Spartipps</h3>
    <section class="panel"><h3>Geht „Extreme Couponing“ wie in den USA auch hier?</h3>
    <p>Nur teilweise. In Deutschland sind Coupons fast immer Händler-Coupons in Apps, oft auf ein Stück pro Einkauf begrenzt. Einen 200-€-Wagen für 0 € schaffst du hier nicht. Einzelne Artikel umsonst oder mit Plus gehen aber, wenn du Händler-App, Payback oder Rewe Bonus, Cashback-Apps und „Gratis testen“-Aktionen der Hersteller kombinierst.</p></section>
@@ -485,7 +510,6 @@ function renderTips(){
    <h3 class="sec-h">Apps und Programme deiner Märkte</h3>
    <div class="tips">${T.map(([s,prog,txt])=>`<div class="tip"><h4>${sb(s,true)}${esc(sname(s))}</h4><span class="prog">${prog}</span><p>${txt}</p><a href="${STORES[s].link}" target="_blank" rel="noopener" style="font-size:.84rem">Angebote ansehen</a></div>`).join("")}
    <div class="tip"><h4><span class="ico">${IC.layers}</span>Cashback-Apps</h4><span class="prog">Marktguru · Scondoo · Coupies</span><p>Geld zurück auf bestimmte Markenprodukte, egal in welchem Markt gekauft. Kassenbon fotografieren, das Geld kommt aufs Konto oder per PayPal.</p></div>
-   <div class="tip"><h4><span class="ico">${IC.box}</span>SparRadar als App</h4><span class="prog">Android · Windows</span><p>Zum Installieren: APK aufs Handy laden und öffnen, Setup.exe am PC starten. Beide zeigen immer diese aktuelle Version.</p><div class="links"><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-App.apk">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></div>
    <div class="tip"><h4><span class="ico">${IC.bag}</span>Too Good To Go</h4><span class="prog">Abends Essen retten</span><p>Standort Wörth am Rhein wählen und Bäcker und Märkte in der Nähe als Favoriten speichern.</p><a href="https://www.toogoodtogo.com/de" target="_blank" rel="noopener" style="font-size:.84rem">toogoodtogo.com</a></div></div>`}
 
 // Handy: Märkte, Kategorien und Sortierung aufgeräumt in einem Fenster statt drei langer Leisten
@@ -515,7 +539,8 @@ function render(){
   document.getElementById("wk0").setAttribute("aria-pressed",S.week===0);document.getElementById("wk1").setAttribute("aria-pressed",S.week===1);
   const hits=new Set(watchHits(null).flatMap(x=>x.hits.map(o=>o.id))).size;
   const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;
-  const lb=document.getElementById("listBadge");lb.textContent=S.list.length;lb.hidden=!S.list.length;
+  const ln=S.list.filter(id=>byId(id)&&!S.checked.includes(id)).length+S.extra.filter(x=>!S.checked.includes(x.id)).length;
+  const lb=document.getElementById("listBadge");lb.textContent=ln;lb.hidden=!ln;
   const nc=S.coupons.filter(cpActive).length,cb=document.getElementById("cpBadge");cb.textContent=nc;cb.hidden=!nc;
   const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
   document.getElementById("storeChips").innerHTML=`<button class="chip plain" data-store="" aria-pressed="${!S.stores.size}">Alle Märkte</button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="chip" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k)}${esc(STORES[k].n)}</button>`).join("");
@@ -528,7 +553,7 @@ function render(){
   document.getElementById("qclear").hidden=!S.q;
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
-  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=S.sheet==="add"?renderAdd():S.sheet==="filter"?renderFilter():S.sheet==="news"?renderNews():renderKracher();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
+  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
 }
 
 // kaputte Fotos durch Illustration ersetzen
@@ -546,6 +571,8 @@ document.addEventListener("click",e=>{
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
   if(b.id==="openFilter"){S.sheet="filter";render();return}
+  if(b.id==="settingsBtn"){S.sheet="settings";render();return}
+  if(b.id==="reloadApp"){location.reload();return}
   if(b.id==="syncCopy"){copy(Sync.cfg().token,"Code kopiert. Jetzt an dich selbst schicken und auf dem anderen Gerät einfügen.");return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
@@ -568,7 +595,11 @@ document.addEventListener("click",e=>{
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
-  if(b.id==="clearList"){S.list=[];save();render();return}
+  if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
+  if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
+  if(b.dataset.check){const id=b.dataset.check,i=S.checked.indexOf(id);if(i>=0)S.checked.splice(i,1);else S.checked.push(id);save();render();return}
+  if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
+  if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
   if(b.id==="shareOther"){navigator.share({title:"SparRadar",text:SHARE_TXT}).catch(()=>{});return}
   if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){S.watch.push({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
@@ -579,6 +610,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.sheet){S.sheet=nu
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
+  if(e.target.id==="extraForm"){e.preventDefault();const v=document.getElementById("extraIn").value.trim();if(v){S.extra.push({id:"x-"+Date.now(),n:v});save();render();document.getElementById("extraIn")?.focus()}return}
   if(e.target.id==="syncForm"){e.preventDefault();const t=document.getElementById("syncToken").value.trim();
     if(!/^(ghp_|github_pat_)/.test(t)){toast("Das sieht nicht wie ein GitHub-Schlüssel aus (beginnt mit ghp_).");return}
     toast("Verbinde …");Sync.connect(t).then(()=>{toast("Verbunden! Deine Listen sind jetzt auf allen Geräten gleich.");render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
@@ -614,6 +646,10 @@ applyZoom();
 document.getElementById("stand").addEventListener("click",e=>{if(e.target.id!=="flyerBtn")return;const i=document.getElementById("flyerInfo");i.hidden=!i.hidden;e.target.setAttribute("aria-expanded",!i.hidden)});
 document.getElementById("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
 load();
+// „Nach oben“-Knopf bei langen Listen
+const topBtn=document.createElement("button");topBtn.id="toTop";topBtn.className="totop";topBtn.hidden=true;topBtn.setAttribute("aria-label","Nach oben");
+topBtn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';
+document.body.appendChild(topBtn);addEventListener("scroll",()=>{topBtn.hidden=scrollY<900},{passive:true});
 
 // Bleibt die App lange offen (Windows-Fenster, Handy im Hintergrund): neue Version still neu laden,
 // neue Angebote nachladen. Nie mitten in einer Eingabe oder bei offenem Fenster.
