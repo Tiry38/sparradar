@@ -1,44 +1,49 @@
-"""Einmalige Diagnose: Wo stehen App-Preise (Lidl Plus, Rewe Bonus, Netto-App, Payback) in den Daten?
-Nur von Hand starten (Workflow „Diagnose“). Wenige Abrufe mit Pausen, ehrlicher User-Agent."""
+"""Einmalige Diagnose: Wie blättert kaufDA weiter? (Nur von Hand starten, wenige Abrufe.)"""
 import json
 import re
+import time
 
 import fetch_offers as f
 
-HINT = re.compile(r"plus|\bapp\b|bonus|payback|coupon|mitglied|vorteil", re.I)
+URL = f.KD_STORES["netto"]
 
 
-def kd(name, url, pages=4):
-    keys, pkeys, shown = set(), set(), 0
-    for page in range(1, pages + 1):
-        items, total = f.kd_page(url if page == 1 else f"{url}?page={page}")
-        for it in items:
-            keys |= set(it)
-            pkeys |= set(it.get("prices") or {})
-            txt = json.dumps({k: v for k, v in it.items() if k not in ("offerImages",)}, ensure_ascii=False)
-            if HINT.search(txt) and shown < 6:
-                shown += 1
-                print(f"  [{name}] {it.get('title')} | desc={it.get('description')!r}")
-                print("     prices=", json.dumps(it.get("prices"), ensure_ascii=False))
-                rest = {k: v for k, v in it.items() if k not in ("offerImages", "prices", "title", "description", "categoryPaths", "parentContent")}
-                print("     rest=", json.dumps(rest, ensure_ascii=False)[:900])
-    print(f"=== {name}: Felder={sorted(keys)}")
-    print(f"    Preis-Felder={sorted(pkeys)}")
+def ids(h):
+    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
+    if not m:
+        return set(), None, None
+    d = json.loads(m.group(1))
+    pi = d["props"]["pageProps"].get("pageInformation") or {}
+    main = (pi.get("offers") or {}).get("main") or {}
+    return {it.get("id") for it in main.get("items") or []}, main.get("totalItems"), d.get("buildId")
 
 
-def lidl():
-    raw = f.http("https://www.lidl.de/q/api/search?assortment=DE&locale=de_DE&version=2.1.0&store=1&category.id=10068374&fetchsize=60&offset=0")
-    d = json.loads(raw or "{}")
-    keys = set()
-    for it in d.get("items") or []:
-        g = (it.get("gridbox") or {}).get("data") or {}
-        keys |= set(g)
-        if g.get("lidlPlus"):
-            print("  [lidl.de] Lidl Plus:", g.get("fullTitle"), json.dumps(g.get("lidlPlus"), ensure_ascii=False)[:600], "| price=", json.dumps(g.get("price"), ensure_ascii=False)[:400])
-    print("=== lidl.de gridbox-Felder:", sorted(keys))
-
-
-if __name__ == "__main__":
-    for name, url in f.KD_STORES.items():
-        kd(name, url)
-    lidl()
+h1 = f.http(URL); time.sleep(2)
+a, total, build = ids(h1)
+h1b = f.http(URL); time.sleep(2)
+b, _, _ = ids(h1b)
+print("Seite 1 zweimal: gleiche Angebote?", a == b, len(a), "von", total, "buildId", build)
+for m in sorted(set(re.findall(r'<link[^>]+rel="(?:next|prev|canonical)"[^>]*>', h1 or "")))[:10]:
+    print("LINK", m)
+for m in sorted(set(re.findall(r'href="([^"]*(?:page|seite|offset|p=)[^"]*)"', h1 or "", re.I)))[:20]:
+    print("HREF", m)
+for m in sorted(set(re.findall(r'"(/api/[^"]{3,120})"', h1 or "")))[:20]:
+    print("API", m)
+for m in sorted(set(re.findall(r'(https?://[a-z0-9.-]*(?:bonial|kaufda)[a-z0-9.-]*/[^"\s]{0,80})', h1 or "")))[:40]:
+    if "content-media" not in m and ".jpg" not in m and ".png" not in m:
+        print("URL", m)
+for q in ("?page=2", "?offset=16", "?p=2", "?seite=2"):
+    hh = f.http(URL + q); time.sleep(2)
+    s, t, _ = ids(hh)
+    print(q, "->", len(s), "Angebote, neu gegenüber Seite 1:", len(s - a - b))
+if build:
+    path = URL.split("kaufda.de")[1]
+    for q in ("", "?page=2"):
+        raw = f.http(f"https://www.kaufda.de/_next/data/{build}/de-DE{path}.json{q}"); time.sleep(2)
+        try:
+            d = json.loads(raw or "")
+            main = d["pageProps"]["pageInformation"]["offers"]["main"]
+            s = {it.get("id") for it in main.get("items") or []}
+            print("_next/data", q, "->", len(s), "neu:", len(s - a - b), "Schlüssel:", [k for k in main if k != "items"])
+        except Exception as e:
+            print("_next/data", q, "->", repr(e)[:120])
