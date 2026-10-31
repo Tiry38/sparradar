@@ -2,12 +2,17 @@ package de.sparradar.app;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.PendingIntent;
+import android.app.DownloadManager;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageInstaller;
+import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.webkit.JavascriptInterface;
@@ -18,8 +23,8 @@ import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -32,7 +37,6 @@ public class MainActivity extends Activity {
 
     // Updates der App selbst: der Build legt version.json und die APK in den Release "apps"
     private static final String REL = "https://github.com/Tiry38/sparradar/releases/download/apps/";
-    private static final String ACTION_INSTALL_STATUS = "de.sparradar.app.INSTALL_STATUS";
     private static final long CHECK_EVERY_MS = 10 * 60 * 1000; // beim Öffnen prüfen, höchstens alle 10 Minuten
 
     private WebView web;
@@ -40,6 +44,29 @@ public class MainActivity extends Activity {
     private long lastCheck = 0;
     private boolean updateRunning = false;
     private boolean waitForPermission = false;
+    private long downloadId = -1;
+
+    /** Download fertig -> Androids eigene Installation öffnen („Aktualisieren?“) */
+    private final BroadcastReceiver downloadDone = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context c, Intent i) {
+            if (i.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -2) != downloadId) return;
+            updateRunning = false;
+            Uri apk = ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).getUriForDownloadedFile(downloadId);
+            if (apk == null) {
+                toast("Download hat nicht geklappt. Bitte später noch einmal versuchen.");
+                return;
+            }
+            Intent install = new Intent(Intent.ACTION_VIEW)
+                    .setDataAndType(apk, "application/vnd.android.package-archive")
+                    .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+            try {
+                startActivity(install);
+            } catch (Exception e) {
+                toast("Installation konnte nicht geöffnet werden. Bitte die Datei unter Downloads antippen.");
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +115,10 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
+
+        IntentFilter done = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(downloadDone, done, Context.RECEIVER_EXPORTED);
+        else registerReceiver(downloadDone, done);
 
         setContentView(web);
         if (savedInstanceState != null) {
@@ -155,7 +186,11 @@ public class MainActivity extends Activity {
             try {
                 String json = new String(get(REL + "version.json"), "UTF-8");
                 java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"code\"\\s*:\\s*(\\d+)").matcher(json);
-                if (m.find() && Integer.parseInt(m.group(1)) > installedVersion()) {
+                int latest = m.find() ? Integer.parseInt(m.group(1)) : 0;
+                SharedPreferences prefs = getSharedPreferences("sparradar", MODE_PRIVATE);
+                // automatisch nur einmal pro neuer Version fragen, über den Knopf in den Einstellungen immer
+                if (latest > installedVersion() && (manual || prefs.getInt("askedVersion", 0) < latest)) {
+                    prefs.edit().putInt("askedVersion", latest).apply();
                     runOnUiThread(this::askForUpdate);
                 } else if (manual) {
                     runOnUiThread(() -> toast("Du hast schon die neueste App-Version."));
@@ -195,49 +230,35 @@ public class MainActivity extends Activity {
         downloadAndInstall();
     }
 
+    /** Update über den Android-Download-Manager laden (Fortschritt in der Benachrichtigungsleiste). */
     private void downloadAndInstall() {
-        updateRunning = true;
-        toast("Update wird geladen …");
-        new Thread(() -> {
-            try {
-                byte[] apk = get(REL + "SparRadar.apk");
-                PackageInstaller pi = getPackageManager().getPackageInstaller();
-                PackageInstaller.SessionParams params = new PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL);
-                params.setAppPackageName(getPackageName());
-                int id = pi.createSession(params);
-                try (PackageInstaller.Session session = pi.openSession(id)) {
-                    try (OutputStream out = session.openWrite("sparradar.apk", 0, apk.length)) {
-                        out.write(apk);
-                        session.fsync(out);
-                    }
-                    Intent status = new Intent(this, MainActivity.class).setAction(ACTION_INSTALL_STATUS);
-                    PendingIntent p = PendingIntent.getActivity(this, 0, status,
-                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_MUTABLE);
-                    session.commit(p.getIntentSender());
-                }
-            } catch (Exception e) {
-                updateRunning = false;
-                runOnUiThread(() -> toast("Update hat nicht geklappt. Bitte später noch einmal versuchen."));
-            }
-        }).start();
-    }
-
-    /** Rückmeldung von Android zur Installation (Activity läuft als singleTask). */
-    @Override
-    protected void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        if (!ACTION_INSTALL_STATUS.equals(intent.getAction())) return;
-        int st = intent.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
-        if (st == PackageInstaller.STATUS_PENDING_USER_ACTION) {
-            @SuppressWarnings("deprecation")
-            Intent confirm = intent.getParcelableExtra(Intent.EXTRA_INTENT);
-            if (confirm != null) startActivity(confirm); // Androids eigene Sicherheitsabfrage
-            return;
-        }
-        updateRunning = false;
-        if (st != PackageInstaller.STATUS_SUCCESS && st != PackageInstaller.STATUS_FAILURE_ABORTED) {
+        try {
+            File dir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS);
+            File old = new File(dir, "SparRadar-Update.apk");
+            if (old.exists()) old.delete();
+            DownloadManager.Request r = new DownloadManager.Request(Uri.parse(REL + "SparRadar.apk"))
+                    .setTitle("SparRadar-Update")
+                    .setDescription("Neue Version wird geladen")
+                    .setMimeType("application/vnd.android.package-archive")
+                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                    .setDestinationInExternalFilesDir(this, Environment.DIRECTORY_DOWNLOADS, "SparRadar-Update.apk");
+            downloadId = ((DownloadManager) getSystemService(DOWNLOAD_SERVICE)).enqueue(r);
+            updateRunning = true;
+            toast("Update wird geladen … gleich fragt Android „Aktualisieren?“ – einfach bestätigen.");
+        } catch (Exception e) {
+            updateRunning = false;
             toast("Update hat nicht geklappt. Bitte später noch einmal versuchen.");
         }
+    }
+
+    @Override
+    protected void onDestroy() {
+        try {
+            unregisterReceiver(downloadDone);
+        } catch (Exception ignored) {
+            // war nicht registriert
+        }
+        super.onDestroy();
     }
 
     private static byte[] get(String url) throws Exception {
