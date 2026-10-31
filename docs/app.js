@@ -208,7 +208,8 @@ function filtered(){
   if(S.cat)r=r.filter(o=>o.c===S.cat);
   const qt=S.q.trim().split(/\s+/).filter(Boolean);if(qt.length)r=searchOffers(r,S.q);
   const f0={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
-  const f=qt.length?(a,b)=>relevance(a,qt)-relevance(b,qt)||f0(a,b):f0;
+  // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
+  const f=qt.length?(a,b)=>f0(a,b)||relevance(a,qt)-relevance(b,qt):f0;
   return r.sort(f)}
 const score = o => {const v=verdict(o).t;return offPct(o)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
@@ -353,7 +354,7 @@ function moreArticles(shown){
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  33:["Die Einstellungen findest du jetzt ganz unten im Tab „Coupons“."],
+  34:["Angebote stehen immer nach dem stärksten Rabatt sortiert, auch bei der Suche.","Die Einstellungen findest du jetzt ganz unten im Tab „Coupons“."],
   32:["Viel mehr Angebote: Vorher fehlten bei jedem Markt viele Angebote (z. B. bei Lidl), jetzt kommen alle aus den Prospekten.","Lidl-Plus-Preise, App-Preise und Rewe-Bonus stehen direkt beim Angebot."],
   31:["Suche und Merkliste kennen jetzt zehntausende Artikel (z. B. alle Tassimo-Sorten) zum gezielten Merken.","Merkliste erkennt auch Prospekt-Angebote wie „Tassimo, versch. Sorten“."],
   30:["Keine Update-Hinweise für die Android-App mehr: Neuigkeiten kommen ab jetzt immer automatisch, ohne Installieren."],
