@@ -397,7 +397,8 @@ function renderLightbox(){const u=S.lightbox;return u?`<div class="lightbox" id=
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  39:["Alle Produktbilder jetzt in voller Auflösung – scharf statt verpixelt."],
+  41:["Update-Fenster sieht sauber aus, Bilder schärfer."],
+  40:["Alle Produktbilder jetzt in voller Auflösung – scharf statt verpixelt.","Grüne Umrandung der Markt-Kacheln nicht mehr abgeschnitten."],
   38:["Neues Logo in Anthrazit und Grün – mit Prozentzeichen."],
   37:["Zurück-Taste: geht immer nur einen Schritt zurück, ganz am Ende fragt SparRadar, ob du die App schließen willst."],
   36:["SparRadar verschenken: schöne Einladung mit Logo per WhatsApp, Installation ohne Warnungen."],
@@ -420,7 +421,10 @@ function checkWhatsNew(){
   if(last==null&&!WAS_USER){store.set("seenVersion",MYV);return}
   if(S.sheet)return;
   if(String(last)===String(MYV))return;
-  S.whatsNew=Object.keys(CHANGES).map(Number).filter(v=>v>(+last||0)&&v<=+MYV).sort((a,b)=>b-a).flatMap(v=>CHANGES[v]).slice(0,7);
+  const vs=Object.keys(CHANGES).map(Number).sort((a,b)=>b-a);
+  let pick=vs.filter(v=>v>(+last||0)&&v<=+MYV);
+  if(!pick.length)pick=vs.filter(v=>v<=+MYV).slice(0,1);
+  S.whatsNew=pick.flatMap(v=>CHANGES[v]).slice(0,7);
   store.set("seenVersion",MYV);S.sheet="whatsnew";render()}
 function renderWhatsNew(){const n=S.whatsNew||[];
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="SparRadar wurde aktualisiert">

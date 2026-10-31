@@ -1,35 +1,42 @@
-"""Einmalige Diagnose: dm-Produktsuche – wie findet man alle Aktionen? (Nur von Hand, wenige Abrufe.)"""
+"""Einmalige Diagnose: Welche Bildgrößen liefert kaufDA (bonial) wirklich? (Nur von Hand, wenige Abrufe.)"""
 import json
-import time
+import struct
+import urllib.request
 
-import fetch_offers as f
-
-B = "https://product-search.services.dmtech.com/de/search"
+UA = "SparRadar/1.0 (private Angebotsuebersicht; 1 Abruf pro Tag)"
 
 
-def get(q):
-    raw = f.http(B + q)
-    time.sleep(2)
+def size(url):
     try:
-        return json.loads(raw or "")
-    except ValueError:
-        print("kein JSON für", q)
-        return {}
+        with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": UA}), timeout=30) as r:
+            data = r.read()
+            ct = r.headers.get("Content-Type")
+    except Exception as e:
+        return f"FEHLER {e}"
+    w = h = None
+    if data[:8] == b"\x89PNG\r\n\x1a\n":
+        w, h = struct.unpack(">II", data[16:24])
+    else:  # JPEG: SOF-Marker suchen
+        i = 2
+        while i < len(data) - 9:
+            if data[i] != 0xFF:
+                i += 1
+                continue
+            m = data[i + 1]
+            if m in (0xC0, 0xC1, 0xC2):
+                h, w = struct.unpack(">HH", data[i + 5:i + 9])
+                break
+            i += 2 + struct.unpack(">H", data[i + 2:i + 4])[0]
+    return f"{len(data) // 1024} KB, {w}x{h}, {ct}"
 
 
-f.log("robots:", (f.http("https://product-search.services.dmtech.com/robots.txt") or "")[:300])
-d = get("?query=&pageSize=60&currentPage=0")
-print("Schlüssel:", [k for k in d if k != "products"], {k: v for k, v in d.items() if not isinstance(v, (list, dict))})
-for fa in d.get("facets") or []:
-    vals = fa.get("values") or fa.get("facetValues") or []
-    print("FACET", fa.get("name") or fa.get("id") or fa.get("key"), "|", json.dumps(fa, ensure_ascii=False)[:300])
-print("Produkt-Felder:", sorted((d.get("products") or [{}])[0].keys()))
-p0 = (d.get("products") or [{}])[0]
-print("Beispiel tileData.price:", json.dumps((p0.get("tileData") or {}).get("price"), ensure_ascii=False)[:500])
-print("Beispiel sonst:", json.dumps({k: v for k, v in p0.items() if k not in ("tileData",)}, ensure_ascii=False)[:800])
-for q in ("?query=&pageSize=60&currentPage=0&isNew=false&type=search&promotion=true",
-          "?query=angebot&pageSize=60&currentPage=0", "?query=kaffee&pageSize=60&currentPage=0"):
-    dd = get(q)
-    ps = dd.get("products") or []
-    red = sum(1 for p in ps if (((p.get("tileData") or {}).get("price") or {}).get("price") or {}).get("previous"))
-    print(q, "->", len(ps), "Produkte, davon reduziert:", red, {k: v for k, v in dd.items() if not isinstance(v, (list, dict))})
+offers = json.load(open("../docs/data/offers.json"))["offers"]
+pick = [o for o in offers if "palmolive" in ((o.get("b") or "") + o["n"]).lower()][:1]
+pick += [o for o in offers if o["s"] == "lidl" and "bonial" in (o.get("img") or "")][:1]
+pick += [o for o in offers if o["s"] == "rewe" and "bonial" in (o.get("img") or "")][:1]
+for o in pick:
+    base = (o.get("il") or o.get("img")).split("?")[0]
+    print("\n===", o["s"], o["n"])
+    for q in ("?impolicy=SEO-offer-normal", "", "?impolicy=SEO-offer-large", "?impolicy=SEO-offer-zoom",
+              "?impolicy=zoomlarge", "?width=1500", "?impolicy=original"):
+        print(f"  {q or '(ohne)':32s} {size(base + q)}")
