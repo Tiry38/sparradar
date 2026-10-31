@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Preisschild aus docs/icon.svg, auf die sichere Zone des Android-Symbols verkleinert -->
+<!-- Preisschild aus docs/icon.svg (weiß), auf die sichere Zone des Android-Symbols verkleinert -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
@@ -14,11 +14,11 @@
         <path
             android:pathData="M411,286L286,411a40,40 0,0 1,-56 0L96,277V96h181l134,134a40,40 0,0 1,0 56Z"
             android:strokeWidth="40"
-            android:strokeColor="#141726"
+            android:strokeColor="#FFFFFF"
             android:strokeLineCap="round"
             android:strokeLineJoin="round" />
         <path
-            android:fillColor="#141726"
+            android:fillColor="#FFFFFF"
             android:pathData="M154,176a22,22 0,1 0,44 0a22,22 0,1 0,-44 0Z" />
     </group>
 </vector>

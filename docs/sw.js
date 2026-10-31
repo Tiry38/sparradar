@@ -1,5 +1,5 @@
 // SparRadar Service Worker: App offline verfügbar, Angebote immer frisch (Netz zuerst, sonst Cache)
-const CACHE = "sparradar-v2";
+const CACHE = "sparradar-v3";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", e => {

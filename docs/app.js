@@ -394,6 +394,8 @@ function renderLightbox(){const u=S.lightbox;return u?`<div class="lightbox" id=
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  38:["Neues Logo in Anthrazit und Grün."],
+  37:["Zurück-Taste: geht immer nur einen Schritt zurück, ganz am Ende fragt SparRadar, ob du die App schließen willst."],
   36:["SparRadar verschenken: schöne Einladung mit Logo per WhatsApp, Installation ohne Warnungen."],
   35:["Jeden Artikel antippen: Detailansicht mit großem Bild, Beschreibung, Preisrechnung und Preisverlauf. Bild antippen zum Vergrößern."],
   34:["Angebote stehen immer nach dem stärksten Rabatt sortiert, auch bei der Suche.","Die Einstellungen findest du jetzt ganz unten im Tab „Coupons“."],
@@ -572,11 +574,11 @@ function renderSync(){
 // Einladung: schöne Landingpage (einladung.html) mit Logo-Vorschau in WhatsApp; Name steht nur im Link
 const inviteUrl = () => { const n=(store.get("inviteName","")||"").trim(); return APP_URL+"einladung.html"+(n?"?von="+encodeURIComponent(n):""); };
 const inviteText = () => { const n=(store.get("inviteName","")||"").trim();
-  return `🎁 Persönliche Einladung${n?" von "+n:""}\n\nIch habe dich für SparRadar ausgewählt – meine Spar-App mit allen Angeboten von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth.\n\n👉 Einfach antippen und installieren:\n${inviteUrl()}`; };
+  return `🎁 Persönliche Einladung${n?" von "+n:""}\n\nIch habe dich für SparRadar ausgewählt – meine Spar-App mit allen Angeboten von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth.\n\n👉 So einfach geht's:\n1. Link antippen\n2. „SparRadar installieren“ drücken\n3. Mit „Installieren“ bestätigen – fertig!\n\nKeine Warnung, nichts zu deaktivieren.\n${inviteUrl()}`; };
 function renderShare(){
   const n=store.get("inviteName","");
   return `<section class="panel invite" id="sharePanel">
-   <div class="inv-head"><span class="inv-logo" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#16191C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="#16191C"/></svg></span>
+   <div class="inv-head"><span class="inv-logo" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="#FFFFFF"/></svg></span>
     <div><span class="inv-badge">🎁 PERSÖNLICHE EINLADUNG</span><h3>SparRadar verschenken</h3></div></div>
    <p>Lade Familie und Freunde ein. Sie bekommen eine Einladung mit Logo, tippen auf <b>„SparRadar installieren“</b> und haben die App auf dem Startbildschirm – ohne Warnungen, mit automatischen Updates.</p>
    <label class="inv-name">Dein Name auf der Einladung<input id="inviteName" value="${esc(n)}" placeholder="z. B. Kevin" maxlength="30" autocomplete="off"></label>
@@ -677,9 +679,23 @@ function navSync(){const want=(S.tab!=="offers"?1:0)+(S.sheet?1:0)+(S.lightbox?1
   if(NAV>want){const n=NAV-want;NAV=want;IGNORE_POP++;history.go(-n)}}
 addEventListener("popstate",()=>{
   if(IGNORE_POP>0){IGNORE_POP--;return}
+  if(NAV===0){askExit();return}   // ganz am Anfang angekommen: fragen, ob die App geschlossen werden soll
   NAV=Math.max(0,NAV-1);
   if(S.lightbox)S.lightbox=null;else if(S.sheet)S.sheet=null;else if(S.tab!=="offers"){S.tab="offers";scrollTo({top:0})}
   render()});
+
+// Schutz-Eintrag im Verlauf: das letzte „Zurück“ landet hier und fragt nach, statt die App sofort zu schließen
+function askExit(){
+  let el=document.getElementById("exitAsk");
+  if(!el){el=document.createElement("div");el.id="exitAsk";el.className="exitask";document.body.appendChild(el)}
+  el.innerHTML=`<div class="exitbox" role="alertdialog" aria-label="App schließen?"><span class="newsico">${IC.x}</span><h3>SparRadar wirklich schließen?</h3>
+   <div class="factions"><button class="btn ghost" id="exitNo">Nein</button><button class="btn" id="exitYes">Ja, schließen</button></div></div>`;
+  el.hidden=false}
+function closeExit(stay){const el=document.getElementById("exitAsk");if(el)el.hidden=true;
+  if(stay){history.pushState({sr:"guard"},"");return}
+  if(window.SparRadarApp?.exitApp){window.SparRadarApp.exitApp();return}   // Android-App
+  try{window.close()}catch(e){}
+  setTimeout(()=>{history.back();toast("Zum Schließen jetzt noch einmal Zurück tippen.")},150)}
 
 function render(){
   document.getElementById("filters").hidden=S.tab!=="offers";
@@ -716,6 +732,8 @@ document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.d
 
 document.addEventListener("click",e=>{
   if(e.target.id==="sheet"){S.sheet=null;render();return}
+  if(e.target.id==="exitNo"||e.target.id==="exitAsk"){closeExit(true);return}
+  if(e.target.id==="exitYes"){closeExit(false);return}
   if(e.target.closest("#lightbox")){S.lightbox=null;render();return}
   const b=e.target.closest("button");
   if(!e.target.closest(".sugg,#q,#kwIn"))hideSugg();
@@ -820,6 +838,7 @@ applyZoom();
 document.getElementById("stand").addEventListener("click",e=>{if(e.target.id!=="flyerBtn")return;const i=document.getElementById("flyerInfo");i.hidden=!i.hidden;e.target.setAttribute("aria-expanded",!i.hidden)});
 document.getElementById("sort").addEventListener("change",e=>{S.sort=e.target.value;render()});
 load();
+history.pushState({sr:"guard"},"");   // Schutz-Eintrag für die Frage „wirklich schließen?“
 // „Nach oben“-Knopf bei langen Listen
 const topBtn=document.createElement("button");topBtn.id="toTop";topBtn.className="totop";topBtn.hidden=true;topBtn.setAttribute("aria-label","Nach oben");
 topBtn.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m6 15 6-6 6 6"/></svg>';

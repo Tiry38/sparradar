@@ -30,7 +30,7 @@
   .card{width:100%;max-width:440px;min-width:0;display:grid;gap:18px;text-align:center}
   body{overflow-x:hidden}
   h1,.from{overflow-wrap:anywhere}
-  .logo{width:116px;height:116px;margin:0 auto;border-radius:30px;background:var(--grad-sun);display:grid;place-items:center;box-shadow:0 18px 44px rgba(255,138,31,.4);transform:rotate(-6deg)}
+  .logo{width:116px;height:116px;margin:0 auto;border-radius:30px;background:linear-gradient(135deg,#2B3034 0%,#2E3A35 38%,#1E9E5A 62%,#2BD46E 100%);display:grid;place-items:center;box-shadow:0 18px 44px rgba(30,158,90,.45);transform:rotate(-6deg)}
   .badge{justify-self:center;background:var(--grad-sun);color:#16191C;font-weight:800;letter-spacing:.12em;font-size:.78rem;border-radius:999px;padding:6px 14px}
   h1{font-family:"Bricolage Grotesque",sans-serif;font-size:2.4rem;line-height:1.05;margin:0;letter-spacing:-.02em}
   h1 span{background:linear-gradient(135deg,var(--fg) 30%,var(--green));-webkit-background-clip:text;background-clip:text;color:transparent}
@@ -45,13 +45,21 @@
   .help ol{margin:8px 0 0;padding-left:20px}
   .help.show{display:block}
   .small{color:var(--muted);font-size:.85rem}
+  a.install{display:block;text-decoration:none}
+  .install.chrome{background:linear-gradient(135deg,#4285F4,#1A73E8)}
+  .install.pulse{animation:pulse 1.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 10px 30px rgba(30,158,90,.4)}50%{box-shadow:0 10px 44px rgba(74,222,128,.75)}}
+  .steps{list-style:none;margin:0;padding:0;display:grid;gap:8px;text-align:left}
+  .steps li{display:flex;gap:10px;align-items:center}
+  .steps li b:first-child{flex:none;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--grad-brand);color:#fff}
+  .safe{margin:0;color:var(--green);font-weight:700;font-size:.92rem}
   .small a{color:var(--muted)}
   .open{color:var(--green);font-weight:700}
 </style>
 </head>
 <body>
 <main class="card">
-  <div class="logo" aria-hidden="true"><svg width="62" height="62" viewBox="0 0 24 24" fill="none" stroke="#16191C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="#16191C"/></svg></div>
+  <div class="logo" aria-hidden="true"><svg width="62" height="62" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="#FFFFFF"/></svg></div>
   <span class="badge">🎁 PERSÖNLICHE EINLADUNG</span>
   <h1>Willkommen bei <span>SparRadar</span></h1>
   <p class="from" id="from">Du wurdest <b>persönlich ausgewählt</b>.</p>
@@ -61,7 +69,14 @@
     <li><i>⭐</i><span><b>Merkliste</b>: SparRadar sagt dir, wenn dein Lieblingsprodukt im Angebot ist</span></li>
     <li><i>📝</i><span><b>Einkaufszettel</b> nach Märkten sortiert, zum Abhaken</span></li>
   </ul>
+  <a class="install chrome" id="openChrome" hidden>🌐 In Chrome öffnen (zum Installieren)</a>
   <button class="install" id="install">📲 SparRadar installieren</button>
+  <ol class="steps" aria-label="So geht's">
+    <li><b>1</b><span>Auf <b>„SparRadar installieren“</b> tippen</span></li>
+    <li><b>2</b><span>Kurz mit <b>„Installieren“</b> bestätigen</span></li>
+    <li><b>3</b><span><b>Fertig!</b> SparRadar ist auf deinem Startbildschirm</span></li>
+  </ol>
+  <p class="safe">✅ Keine Warnung, nichts zu deaktivieren – Updates kommen von selbst.</p>
   <div class="help" id="help"></div>
   <p class="small">Kostenlos · ohne Anmeldung · ohne Werbung<br><a href="./" class="open">Erst mal nur ansehen →</a></p>
 </main>
@@ -76,7 +91,15 @@
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
   let prompt = null;
   // Chrome/Edge auf Android und PC: echte App-Installation über den Browser (keine APK, keine Warnung)
-  addEventListener("beforeinstallprompt", e => { e.preventDefault(); prompt = e; });
+  addEventListener("beforeinstallprompt", e => { e.preventDefault(); prompt = e; btn.classList.add("pulse"); });
+  // In WhatsApp/Instagram/Facebook geöffnet (eingebauter Mini-Browser)? Dort kann man nicht installieren -> Chrome öffnen
+  const inApp = /; wv\)|WhatsApp|FBAN|FBAV|Instagram/i.test(navigator.userAgent) && /Android/i.test(navigator.userAgent);
+  if (inApp) {
+    const c = document.getElementById("openChrome");
+    c.href = "intent://" + location.host + location.pathname + location.search + "#Intent;scheme=https;package=com.android.chrome;end";
+    c.hidden = false;
+    btn.hidden = true;
+  }
   addEventListener("appinstalled", () => done());
   if (standalone) { btn.textContent = "SparRadar öffnen"; }
 

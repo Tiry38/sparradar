@@ -63,6 +63,12 @@ public class MainActivity extends Activity {
                     checkForUpdate(true);
                 });
             }
+
+            /** „Ja, schließen“ in der Web-App: App wirklich beenden */
+            @JavascriptInterface
+            public void exitApp() {
+                runOnUiThread(() -> finish());
+            }
         }, "SparRadarApp");
         // Versionsnummer für die Anzeige in den Einstellungen der Web-App
         s.setUserAgentString(s.getUserAgentString() + " SparRadarAndroid/" + installedVersion());
