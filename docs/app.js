@@ -446,10 +446,11 @@ function kracherBtn(){const k=ranked()[0];if(!k)return"";
    <span class="big"><b>${eur(fin(k))}</b>${offPct(k)?`<span>−${offPct(k)} %</span>`:""}</span></button>`}
 
 // Märkte ohne Angebote in der gewählten Woche (z. B. Prospekt für nächste Woche noch nicht veröffentlicht)
-function missingHTML(){if(!(S.week||WEEKEND)||S.q.trim())return "";
-  const have=new Set(weekOffers().map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s));
+function missingHTML(){if(S.q.trim()||S.cat)return "";
+  const have=new Set((S.week||WEEKEND?weekOffers():OFFERS.filter(o=>!o.from||o.from<=SHOP)).map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s));
   if(!miss.length)return "";
-  return `<p class="catoff miss">Noch kein Prospekt ${S.week?"dafür":"für nächste Woche"} online: <b>${miss.map(s=>esc(sname(s))).join(", ")}</b>. Sobald er veröffentlicht ist, holt SparRadar ihn automatisch.</p>`}
+  const dm=miss.includes("dm")?` <span class="dmnote">dm veröffentlicht seine Aktionen nicht vorab und hat sonst Dauerpreise (mind. 4 Monate garantiert) – ohne Aktion lohnt kein Warten.</span>`:"";
+  return `<p class="catoff miss">Noch kein Prospekt ${S.week?"dafür":WEEKEND?"für nächste Woche":"für heute"} online: <b>${miss.map(s=>esc(sname(s))).join(", ")}</b>. Sobald er veröffentlicht ist, holt SparRadar ihn automatisch.${dm}</p>`}
 function renderOffers(){
   if(!OFFERS.length)return `<div class="empty"><b>Noch keine Angebote</b>Sobald der tägliche Abruf gelaufen ist, erscheinen hier die Angebote.</div>`;
   const r=filtered(),bestIds=new Set();
@@ -593,6 +594,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  54:["dm: Fehlt der neue dm-Prospekt, sagt die App das jetzt klar dazu. dm veröffentlicht nichts vorab, dafür schaut der Prospekt-Wächter jetzt jeden Tag nach, damit die neuen dm-Aktionen sofort drin sind."],
   53:["Rewe: Angebote der nächsten Woche als „Vorschau“ aus dem Rewe-Prospekt, sobald er veröffentlicht ist. Kommt der Prospekt deines Markts, ersetzt er die Vorschau sofort.","Einkaufszettel: abgelaufene Angebote verschwinden nicht mehr still, sondern stehen unter „Abgelaufen“ – mit Tausch-Knopf, wenn es den Artikel wieder gibt.","Fehlt ein Markt in der nächsten Woche, steht oben, dass sein Prospekt noch nicht online ist."],
   52:["Samstag ab 22 Uhr und sonntags zeigt die ganze App automatisch schon die Angebote ab Montag – dann hat eh kein Markt mehr offen."],
   51:["Nächste Woche früher: Aldi-Angebote der kommenden Woche kommen jetzt direkt von den Aldi-Tagesseiten, Edeka als „Vorschau“ aus dem regionalen Prospekt, sobald es ihn gibt.","Ein Prospekt-Wächter schaut Do–So alle 2 Stunden nach neuen Prospekten aller Märkte."],
