@@ -346,3 +346,19 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .dev .dt b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dev .dt small{color:var(--muted);font-size:.76rem}
 .dev.me .dt small{color:var(--save);font-weight:700}
+
+/* Coupon mit einem Tipp */
+.cpq-open{width:100%;justify-content:center;margin:10px 0;font-size:1rem;padding:12px}
+.cpq{border:2px solid color-mix(in oklab,var(--save) 55%,var(--line));border-radius:16px;padding:12px;margin:10px 0;background:var(--surface2)}
+.cpq-h{font-weight:800;font-size:1.02rem}
+.cpq p{margin:4px 0 10px;font-size:.85rem;color:var(--muted)}
+.cpq-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cpq-b{border:1px solid var(--line);background:var(--surface);color:var(--ink,inherit);border-radius:14px;padding:14px 4px;font:800 1.15rem var(--f-price,inherit);cursor:pointer}
+.cpq-b:active{transform:scale(.97)}
+.cpq-own{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.cpq-own input{flex:1 1 140px;min-width:0}
+.cpq-own select{flex:0 1 auto}
+.cpq .linkbtn{margin-top:8px}
+.cpq.has .cpq-row{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.cpq.has .cpq-row b{font:800 1.1rem var(--f-price,inherit);color:var(--save)}
+.cpq.has .cpq-row span{flex:1;min-width:0;font-size:.82rem;color:var(--muted)}

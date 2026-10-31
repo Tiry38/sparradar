@@ -417,6 +417,11 @@ let SIMG=null,simgLoading=false,CAT_IDX=null;
 function loadSugImgs(then){if(SIMG||simgLoading)return;simgLoading=true;
   Promise.all([fetch("data/names-img.json").then(r=>r.json()).catch(()=>({})),fetch("data/catalog-img.json").then(r=>r.json()).catch(()=>[])])
     .then(([n,c])=>{SIMG={names:n&&typeof n==="object"?n:{},cat:Array.isArray(c)?c:[]};then&&then()})}
+// Kein Bild für genau diesen Namen? Ähnlichster Artikel im Artikelstamm (gleiche Marke = erstes Wort, mind. 3 gleiche Wörter)
+function simImg(t){if(!SIMG||!CATALOG||!SIMG.cat.length)return "";const w=wTokens(t);if(w.length<3)return "";
+  let best=-1,bi=-1;for(let i=0;i<CATALOG.length;i++){const c=CATALOG_N[i];if(!SIMG.cat[i]||!c.startsWith(w[0]))continue;
+    const ct=wTokens(CATALOG[i]),n=w.filter(x=>ct.includes(x)).length;if(n>=3&&n>=w.length*.6&&n-ct.length*.1>best){best=n-ct.length*.1;bi=i}}
+  if(bi<0)return "";const c=SIMG.cat[bi];return (c[0]==="b"?"https://images.openbeautyfacts.org":"https://images.openfoodfacts.org")+"/images/products/"+c.slice(2)+".jpg"}
 function sugImg(t){
   const k=norm(t),o=OFFERS.find(x=>x.img&&(norm(x.n)===k||norm((x.b||"")+x.n)===k));if(o)return sharp(o.img);
   if(!SIMG)return "";
@@ -604,6 +609,7 @@ function renderDetail(){
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
      <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
+    ${cpQuick(o)}
     ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
     ${o.ous&&o.o?`<div class="rk perkbox"><h4>🏷️ Kostet eigentlich ${eur(o.o)}</h4><p>Das ist die UVP (Preisempfehlung des Herstellers). ${esc(sname(o.s))} nennt im Prospekt keinen „statt“-Preis – die UVP stammt von ${esc(sname(o.ous))} für denselben Markenartikel in gleicher Menge.</p></div>`:""}
     ${perk(o)?`<div class="rk perkbox"><h4>💡 Dein Vorteil</h4><p>${esc(perk(o).l)}</p></div>`:""}
@@ -631,6 +637,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  64:["Coupon mit einem Tipp: Im Angebot auf „🎟️ Ich habe einen Coupon dafür“ tippen und den Wert wählen (z. B. −1 € oder −20 %). Markt, Artikel und Gültigkeit übernimmt SparRadar selbst und rechnet den Coupon sofort ein.","Merkliste: Gemerkte Artikel zeigen jetzt ihr Produktbild (aus dem Artikelstamm), auch wenn sie gerade nicht im Angebot sind."],
   63:["Geräte verbinden: Beliebig viele Geräte mit demselben Code verbinden (z. B. Handys von Mama und Stefan, Tablet, PC) – alle haben denselben Einkaufszettel und dieselbe Merkliste.","In den Einstellungen siehst du jetzt, welche Geräte verbunden sind und wann sie zuletzt aktiv waren. Jedem Gerät kannst du einen Namen geben, z. B. „Mamas Handy“."],
   62:["Merkliste: Falsche Treffer behoben (z. B. „More Barista“ fand „Dallmayr Prodomo“, weil Wörter über Wortgrenzen verglichen wurden).","Gemerkte Artikel jetzt übersichtlich mit Bild und „x Treffer im Angebot“ bzw. „gerade nicht im Angebot“. Antippen zeigt nur die Treffer dieses Artikels."],
   61:["Bilder: Hohe Fotos (z. B. Flaschen) wurden in der Kachel abgeschnitten, sodass oft nur der Deckel zu sehen war. Jetzt ist immer das ganze Bild sichtbar.","Schärfere Bilder: Winzige Prospekt-Ausschnitte werden nicht mehr künstlich vergrößert (das machte sie pixelig). Wo es denselben Markenartikel bei einem anderen Markt mit gutem Foto gibt, zeigt SparRadar dieses Foto."],
@@ -747,14 +754,15 @@ function renderKracher(){
 function renderWatch(){
   const wh=watchHits(null);
   if(S.wsel!=null&&!wh[S.wsel])S.wsel=null;
-  if(S.watch.length&&!SIMG)loadSugImgs(()=>{if(S.tab==="watch")render()});
+  // Bilder der gemerkten Artikel: brauchen Bilder-Liste UND Artikelstamm (catalog.json) – beide erst hier laden
+  if(S.watch.length&&(!SIMG||!CATALOG_N)){const again=()=>{if(S.tab==="watch"&&SIMG&&CATALOG_N)render()};if(!SIMG)loadSugImgs(again);if(!CATALOG_N)loadCatalog(again)}
   const sel=S.wsel!=null?[wh[S.wsel]]:wh;
   const hits=[...new Map(sel.flatMap(x=>x.hits).map(o=>[o.id,o])).values()].sort((a,b)=>offPct(b)-offPct(a));
   return `<section class="panel"><h3>Was soll ich für dich beobachten?</h3>
     <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt. Die Zahl am Tab „Merkliste“ zeigt dir beim Öffnen, wie viele Treffer gerade im Angebot sind.</p>
     <form class="addrow" id="kwForm"><input id="kwIn" placeholder="z. B. Mozzarella, Felix, Cola" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg (optional)" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
     <div id="kwSugg"></div>
-    <div class="wlist">${S.watch.map((w,i)=>{const n=wh[i].hits.length,im=sugImg(w.k)||(wh[i].hits.find(o=>o.img)||{}).img||"",on=S.wsel===i;
+    <div class="wlist">${S.watch.map((w,i)=>{const n=wh[i].hits.length,im=sugImg(w.k)||(wh[i].hits.find(o=>o.img)||{}).img||simImg(w.k)||"",on=S.wsel===i;
       return `<div class="witem${n?" hit":""}${on?" on":""}"><button class="wmain" data-wsel="${i}" aria-pressed="${on}" title="${esc(w.k)}">${safeUrl(im)?`<img src="${esc(sharp(im))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<span class="wph">${IC.bell}</span>`}<span class="wtx"><b>${esc(w.k)}</b><small>${n?`${n} ${n===1?"Treffer":"Treffer"} im Angebot`:"gerade nicht im Angebot"}${w.max?` · bis ${eur(w.max)}/kg`:""}</small></span></button><button class="wdel" data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></div>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
    </section>
    <div class="meta"><h2>${S.wsel!=null?`Treffer für „${esc(S.watch[S.wsel].k)}“`:"Deine Treffer"}</h2><span>${S.wsel!=null?`<button class="linkbtn" data-wsel="${S.wsel}">Alle zeigen</button> · `:""}${hits.length} Angebote</span></div>
@@ -896,6 +904,24 @@ function renderList(){
    ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
    <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
    ${tripsHTML()}`}
+
+// ---------- Coupon mit einem Tipp (direkt am Angebot) ----------
+// Kevins Wunsch: so einfach, dass es jeder schafft. Markt, Artikel und Gültigkeit kommen vom Angebot, man wählt nur den Wert.
+const CPQ=[["euro",.5],["euro",1],["euro",2],["pct",10],["pct",20],["pct",30]];
+function cpQuick(o){if(!o.p)return "";
+  const mine=S.coupons.map((c,i)=>({c,i})).filter(x=>cpActive(x.c)&&couponsFor(o).includes(x.c));
+  if(mine.length)return `<div class="cpq has"><div class="cpq-h">🎟️ Dein Coupon ist eingerechnet</div>${mine.map(({c,i})=>`<div class="cpq-row"><b>${esc(cpValueTxt(c))}</b><span>${esc(c.k)} · ${esc(c.prog)}${c.to?" · bis "+fmtDate(c.to):""}</span><button class="btn ghost sm" data-delcp="${i}">Entfernen</button></div>`).join("")}</div>`;
+  if(S.cpq!==o.id)return `<button class="btn cpq-open" data-cpq="${esc(o.id)}">🎟️ Ich habe einen Coupon dafür</button>`;
+  return `<div class="cpq"><div class="cpq-h">🎟️ Wie viel bringt dein Coupon?</div><p>Einfach antippen – SparRadar rechnet ihn sofort ein (gilt bei ${esc(sname(o.s))}${o.to?" bis "+fmtDate(o.to):""}).</p>
+    <div class="cpq-grid">${CPQ.map(([t,v])=>`<button class="cpq-b" data-cpqset="${esc(o.id)}|${t}|${v}">${t==="euro"?"−"+eur(v):`−${v} %`}</button>`).join("")}</div>
+    <form class="cpq-own" id="cpqForm" data-id="${esc(o.id)}"><input id="cpqVal" inputmode="decimal" placeholder="anderer Wert, z. B. 1,50" autocomplete="off"><select id="cpqType"><option value="euro">€ weniger</option><option value="pct">% weniger</option><option value="preis">€ Endpreis</option></select><button class="btn" type="submit">OK</button></form>
+    <button class="linkbtn" data-cpq="">Abbrechen</button></div>`}
+function cpqSave(id,t,v){const o=byId(id);if(!o||!v)return;
+  if(t==="pct"&&v>=100){toast("Ein Rabatt muss unter 100 % liegen.");return}
+  if(t==="preis"&&v>=o.p){toast("Der Coupon-Preis muss unter dem Angebotspreis liegen.");return}
+  const k=(o.b&&!norm(o.n).includes(norm(o.b))?o.b+" ":"")+o.n;
+  S.coupons.push({s:o.s,prog:defaultProg(o.s),k:k.replace(/\s+/g," ").trim(),t,v,to:o.to||null});S.cpq=null;save();
+  toast(S.useApp?`Coupon gespeichert – du zahlst jetzt ${eur(fin(o))}`:"Coupon gespeichert. „Apps & Coupons einrechnen“ ist ausgeschaltet – in den Einstellungen einschalten.");render()}
 
 function renderCoupons(){
   const act=S.coupons.map((c,i)=>({c,i})).filter(x=>cpActive(x.c));
@@ -1151,6 +1177,8 @@ document.addEventListener("click",e=>{
   if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
   if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
   if(b.dataset.wsel!=null&&b.dataset.wsel!==""){const i=+b.dataset.wsel;S.wsel=S.wsel===i?null:i;render();return}
+  if(b.dataset.cpq!=null){S.cpq=b.dataset.cpq||null;render();return}
+  if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
@@ -1192,6 +1220,7 @@ document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
   if(e.target.id==="extraForm"){e.preventDefault();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p}:{id,n:x.n});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
+  if(e.target.id==="cpqForm"){e.preventDefault();cpqSave(e.target.dataset.id,document.getElementById("cpqType").value,parseNum(document.getElementById("cpqVal").value));return}
   if(e.target.id==="devForm"){e.preventDefault();const v=document.getElementById("devName").value.trim().slice(0,30);store.set("devName",v);Sync.push().then(()=>{toast(v?`Dieses Gerät heißt jetzt „${v}“`:"Name zurückgesetzt");render()});return}
   if(e.target.id==="syncForm"){e.preventDefault();const t=document.getElementById("syncToken").value.trim();
     if(!/^(ghp_|github_pat_)/.test(t)){toast("Das sieht nicht wie ein GitHub-Schlüssel aus (beginnt mit ghp_).");return}
