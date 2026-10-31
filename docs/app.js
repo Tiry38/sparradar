@@ -203,7 +203,40 @@ function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.lengt
 // Aldi in größerer Breite. Gilt auch für schon gespeicherte Angebote.
 const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails)$/,"").replace(/\/scaleWidth\/500\//,"/scaleWidth/1000/");
 const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
-function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}</div>`}
+// Beschriftung für kommende Angebote: „Nächste Woche“, oder „Ab Donnerstag“, wenn etwas noch diese Woche startet
+function nextLabel(){const nx=OFFERS.filter(o=>o.from&&o.from>TODAY).map(o=>shopDay(o.from)).sort()[0];
+  if(!nx)return "Nächste Woche";
+  const d=new Date(TODAY+"T12:00:00"),mon=new Date(d);mon.setDate(d.getDate()+((8-d.getDay())%7||7));
+  const nextMon=`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,"0")}-${String(mon.getDate()).padStart(2,"0")}`;
+  return nx>=nextMon?"Nächste Woche":"Ab "+new Date(nx+"T12:00:00").toLocaleDateString("de-DE",{weekday:"long"})}
+const nextShort = () => {const l=nextLabel();return l==="Nächste Woche"?"nächste Woche":l.replace("Ab","ab")};
+// ---------- Vorteil ohne „statt“-Preis ----------
+// Steht im Prospekt kein „statt“-Preis, zeigt SparRadar den Vorteil aus eigenen Daten – klar gekennzeichnet (blau):
+// 1) günstiger als zuletzt im selben Markt  2) Großpackung günstiger pro kg/l  3) günstigster aller Märkte
+const PERK=new Map();
+const fmtQty = q => !q?"":q.v<1?`${Math.round(q.v*1000)} ${q.u==="kg"?"g":"ml"}`:`${String(Math.round(q.v*100)/100).replace(".",",")} ${q.u}`;
+const coreKey = o => [...new Set(((o.b||"")+" "+o.n).toLowerCase().match(/[a-zäöüß0-9]+/g)||[])].map(norm)
+  .filter(t=>t&&!/^(xxl|xl|maxi|mega|jumbo|grosspackung|vorratspackung|familienpackung|sparpack|xxxl)$/.test(t)).map(t=>t.replace(/(en|e|n)$/,"").replace(/([^s])s$/,"$1")).sort().join(" ");
+function perk(o){
+  if(!o||o.o||o.bo||!o.p||offPct(o))return null;
+  if(PERK.has(o.id))return PERK.get(o.id);
+  let r=null;const k=coreKey(o),q=packQty(o.d);
+  const same=OFFERS.filter(x=>x!==o&&x.s===o.s&&x.p>o.p+.009&&(x.from||"")<(o.from||"")&&coreKey(x)===k&&((q&&packQty(x.d)&&Math.abs(packQty(x.d).v-q.v)/q.v<.05)||(!q&&x.d===o.d))).sort((a,b)=>(b.from||"").localeCompare(a.from||""))[0];
+  if(same){const pct=Math.round((1-o.p/same.p)*100);
+    if(pct>=3)r={pct,b:`−${pct} % ggü. bisher`,s:`bisher ${eur(same.p)}`,l:`Bei ${sname(o.s)} kostet dieselbe Packung bis ${same.to?fmtDate(same.to):"jetzt"} ${eur(same.p)}, ab ${fmtDate(shopDay(o.from))} nur ${eur(o.p)}. Das sind ${pct} % weniger.`}}
+  const h=histOf(o),last=h.length?h[h.length-1]:0;
+  if(!r&&last>o.p+.009){const pct=Math.round((1-o.p/last)*100);
+    if(pct>=3)r={pct,b:`−${pct} % ggü. zuletzt`,s:`zuletzt ${eur(last)}`,l:`Bei ${sname(o.s)} kostete dieser Artikel zuletzt ${eur(last)}, jetzt ${eur(o.p)}. Das sind ${pct} % weniger (aus dem SparRadar-Preisverlauf, kein „statt“-Preis des Händlers).`}}
+  if(!r&&o.gp&&o.gp.v>0){
+    const sm=OFFERS.filter(x=>x!==o&&x.s===o.s&&x.p>0&&x.p<o.p&&x.gp&&x.gp.u===o.gp.u&&x.gp.v>o.gp.v*1.03&&coreKey(x)===k).sort((a,b)=>a.gp.v-b.gp.v)[0];
+    if(sm){const pct=Math.round((1-o.gp.v/sm.gp.v)*100);
+      r={pct,b:`Großpackung −${pct} %/${o.gp.u}`,s:`pro ${o.gp.u} ${pct} % günstiger als ${packQty(sm.d)?"die "+fmtQty(packQty(sm.d))+"-Packung":"die kleine Packung"}`,
+        l:`Großpackung: ${eur(o.gp.v)} pro ${o.gp.u} statt ${eur(sm.gp.v)} pro ${o.gp.u} bei der kleineren Packung (${sm.d||sm.n}, ${eur(sm.p)}). Pro ${o.gp.u==="l"?"Liter":"Kilo"} sparst du ${pct} %.`}}}
+  if(!r){const c=sameElsewhere(o,weekOffers()).filter(x=>Math.abs(x.f-1)<.05).map(x=>({x:x.x,v:fin(x.x)})).sort((a,b)=>a.v-b.v);
+    if(c.length&&c[0].v>=fin(o)*1.05){const pct=Math.round((1-fin(o)/c[0].v)*100);
+      r={pct,b:"günstigster Markt",s:`bei ${sname(c[0].x.s)} ${eur(c[0].v)}`,l:`Derselbe Artikel kostet beim nächstgünstigen Markt (${sname(c[0].x.s)}) ${eur(c[0].v)}. Hier sparst du ${pct} %.`}}}
+  PERK.set(o.id,r);return r}
+function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
 
 // ---------- Daten ----------
 // ---------- Automatische Rabatt-Prüfung ----------
@@ -290,7 +323,7 @@ async function load(){
     NAMES=Object.keys(nm||{});
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
-    RAW=o.offers.filter(x=>!x.to||x.to>=TODAY);OFFERS=RAW.map(checkDeal);
+    RAW=o.offers.filter(x=>!x.to||x.to>=TODAY);OFFERS=RAW.map(checkDeal);PERK.clear();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
@@ -377,7 +410,7 @@ function card(o,bestIds){
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
-     <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
+     <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}">${validTxt(o)}</span>
@@ -388,7 +421,7 @@ function card(o,bestIds){
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
   return `<button class="kracher" id="openK" aria-label="Kracher öffnen">
    <span class="boom">${IC.flame}</span>
-   <span><span class="eyebrow">Kracher ${S.week?"demnächst":"der Woche"}</span><span class="what" style="display:block">${esc(k.n)} bei ${esc(sname(k.s))}</span><span class="how" style="display:block">${comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).fresh?[ref(k)>fin(k)?"statt "+eur(ref(k)):"",validTxt(k)].filter(Boolean).join(" · "):verdict(k).l} · antippen für Details</span></span>
+   <span><span class="eyebrow">Kracher ${S.week?nextShort():"der Woche"}</span><span class="what" style="display:block">${esc(k.n)} bei ${esc(sname(k.s))}</span><span class="how" style="display:block">${comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).fresh?[ref(k)>fin(k)?"statt "+eur(ref(k)):"",validTxt(k)].filter(Boolean).join(" · "):verdict(k).l} · antippen für Details</span></span>
    <span class="big"><b>${eur(fin(k))}</b>${offPct(k)?`<span>−${offPct(k)} %</span>`:""}</span></button>`}
 
 function renderOffers(){
@@ -396,7 +429,7 @@ function renderOffers(){
   const r=filtered(),bestIds=new Set();
   if((S.q.trim()||S.cat)&&r.length>1){const by={};r.forEach(o=>{if(unit(o)==null)return;const k=o.gp.u;if(!by[k]||unit(o)<unit(by[k]))by[k]=o});Object.values(by).forEach(o=>bestIds.add(o.id))}
   const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
-  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cat?CATS[S.cat]:(S.week?"Angebote, die bald starten":"Angebote, die jetzt gelten");
+  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cat?CATS[S.cat]:(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):"Angebote, die jetzt gelten");
   const shown=r.slice(0,S.limit);
   return `${kracherBtn()}
    ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
@@ -508,6 +541,7 @@ function renderDetail(){
      <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
     ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${perk(o)?`<div class="rk perkbox"><h4>💡 Dein Vorteil</h4><p>${esc(perk(o).l)}</p></div>`:""}
     ${compareHTML(o)}
     <dl class="dfacts">
      <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(shopDay(o.from))+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
@@ -531,6 +565,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  49:["Der Knopf „Demnächst“ heißt jetzt „Nächste Woche“ (bzw. „Ab Donnerstag“, wenn noch diese Woche etwas startet).","Neu: Angebote ohne „statt“-Preis zeigen jetzt ihren Vorteil – blau markiert: günstiger als zuletzt, Großpackung günstiger pro Kilo oder günstigster Markt.","Filter überarbeitet: Kategorien richten sich nur noch nach Artikelname, Marke und Warengruppe, nicht mehr nach der Beschreibung."],
   48:["Neu: Barcode-Scanner. Im Laden auf das Strichcode-Symbol im Suchfeld tippen, Artikel scannen und sehen, ob er gerade irgendwo im Angebot ist.","Neu: Preisvergleich in der Artikelansicht – derselbe Artikel bei den anderen Märkten.","Einkaufszettel: Summe pro Markt und Tipp, wenn es einen Artikel woanders günstiger gibt (mit „Tauschen“).","Neu: Gespart-Zähler. Was du auf dem Zettel abhakst, zählt als gekauft: diese Woche, diesen Monat, insgesamt."],
   47:["Kracher der Woche: zählt jetzt nur belegte Rabatte. Rabatte gegenüber der UVP (Preisempfehlung des Herstellers) stehen in der Liste mit vollem Prozentwert, werden aber nicht mehr zum Kracher.","Bei UVP steht jetzt „UVP“ statt „statt“ am Preis."],
   46:["Scheck-In und Serpa sind entfernt, ebenso „Angebot eintragen“.","Genaue Rabatt-Prüfung: Ab 40 % wird jeder Rabatt geprüft. Echte Rabatte (Händler nennt eigenen 30-Tage-Preis, anderer Markt oder Preisverlauf bestätigt) bleiben oben. Grau wird nur, was nachweislich falsch ist. UVP wird als „UVP“ angezeigt."],
@@ -607,7 +642,7 @@ function renderKracher(){
     <div class="t">${esc(o.n)}<small>${esc(sname(o.s))}${o.b?" · "+esc(o.b):""} · ${esc(o.d||"")}</small><div class="pills">${offPct(o)?`<span class="pill of">−${offPct(o)} %</span>`:""}${steps(o).filter(s=>!["base","of"].includes(s.t)).map(s=>`<span class="pill ${s.t==="cb"?"cb":""}">${esc(s.l)}</span>`).join("")}</div></div>
     <div class="pr"><b>${eur(fin(o))}</b>${ref(o)>fin(o)?`<s>${eur(ref(o))}</s>`:""}</div></div>`;
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kracher">
-   <div class="sheet-h"><span style="width:38px;height:38px;border-radius:11px;background:#E5332A;color:#FFE27A;display:grid;place-items:center;transform:rotate(-8deg)">${IC.flame}</span><h2>Kracher ${S.week?"demnächst":"der Woche"}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <div class="sheet-h"><span style="width:38px;height:38px;border-radius:11px;background:#E5332A;color:#FFE27A;display:grid;place-items:center;transform:rotate(-8deg)">${IC.flame}</span><h2>Kracher ${S.week?nextShort():"der Woche"}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <section class="hero">${thumb(k,true)}
     <div class="info">
      <div class="store" style="gap:9px">${sb(k.s,true)}${esc(sname(k.s))} · ${validTxt(k)}</div>
@@ -775,7 +810,7 @@ function renderTips(){
    [IC.chart,"Fake-Rabatte erkennen","SparRadar speichert jeden Tag die Preise. Nach ein paar Wochen zeigt es dir, ob ein „statt“-Preis wirklich verlangt wurde."],
    [IC.box,"Vorrat bei Tiefpreis","Haltbares wie Katzenfutter, Kaffee, Nudeln oder Getränke nur kaufen, wenn der Grundpreis unter deinem Wunschpreis liegt. Dann gleich für mehrere Wochen."],
    [IC.scale,"Grundpreis zählt","Vergleiche immer den Preis pro kg oder l. Die Großpackung ist nicht automatisch günstiger."],
-   [IC.cal,"Montag und Donnerstag","An diesen Tagen starten bei Lidl und Aldi die neuen Aktionen. Unter „Demnächst“ siehst du sie schon vorher."],
+   [IC.cal,"Montag und Donnerstag","An diesen Tagen starten bei Lidl und Aldi die neuen Aktionen. Unter „Nächste Woche“ siehst du sie schon vorher."],
    [IC.bag,"Too Good To Go","Bäcker und Märkte geben abends übrig gebliebene Lebensmittel als Überraschungstüte ab, meist für etwa ein Drittel des Werts."]];
   return `${renderCoupons()}
    <h3 class="sec-h">Spartipps</h3>
@@ -838,6 +873,7 @@ function closeExit(stay){const el=document.getElementById("exitAsk");if(el)el.hi
 function render(){
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
+  document.getElementById("wk1").textContent=nextLabel();
   document.getElementById("wk0").setAttribute("aria-pressed",S.week===0);document.getElementById("wk1").setAttribute("aria-pressed",S.week===1);
   const hits=new Set(watchHits(null).flatMap(x=>x.hits.map(o=>o.id))).size;
   const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;

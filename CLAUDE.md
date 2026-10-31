@@ -79,6 +79,8 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Gleicher Artikel woanders:** `tokKey()` (Wörter aus Marke + Name, Reihenfolge egal) + `sameElsewhere()` rechnet Preise über den Grundpreis bzw. gleiche Packungsgröße auf dieselbe Menge um. Genutzt von Rabatt-Prüfung, Detail-„Preisvergleich“ (`compareHTML`) und Zettel-Tipp „Woanders günstiger“ (`swapTips`, Knopf „Tauschen“).
 - **Gespart-Zähler:** Abhaken auf dem Zettel speichert `{id,n,s,v,d}` in `S.saved` (localStorage `sr_saved`, auch im Sync). Ent-Haken nimmt es wieder raus. Anzeige `savedHTML()` oben im Zettel.
 - **Barcode-Scanner:** Knopf im Suchfeld (`#scanBtn`), Fenster `renderScan`/`Scan`. Erkennung per `BarcodeDetector` (Chrome Android), sonst ZXing aus `docs/vendor/zxing.min.js` (MIT, lädt nur bei Bedarf). EAN -> Name über Open Food Facts / Open Beauty Facts API (CORS, ohne Schlüssel). Die alte APK hat keine Kamera-Berechtigung -> Hinweis auf Chrome-Installation; Nummer kann auch eingetippt werden.
+- **Vorteil ohne „statt“-Preis** (`perk()`, blaues Abzeichen + „💡 Dein Vorteil“ im Detail): 1) dieselbe Packung im selben Markt vorher teurer („bisher“, aus OFFERS bzw. Preisverlauf), 2) Großpackung günstiger pro kg/l als kleinere Packung im selben Markt (`coreKey` ohne XXL/Maxi), 3) günstigster aller Märkte. Zählt NICHT in `offPct`/Sortierung, ist kein Händler-„statt“-Preis.
+- **Umschalter „Nächste Woche“** (früher „Demnächst“): `nextLabel()` zeigt „Ab Donnerstag“ o. ä., wenn kommende Angebote noch diese Woche starten.
 - **Aldi Süd** liefert kein UVP-Merkmal (nur `wasPriceDisplay`, `savingsDisplay`) -> dort nur Marktvergleich/Preisverlauf.
 
 ## App-Funktionen (Überblick)

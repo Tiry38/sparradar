@@ -238,3 +238,10 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .scanres:empty{display:none}
 .scanres h4{margin:0}
 .swaps .swap .btn{flex:none;white-space:nowrap}
+/* Vorteil ohne „statt“-Preis: blau, damit klar ist, dass es kein Händler-„statt“-Preis ist */
+.off.pk{background:linear-gradient(135deg,#2563EB,#1D4ED8)!important;box-shadow:0 3px 10px rgba(37,99,235,.35);font-size:.78rem;padding:2px 7px}
+.perk{display:block;font-size:.76rem;font-weight:700;color:#2563EB;line-height:1.2}
+@media (prefers-color-scheme:dark){.perk{color:#7DA8FF}}
+:root[data-theme="dark"] .perk{color:#7DA8FF}
+.rk.perkbox{background:color-mix(in srgb,#2563EB 12%,transparent)}
+.rk.perkbox p{margin:0;font-size:.88rem;line-height:1.4}
