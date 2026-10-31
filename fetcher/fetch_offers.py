@@ -126,7 +126,7 @@ ALCOHOL = re.compile(r"\d+(?:[.,]\d+)?\s*%\s*vol|\b(?:aop|aoc|doc|docg|igp|igt|q
 # Händler-Kategorien (kaufDA/Lidl, z. B. „Tierfutter / Hundefutter“): zweitbester Hinweis nach dem Artikelnamen
 CAT_HINTS = [
     ("katze", r"katzenfutter|katzennahrung|katzensnack"),
-    ("tier", r"hundefutter|tierfutter|hunde ?snacks|tierbedarf|katzenstreu|vogelfutter"),
+    ("tier", r"hundefutter|hunde ?snacks|katzenstreu|vogelfutter"),
     ("getraenke", r"(?:sekt|wein|lik[öo]r|whiske?y|wodka|rum|gin|saft|wasser|bier|softdrink|korn|weinbrand|spirituosen|cola|limo)marken|\bwein\b|alkoholische getr|spirituosen|\bbier\b|wassermarken|mineralwasser|softdrinks|limonade|s[äa]fte\b|fruchtsaft|energy ?drinks?"),
     ("freizeit", r"reiseangebote|\breisen\b|spielzeug|mini-k[üu]che|spielk[üu]che"),
     ("technik", r"k[üu]chenkleinger[äa]te|mikrowelle|elektroger[äa]te|unterhaltungselektronik"),
@@ -149,6 +149,15 @@ def classify(title, brand="", food=True, cats=None):
     ident = name + " / " + ct
     if re.search(r"katze", ident) and not re.search(r"streu|spielzeug|kratz|toilette", ident):
         return "katze"
+    # genaueste Warengruppe „Hundefutter“ schlägt den Namen („Rinder-Herzen“ von ZooRoyal ist Hundefutter)
+    if re.search(r"hundefutter|hundenahrung|hunde ?snack|katzenfutter|katzennahrung|zooroyal|vitakraft|pedigree|chappi|rinti|frolic|animonda|beneful", ident):
+        return "katze" if re.search(r"katze", ident) else "tier"
+    if food:
+        # zusammengesetzte Namen: Käse-Aufschnitt ist Käse, Schinken-Croissant ist Backware
+        if re.search(r"croissant|br[öo]tchen|baguette|brezel|laugenst|(?<!leb)kuchen\b|\btorte\b", name) and not re.search(r"salami|wurst", name) and not re.search(r"tiefgefr|tk\b", name):
+            return "brot"
+        if re.search(r"k[äa]se", name) and not re.search(r"leberk[äa]se|fleischk[äa]se|wurst|schinken|salami|kuchen|torte|nuggets|chips|cracker|sticks", name):
+            return "kuehl"
     if "langnese" in ident and "honig" in ident:
         return "vorrat"  # Langnese gibt es als Honig und als Eis
     if ALCOHOL.search(ident) and not re.search(r"glas|gl[äa]ser|k[üu]hler|dekanter|essig|sauce|so[ßs]e", name):
@@ -607,6 +616,8 @@ def merge(offers):
             by[k] = o
             continue
         # das vollständigere Angebot behalten, fehlende Felder ergänzen
+        if cur.get("c") in ("vorrat", "sonstiges") and o.get("c") not in ("vorrat", "sonstiges"):
+            cur["c"] = o["c"]  # „Vorrat“/„Sonstiges“ ist nur die Notlösung, wenn nichts passte
         if "ou" not in cur and "ou" in o and (not cur.get("o") or cur.get("o") == o.get("o")):
             cur["ou"] = o["ou"]  # 0 = eigener früherer Preis (zählt, obwohl „falsch“ im Sinne von Python)
         for f in ("b", "o", "gp", "img", "il", "ims", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url"):
