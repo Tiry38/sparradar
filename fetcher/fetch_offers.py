@@ -782,7 +782,7 @@ def merge(offers):
             cur.pop("pv", None)  # derselbe Artikel steht auch im bestätigten Prospekt
         if "ou" not in cur and "ou" in o and (not cur.get("o") or cur.get("o") == o.get("o")):
             cur["ou"] = o["ou"]  # 0 = eigener früherer Preis (zählt, obwohl „falsch“ im Sinne von Python)
-        for f in ("b", "o", "gp", "img", "il", "ims", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url"):
+        for f in ("b", "o", "gp", "img", "il", "ims", "iw", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url"):
             if not cur.get(f) and o.get(f):
                 cur[f] = o[f]
         if o.get("x") and not cur.get("x"):
@@ -921,6 +921,90 @@ def borrow_uvp(offers, mem):
     return n
 
 
+# ---------- Unscharfe Bilder ----------
+# kaufDA liefert bei Netto/Rewe/Lidl teils nur winzige Ausschnitte aus dem Prospekt (z. B. 88×325 px, manchmal nur
+# ein Flaschendeckel). Größere Versionen gibt es dort nicht (403). Darum: Bildgröße messen (nur die ersten 64 KB,
+# Ergebnis wird je Adresse gemerkt) und winzige Bilder durch das scharfe Foto desselben Markenartikels von einem
+# anderen Markt ersetzen (gleiche Marke + gleiche Wörter im Namen). Das Original bleibt als weiteres Bild erhalten.
+def img_dims(b):
+    import struct
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return list(struct.unpack(">II", b[16:24]))
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP" and b[12:16] == b"VP8X":
+        return [int.from_bytes(b[24:27], "little") + 1, int.from_bytes(b[27:30], "little") + 1]
+    i = 2
+    while i < len(b) - 9:
+        if b[i] != 0xFF:
+            i += 1
+            continue
+        if b[i + 1] in (0xC0, 0xC1, 0xC2):
+            h, w = struct.unpack(">HH", b[i + 5:i + 9])
+            return [w, h]
+        i += 2 + struct.unpack(">H", b[i + 2:i + 4])[0]
+    return None
+
+
+def measure_images(offers):
+    from concurrent.futures import ThreadPoolExecutor
+    known = {o.get("img"): o["iw"] for o in OLD_OFFERS if o.get("img") and o.get("iw")}
+    todo = sorted({o["img"] for o in offers if o.get("img") and o["img"] not in known and "bonial" in o["img"]})
+
+    def one(u):
+        try:
+            req = urllib.request.Request(u, headers={"User-Agent": UA, "Range": "bytes=0-65535"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                return u, img_dims(r.read(65536))
+        except Exception:
+            return u, None
+    with ThreadPoolExecutor(4) as ex:
+        for u, d in ex.map(one, todo):
+            if d:
+                known[u] = d
+    for o in offers:
+        if o.get("img") in known:
+            o["iw"] = known[o["img"]]
+    log(f"Bildgrößen: {len(todo)} neu gemessen")
+
+
+def name_key(o):
+    b = norm(o.get("b") or "")
+    toks = sorted({norm(t) for t in re.findall(r"[a-zäöüß0-9]+", f"{o.get('b') or ''} {o.get('n')}".lower())} - {""})
+    return b + "|" + " ".join(toks) if b and len(toks) >= 2 else None
+
+
+
+
+def img_px(o):
+    if o.get("iw"):
+        return max(o["iw"])
+    u = o.get("img") or ""
+    return 1000 if "aldi.cx" in u else 0
+
+
+def better_images(offers):
+    best = {}
+    for o in offers:
+        k = name_key(o)
+        if k and img_px(o) >= 450 and img_px(o) > img_px(best.get(k, {})):
+            best[k] = o
+    n = 0
+    for o in offers:
+        px = img_px(o)
+        if not o.get("img") or not px or px >= 300:
+            continue
+        b = best.get(name_key(o) or "")
+        if b and b is not o and b.get("img") != o["img"]:
+            o["ims"] = [u for u in dict.fromkeys([*(o.get("ims") or []), o["img"]]) if u][:8]
+            o["img"], o["io"] = b["img"], b["s"]
+            o["iw"] = b.get("iw") or [1000, 1000]
+            if b.get("il"):
+                o["il"] = b["il"]
+            else:
+                o.pop("il", None)
+            n += 1
+    log(f"Unscharfe Bilder ersetzt: {n}")
+
+
 def finalize(offers, save_uvp=False):
     today = dt.date.today().isoformat()
     offers = drop_previews(merge(offers))
@@ -1014,6 +1098,11 @@ def main():
             log(f"  ! {st}: nur {n_new} statt bisher {n_old} Angebote – Quelle gestört? Alte gültige Angebote bleiben.")
             new += [dict(o) for o in valid if o["s"] == st]
     offers = finalize(new, save_uvp=True)
+    try:
+        measure_images(offers)
+        better_images(offers)
+    except Exception as e:
+        log("  ! Bildprüfung fehlgeschlagen:", repr(e))
     if len(offers) < 30:
         log("! Zu wenige Angebote, alte Daten bleiben stehen.")
         sys.exit(1)

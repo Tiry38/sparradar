@@ -210,7 +210,10 @@ function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.lengt
 // Scharfe Bilder: kaufDA liefert unter derselben Adresse ohne „?impolicy=…“ die volle Auflösung,
 // Aldi in größerer Breite. Gilt auch für schon gespeicherte Angebote.
 const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails)$/,"").replace(/\/scaleWidth\/500\//,"/scaleWidth/1000/");
-const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
+// Winzige Prospekt-Ausschnitte (kaufDA, z. B. 150 px) nicht auf Kartengröße aufblasen – das macht sie pixelig.
+// Größe kommt vom Abruf (o.iw) oder wird beim Laden gemessen (lowres()).
+const LOWPX=320;
+const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}${o.iw&&Math.max(...o.iw)<LOWPX?" lowres":""}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
 // Beschriftung für kommende Angebote: „Nächste Woche“, oder „Ab Donnerstag“, wenn etwas noch diese Woche startet
 function nextLabel(){const nx=OFFERS.filter(o=>o.from&&o.from>SHOP).map(o=>shopDay(o.from)).sort()[0];
   if(!nx)return "Nächste Woche";
@@ -246,6 +249,7 @@ function perk(o){
   PERK.set(o.id,r);return r}
 function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
 
+document.addEventListener("load",e=>{const i=e.target;if(i.tagName==="IMG"&&i.closest(".thumb")&&i.naturalWidth&&Math.max(i.naturalWidth,i.naturalHeight)<LOWPX)i.classList.add("lowres")},true);
 // ---------- Daten ----------
 // ---------- Automatische Rabatt-Prüfung ----------
 // Jeder Rabatt wird beim Laden geprüft. Falsche „statt“-Preise fliegen raus; Rabatte ab 40 %
@@ -615,6 +619,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  61:["Bilder: Hohe Fotos (z. B. Flaschen) wurden in der Kachel abgeschnitten, sodass oft nur der Deckel zu sehen war. Jetzt ist immer das ganze Bild sichtbar.","Schärfere Bilder: Winzige Prospekt-Ausschnitte werden nicht mehr künstlich vergrößert (das machte sie pixelig). Wo es denselben Markenartikel bei einem anderen Markt mit gutem Foto gibt, zeigt SparRadar dieses Foto."],
   60:["Menge gleich beim Hinzufügen: Sobald ein Artikel auf dem Einkaufszettel ist, kannst du direkt auf der Karte (und im Detail) mit − und + die Anzahl einstellen.","Kaffeemaschinen, Pizzaöfen, Fritteusen & Co. stehen jetzt unter Technik."],
   59:["Durchgestrichener Preis „kostet eigentlich“ jetzt auch bei Rewe und Edeka: Nennt der Prospekt keinen „statt“-Preis, zeigt SparRadar die echte UVP desselben Markenartikels (gleiche Menge) von einem anderen Markt – oder den bisherigen Preis im selben Markt.","Kaffeemaschinen, Wasserkocher & Co. stehen jetzt unter Technik statt unter Kaffee & Tee."],
   58:["Kategorien: Du kannst jetzt mehrere gleichzeitig auswählen, z. B. Obst & Gemüse und Fleisch & Fisch. Nochmal antippen nimmt eine Kategorie wieder raus, „Alle Kategorien“ setzt alles zurück.","Prospekte, die erst am Montag erscheinen, werden jetzt auch sofort geholt."],

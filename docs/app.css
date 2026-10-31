@@ -316,3 +316,9 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .trow .tm em{font-style:normal;font-size:.75rem;color:var(--muted)}
 .trow .tp{text-align:right;font-weight:800}
 .rline{grid-template-columns:minmax(0,1fr);grid-auto-flow:column;grid-auto-columns:auto}
+
+/* kleine Bilder in Originalgröße (scharf) statt aufgeblasen */
+.thumb img.lowres,img.lowres{object-fit:scale-down;image-rendering:auto}
+.thumb img.lowres{padding:6px}
+/* Bild immer genau in die Kachel einpassen: hohe Flaschenbilder wurden sonst unten/oben abgeschnitten (nur der Deckel sichtbar) */
+.thumb>img{position:absolute;inset:0;width:100%;height:100%;box-sizing:border-box}
