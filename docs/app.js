@@ -172,7 +172,7 @@ const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(o.from) : o.to===TO
 const tagHTML = v => {v=Math.max(v,0);const e=Math.floor(v+1e-9),c=Math.round((v-e)*100);return `<span class="eu">${e||"-"}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
 const comboLabels = o => steps(o).filter(s=>s.t!=="base"&&s.t!=="of").map(s=>s.l);
 function verdict(o){const h=histOf(o);
-  if(h.length<3)return{t:"ok",l:"Preisverlauf wird gerade aufgebaut",s:"Neu im Verlauf"};
+  if(h.length<3)return{t:"ok",l:"Preisvergleich startet: SparRadar merkt sich ab jetzt jeden Tag den Preis. Nach ein paar Tagen siehst du hier, ob es ein echter Tiefpreis ist oder ein Schein-Rabatt.",s:"Preis wird beobachtet",fresh:true};
   const avg=h.reduce((a,b)=>a+b,0)/h.length,min=Math.min(...h);
   if(o.o&&avg<=o.p*1.05)return{t:"fake",l:`Rabatt fraglich: kostete zuletzt meist ${eur(avg)}`,s:"Rabatt fraglich"};
   if(o.p<min-.001)return{t:"low",l:`Tiefstpreis seit ${h.length} Abrufen`,s:"Tiefstpreis"};
@@ -206,7 +206,7 @@ async function load(){
     OFFERS=o.offers.filter(x=>!x.to||x.to>=TODAY).concat(manualOffers());
     const g=new Date(o.generated);
     const pr=flyerInfo();
-    document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?` · <button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
+    document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
     document.getElementById("flyerInfo").innerHTML=pr.rows;
   }catch(e){
     OFFERS=manualOffers();
@@ -291,7 +291,7 @@ function card(o,bestIds){
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
   return `<button class="kracher" id="openK" aria-label="Kracher öffnen">
    <span class="boom">${IC.flame}</span>
-   <span><span class="eyebrow">Kracher ${S.week?"demnächst":"der Woche"}</span><span class="what" style="display:block">${esc(k.n)} bei ${esc(sname(k.s))}</span><span class="how" style="display:block">${comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).l} · tippen für alle Top-Deals</span></span>
+   <span><span class="eyebrow">Kracher ${S.week?"demnächst":"der Woche"}</span><span class="what" style="display:block">${esc(k.n)} bei ${esc(sname(k.s))}</span><span class="how" style="display:block">${comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).fresh?[ref(k)>fin(k)?"statt "+eur(ref(k)):"",validTxt(k)].filter(Boolean).join(" · "):verdict(k).l} · antippen für Details</span></span>
    <span class="big"><b>${eur(fin(k))}</b>${offPct(k)?`<span>−${offPct(k)} %</span>`:""}</span></button>`}
 
 function renderOffers(){
@@ -553,7 +553,8 @@ function render(){
   document.getElementById("qclear").hidden=!S.q;
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
-  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
+  // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
+  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
 }
 
 // kaputte Fotos durch Illustration ersetzen
