@@ -140,10 +140,11 @@ def unit_price(text):
 
 
 def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=None, start=None, end=None,
-          app=None, extra=None, src="", url=None, cat_text="", food=True):
+          app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None):
     title = re.sub(r"\s+", " ", (title or "").strip())
-    if not title or not price or price <= 0:
+    if not title or ((not price or price <= 0) and not bonus_only):
         return None
+    price = price or 0
     up = unit_price(base) if isinstance(base, str) else base
     o = {
         "s": store,
@@ -162,6 +163,10 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         "src": src,
         "url": url,
     }
+    if app_only:
+        o["ao"] = app_only        # Preis gilt nur mit dieser App/Karte
+    if bonus_only:
+        o["bo"] = bonus_only      # Bonus-Aktion: so viel Guthaben gibt es, Preis steht nicht im Prospekt
     o["id"] = f"{store}-{norm(title)[:40]}-{int(o['p'] * 100)}"
     return o
 
@@ -312,6 +317,8 @@ def kd_items(url, all_pages=True):
     return items
 
 
+APP_COND = re.compile(r"lidl\s*plus|app[- ]?preis|mit (der )?app|netto[- ]?app|payback|deutschlandcard|kundenkarte|coupon", re.I)
+APP_LABEL = {"lidl": "Lidl Plus", "edeka": "Edeka-App", "netto": "Netto-App", "rewe": "Rewe-App", "dm": "dm-App", "aldi": "Aldi-App"}
 APP_HINT = re.compile(r"(?:mit\s+(?:der\s+)?app|app[- ]preis|rewe\s+bonus|lidl\s+plus|netto[- ]app)[^0-9]{0,25}(\d+)[,.](\d\d)", re.I)
 
 
@@ -323,11 +330,28 @@ def kd_offer(it):
     cat_names = " ".join(n.get("name", "") for p in paths for n in p if isinstance(n, dict))
     food_hint = any(p and isinstance(p[0], dict) and p[0].get("name") == "Lebensmittel und Getränke" for p in paths)
     pr = it.get("prices") or {}
-    p = pr.get("mainPrice")
+    p = pr.get("mainPrice") or 0
     old = pr.get("secondaryPrice") or None
-    extra, app = [], None
-    m = APP_HINT.search(" ".join([it.get("description") or "", " ".join(str(c) for c in pr.get("conditions") or [])]))
-    if m:
+    extra, app, app_only, bonus_only = [], None, None, None
+    # kaufDA kennzeichnet App-Preise in prices.conditions, z. B. {"other": "Mit Lidl Plus"} oder "App-Preis"
+    cond = " ".join(str(c.get("other") or "") for c in pr.get("conditions") or [] if isinstance(c, dict))
+    if APP_COND.search(cond):
+        label = "Payback" if re.search(r"payback", cond, re.I) else APP_LABEL.get(store, "App")
+        if old and old > p:
+            # „Mit Lidl Plus 1,49 statt 2,29“: ohne App zahlt man 2,29, mit App 1,49
+            p, app, old = old, p, None
+        else:
+            app_only = label  # nur dieser Preis bekannt, gilt nur mit App
+    # Rewe Bonus: prices.description „0,80 € Bonus“ = Guthaben in der Rewe-App
+    mb = re.search(r"(\d+)[,.](\d\d)\s*€?\s*bonus", str(pr.get("description") or ""), re.I)
+    if mb:
+        v = float(f"{mb.group(1)}.{mb.group(2)}")
+        if p:
+            extra.append(["bonus", "Rewe Bonus Guthaben" if store == "rewe" else "Bonus-Guthaben", v])
+        else:
+            bonus_only = v  # Bonus-Aktion ohne Preis im Prospekt
+    m = APP_HINT.search(" ".join([it.get("description") or "", cond]))
+    if m and not app and not app_only:
         v = float(f"{m.group(1)}.{m.group(2)}")
         if store == "rewe" and v < (p or 0) * 0.6:
             extra.append(["bonus", "Rewe Bonus Guthaben", v])
@@ -337,7 +361,8 @@ def kd_offer(it):
     return offer(store, it.get("title"), p, brand=it.get("brand"), desc=it.get("description") or "", old=old,
                  base=pr.get("priceByBaseUnit"), img=imgs.get("normal") or imgs.get("large"),
                  start=it.get("validFrom"), end=it.get("validUntil"), app=app, extra=extra,
-                 src="kaufda.de", cat_text=cat_names + " " + " ".join(it.get("categories") or []), food=food_hint)
+                 src="kaufda.de", cat_text=cat_names + " " + " ".join(it.get("categories") or []), food=food_hint,
+                 app_only=app_only, bonus_only=bonus_only)
 
 
 def fetch_kaufda():

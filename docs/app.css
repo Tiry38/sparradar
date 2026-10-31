@@ -128,3 +128,13 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .wn{margin:0;padding-left:20px;display:grid;gap:8px;font-size:.95rem}
 .wn li::marker{color:var(--save)}
 .sugg{max-height:min(60vh,420px);overflow-y:auto;overscroll-behavior:contain}
+/* Fenster: Inhalte nie zusammendrücken (WebView2 hat den Kracher-Block sonst auf 0 Höhe geschrumpft) */
+.sheet{grid-auto-rows:max-content;align-content:start}
+.sheet>*{min-height:max-content;flex-shrink:0}
+.hero{min-height:min(520px,max-content)}
+/* App-Preise und Bonus-Aktionen */
+.aonly{display:inline-flex;align-items:center;gap:5px;justify-self:start;font-size:.75rem;font-weight:800;color:#fff;background:var(--grad-brand);border-radius:8px;padding:2px 8px}
+.aonly svg{width:13px;height:13px}
+.bonustag{display:grid;background:var(--grad-save);color:#fff;border-radius:10px;padding:4px 10px;line-height:1.1}
+.bonustag b{font-family:var(--f-price);font-size:1.6rem}
+.bonustag small{font-size:.72rem;font-weight:700}

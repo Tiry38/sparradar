@@ -130,7 +130,8 @@ const Sync = {
 function histOf(o){const rows=HIST[o.s+"|"+norm(o.n).slice(0,40)]||[];return rows.filter(r=>r[0]<(o.from||TODAY)).map(r=>r[1])}
 // Referenzpreis für "Ersparnis": statt-Preis, sonst Durchschnitt aus dem Verlauf, sonst Angebotspreis
 function ref(o){if(o.o)return o.o;const h=histOf(o);return h.length>=3?Math.max(o.p,h.reduce((a,b)=>a+b,0)/h.length):o.p}
-function steps(o){const st=[{l:o.o?"Normalpreis":"Angebotspreis",v:o.o||o.p,t:"base"}];
+function steps(o){if(!o.p)return [{l:"Bonus-Aktion",v:0,t:"base"}]; // Rewe-Bonus ohne Preis im Prospekt
+  const st=[{l:o.o?"Normalpreis":"Angebotspreis",v:o.o||o.p,t:"base"}];
   if(o.o)st.push({l:"Angebot",v:o.p-o.o,t:"of"});
   if(S.useApp){if(o.ap)st.push({l:(STORES[o.s]||{}).app?STORES[o.s].app+" App-Preis":"App-Preis",v:o.ap-o.p,t:"app"});(o.x||[]).forEach(([t,l,v])=>st.push({l,v:-v,t}))
     // eigene Coupons: werden in der eingetragenen Reihenfolge auf den jeweils aktuellen Preis angewendet
@@ -206,11 +207,11 @@ function filtered(){
   if(S.stores.size)r=r.filter(o=>S.stores.has(o.s));
   if(S.cat)r=r.filter(o=>o.c===S.cat);
   const qt=S.q.trim().split(/\s+/).filter(Boolean);if(qt.length)r=searchOffers(r,S.q);
-  const f0={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>fin(a)-fin(b)}[S.sort];
+  const f0={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
   const f=qt.length?(a,b)=>relevance(a,qt)-relevance(b,qt)||f0(a,b):f0;
   return r.sort(f)}
 const score = o => {const v=verdict(o).t;return offPct(o)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
-const ranked = () => weekOffers().slice().sort((a,b)=>score(b)-score(a));
+const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
 
 function manualOffers(){return S.manual.filter(m=>!m.to||m.to>=TODAY).map(m=>({...m,src:"selbst eingetragen",manual:true}))}
@@ -299,13 +300,15 @@ const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColo
 // ---------- Ansichten ----------
 function card(o,bestIds){
   const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o);
-  const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} Mit Kombi<b>${eur(fin(o))}</b></div><div class="src">${cl.map(esc).join(" + ")}</div></div>`:"";
+  // App-Preis direkt beim Preis: „Lidl Plus App-Preis 1,49 €“; mehrere Vorteile zusammen = „Mit Kombi“
+  const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} ${cl.length===1?esc(cl[0]):"Mit Kombi"}<b>${eur(fin(o))}</b></div>${cl.length>1?`<div class="src">${cl.map(esc).join(" + ")}</div>`:""}</div>`:"";
   return `<article class="card">${thumb(o)}
    <div class="body">
    <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}</span>
    ${o.manual?'<span class="manual">selbst eingetragen</span>':""}
    <div class="name">${safeUrl(o.url)?`<a href="${esc(o.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${esc(o.n)}</a>`:esc(o.n)}<small>${esc(o.d||"")}</small></div>
-   <div class="pricerow"><div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>
+   ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
+   <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
      <div class="was">${o.o?`<s>statt ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
    ${combo}
@@ -350,6 +353,7 @@ function moreArticles(shown){
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  32:["Viel mehr Angebote: Vorher fehlten bei jedem Markt viele Angebote (z. B. bei Lidl), jetzt kommen alle aus den Prospekten.","Lidl-Plus-Preise, App-Preise und Rewe-Bonus stehen direkt beim Angebot."],
   31:["Suche und Merkliste kennen jetzt zehntausende Artikel (z. B. alle Tassimo-Sorten) zum gezielten Merken.","Merkliste erkennt auch Prospekt-Angebote wie „Tassimo, versch. Sorten“."],
   30:["Keine Update-Hinweise für die Android-App mehr: Neuigkeiten kommen ab jetzt immer automatisch, ohne Installieren."],
   29:["Nach jedem Update erscheint dieses Fenster mit den Neuigkeiten."],
