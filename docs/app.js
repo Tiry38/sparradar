@@ -95,7 +95,13 @@ const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.s
 // GitHub-Konto des Nutzers. Der Schlüssel (nur Recht "gist") bleibt auf dem Gerät, nie im Repo.
 const Sync = {
   API:"https://api.github.com", FILE:"sparradar-sync.json", DESC:"SparRadar-Sync (Merkliste, Einkaufszettel, Coupons)",
-  cfg(){return store.get("sync",null)}, timer:null, busy:false, status:"",
+  cfg(){return store.get("sync",null)}, timer:null, busy:false, status:"", devices:store.get("syncDevs",{}),
+  // Jedes Gerät trägt sich mit Name + „zuletzt aktiv“ ein -> Liste „Verbundene Geräte“ (beliebig viele Geräte mit demselben Code)
+  devId(){let id=store.get("devId","");if(!id){id=Math.random().toString(36).slice(2,10);store.set("devId",id)}return id},
+  devType(){const u=navigator.userAgent;return /iPad|Tablet|SM-T|Tab\b/i.test(u)||(/Android/i.test(u)&&!/Mobile/i.test(u))?"tablet":/Android|iPhone|Mobile/i.test(u)?"phone":"pc"},
+  devName(){return store.get("devName","")||({phone:/iPhone/.test(navigator.userAgent)?"iPhone":"Android-Handy",tablet:"Tablet",pc:/Mac/.test(navigator.userAgent)?"Mac":"Windows-PC"})[this.devType()]},
+  devs(){const me={n:this.devName(),t:this.devType(),at:Date.now()},old=Date.now()-90*864e5;
+    const d=Object.fromEntries(Object.entries(this.devices||{}).filter(([k,v])=>v&&v.at>old&&k!==this.devId()));d[this.devId()]=me;return d},
   data(){return {watch:S.watch,list:S.list,coupons:S.coupons,extra:S.extra,checked:S.checked,saved:S.saved,trips:S.trips,qty:S.qty}},
   snap(){return JSON.stringify(this.data())},
   async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
@@ -118,6 +124,8 @@ const Sync = {
   async pull(first){const c=this.cfg();if(!c?.gist||this.busy)return;this.busy=true;
     try{const g=await this.req("/gists/"+c.gist);const f=g.files[this.FILE];
       const raw=f.truncated?await (await fetch(f.raw_url,{cache:"no-store"})).text():f.content;const remote=JSON.parse(raw||"{}");
+      if(remote.devices&&typeof remote.devices==="object"){this.devices=remote.devices;store.set("syncDevs",remote.devices)}
+      const mine=(this.devices||{})[this.devId()],stale=!mine||mine.n!==this.devName()||Date.now()-mine.at>6*36e5;
       const remoteNew=(remote.updatedAt||0)>store.get("syncRemoteAt",0),localNew=this.snap()!==store.get("syncSnap",null);
       if(remoteNew&&remote.data){
         if(localNew&&!first){this.apply(this.merge(remote.data,this.data()));this.busy=false;return this.push()}
@@ -125,11 +133,12 @@ const Sync = {
         store.set("syncRemoteAt",remote.updatedAt);store.set("syncSnap",this.snap());
         if(first){this.busy=false;return this.push()}
         render()}
-      else if(localNew){this.busy=false;return this.push()}
+      else if(localNew||stale){this.busy=false;return this.push()}
       this.ok()}
     catch(e){this.fail(e)}finally{this.busy=false}},
   async push(){const c=this.cfg();if(!c?.gist)return;if(this.busy){this.changed();return}this.busy=true;
-    try{const at=Date.now();await this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify({updatedAt:at,data:this.data()})}}})});
+    try{const at=Date.now();await this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify({updatedAt:at,data:this.data(),devices:this.devs()})}}})});
+      this.devices=this.devs();store.set("syncDevs",this.devices);
       store.set("syncRemoteAt",at);store.set("syncSnap",this.snap());this.ok()}
     catch(e){this.fail(e)}finally{this.busy=false}},
   changed(){if(!this.cfg()?.gist)return;clearTimeout(this.timer);this.timer=setTimeout(()=>this.push(),1500)},
@@ -168,7 +177,7 @@ const unit = o => o.gp ? o.gp.v*(fin(o)/o.p) : null;
 const unitTxt = o => o.gp ? `1 ${o.gp.u} = ${eur(unit(o))}` : "";
 // Suche: Artikelname, Marke und Markt. Die Beschreibung nur als Notlösung, der Kategoriename nie
 // (sonst findet „Milch“ alles aus „Milch, Käse & Eier“).
-const hay = o => o._hay ??= norm([o.n,o.b,sname(o.s)].join(" "));
+const hay = o => o._hay ??= [o.n,o.b,sname(o.s)].map(norm).join(" "); // Felder getrennt: „Prodomo“ + „Rewe“ ergibt nicht „…more…“
 const hayD = o => o._hayD ??= norm(o.d);
 // genauer Kategoriename (z. B. „Katzenfutter“, „Getränke“) findet die ganze Kategorie
 const matches = (o,k) => hay(o).includes(norm(k)) || norm(CATS[o.c]||"")===norm(k);
@@ -187,12 +196,15 @@ function searchOffers(list,q){const t=q.trim().split(/\s+/).filter(Boolean);if(!
 const WATCH_FILL=/^(\d.*|g|kg|ml|l|cl|x|xl|xxl|st|stk|stueck|pack|packung|bigpack|big|cups?|portionen|kapseln|und|mit|fuer|der|die|das|von)$/;
 const WATCH_WEAK=new Set(["bio","gut","ja","mini","frisch","frische","original","classic","klassik","deluxe","premium","neu","extra"]);
 const wTokens = k => (k.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(t=>t.length>1&&!WATCH_FILL.test(t));
+// Wörter einzeln vergleichen (nie über Wortgrenzen hinweg: „Prodomo Rewe“ enthält sonst „more“)
+const oWords = o => [...new Set(`${o.b||""} ${o.n} ${o.d||""} ${sname(o.s)}`.toLowerCase().match(/[a-zäöüß0-9]+/g)||[])].map(norm).filter(Boolean);
 function watchMatch(o,k){
-  if(matches(o,k))return true;
+  if(norm(CATS[o.c]||"")===norm(k))return true;
   const t=wTokens(k);if(!t.length)return false;
-  const txt=hay(o)+" "+hayD(o);
-  if(t.every(x=>txt.includes(x)))return true;
-  return t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&txt.includes(t[0])&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))}
+  const w=oWords(o),inW=x=>w.some(v=>{const i=v.indexOf(x);if(i<0)return false;const r=v.slice(i+x.length);return /^(|e|n|en|s|es|er|ern|ns)$/.test(r)||r.length>=4}); // zusammengesetzte Wörter und Mehrzahl zählen (Bohnenkaffee, Kaffeebohnen, Weißbiere), Milkana ist aber nicht Milka
+  if(t.every(inW))return true;
+  // „versch. Sorten“: Marke/Produktlinie reicht – aber nur als ganzes Wort oder Wortanfang, mind. 4 Buchstaben
+  return t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&w.some(v=>v===t[0]||(v.startsWith(t[0])&&t[0].length>=5))&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))}
 const hitW = (o,w) => watchMatch(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
 const TOMORROW=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date(Date.now()+864e5));
 const validTxt = o => o.from && o.from>SHOP ? "ab "+fmtDate(shopDay(o.from)) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
@@ -619,6 +631,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  63:["Geräte verbinden: Beliebig viele Geräte mit demselben Code verbinden (z. B. Handys von Mama und Stefan, Tablet, PC) – alle haben denselben Einkaufszettel und dieselbe Merkliste.","In den Einstellungen siehst du jetzt, welche Geräte verbunden sind und wann sie zuletzt aktiv waren. Jedem Gerät kannst du einen Namen geben, z. B. „Mamas Handy“."],
+  62:["Merkliste: Falsche Treffer behoben (z. B. „More Barista“ fand „Dallmayr Prodomo“, weil Wörter über Wortgrenzen verglichen wurden).","Gemerkte Artikel jetzt übersichtlich mit Bild und „x Treffer im Angebot“ bzw. „gerade nicht im Angebot“. Antippen zeigt nur die Treffer dieses Artikels."],
   61:["Bilder: Hohe Fotos (z. B. Flaschen) wurden in der Kachel abgeschnitten, sodass oft nur der Deckel zu sehen war. Jetzt ist immer das ganze Bild sichtbar.","Schärfere Bilder: Winzige Prospekt-Ausschnitte werden nicht mehr künstlich vergrößert (das machte sie pixelig). Wo es denselben Markenartikel bei einem anderen Markt mit gutem Foto gibt, zeigt SparRadar dieses Foto."],
   60:["Menge gleich beim Hinzufügen: Sobald ein Artikel auf dem Einkaufszettel ist, kannst du direkt auf der Karte (und im Detail) mit − und + die Anzahl einstellen.","Kaffeemaschinen, Pizzaöfen, Fritteusen & Co. stehen jetzt unter Technik."],
   59:["Durchgestrichener Preis „kostet eigentlich“ jetzt auch bei Rewe und Edeka: Nennt der Prospekt keinen „statt“-Preis, zeigt SparRadar die echte UVP desselben Markenartikels (gleiche Menge) von einem anderen Markt – oder den bisherigen Preis im selben Markt.","Kaffeemaschinen, Wasserkocher & Co. stehen jetzt unter Technik statt unter Kaffee & Tee."],
@@ -732,15 +746,19 @@ function renderKracher(){
 
 function renderWatch(){
   const wh=watchHits(null);
-  const hits=[...new Map(wh.flatMap(x=>x.hits).map(o=>[o.id,o])).values()].sort((a,b)=>offPct(b)-offPct(a));
+  if(S.wsel!=null&&!wh[S.wsel])S.wsel=null;
+  if(S.watch.length&&!SIMG)loadSugImgs(()=>{if(S.tab==="watch")render()});
+  const sel=S.wsel!=null?[wh[S.wsel]]:wh;
+  const hits=[...new Map(sel.flatMap(x=>x.hits).map(o=>[o.id,o])).values()].sort((a,b)=>offPct(b)-offPct(a));
   return `<section class="panel"><h3>Was soll ich für dich beobachten?</h3>
     <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt. Die Zahl am Tab „Merkliste“ zeigt dir beim Öffnen, wie viele Treffer gerade im Angebot sind.</p>
     <form class="addrow" id="kwForm"><input id="kwIn" placeholder="z. B. Mozzarella, Felix, Cola" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg (optional)" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
     <div id="kwSugg"></div>
-    <div class="kw">${S.watch.map((w,i)=>{const n=wh[i].hits.length;return `<span class="kwchip">${esc(w.k)}${w.max?`<em>≤ ${eur(w.max)}/kg</em>`:""}<span class="n ${n?"":"zero"}">${n}</span><button data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></span>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
+    <div class="wlist">${S.watch.map((w,i)=>{const n=wh[i].hits.length,im=sugImg(w.k)||(wh[i].hits.find(o=>o.img)||{}).img||"",on=S.wsel===i;
+      return `<div class="witem${n?" hit":""}${on?" on":""}"><button class="wmain" data-wsel="${i}" aria-pressed="${on}" title="${esc(w.k)}">${safeUrl(im)?`<img src="${esc(sharp(im))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<span class="wph">${IC.bell}</span>`}<span class="wtx"><b>${esc(w.k)}</b><small>${n?`${n} ${n===1?"Treffer":"Treffer"} im Angebot`:"gerade nicht im Angebot"}${w.max?` · bis ${eur(w.max)}/kg`:""}</small></span></button><button class="wdel" data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></div>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
    </section>
-   <div class="meta"><h2>Deine Treffer</h2><span>${hits.length} Angebote</span></div>
-   ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis.</div>'}`}
+   <div class="meta"><h2>${S.wsel!=null?`Treffer für „${esc(S.watch[S.wsel].k)}“`:"Deine Treffer"}</h2><span>${S.wsel!=null?`<button class="linkbtn" data-wsel="${S.wsel}">Alle zeigen</button> · `:""}${hits.length} Angebote</span></div>
+   ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>${S.wsel!=null?"Dieser Artikel ist gerade nicht im Angebot. SparRadar schaut bei jedem Abruf nach.":"Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis."}</div>'}`}
 
 // Ersparnis-Zähler: was auf dem Zettel abgehakt wird, zählt als gekauft
 function savedHTML(){if(!S.saved.length)return "";
@@ -906,9 +924,13 @@ function renderCoupons(){
 function renderSync(){
   const c=Sync.cfg();
   return `<section class="panel" id="syncPanel"><h3>📱 ↔ 💻 Geräte verbinden</h3>
-   ${c?.gist?`<p><b>Handy und PC sind verbunden.</b> Merkliste, Einkaufszettel und Coupons gleichen sich automatisch ab.</p>
+   ${c?.gist?(()=>{const ds=Object.entries(Sync.devs()).sort((a,b)=>(b[0]===Sync.devId())-(a[0]===Sync.devId())||b[1].at-a[1].at),ic={phone:"📱",tablet:"📱",pc:"💻"};
+     const ago=t=>{const m=Math.round((Date.now()-t)/6e4);return m<2?"gerade aktiv":m<60?`vor ${m} Min.`:m<1440?`vor ${Math.round(m/60)} Std.`:`vor ${Math.round(m/1440)} Tag${Math.round(m/1440)===1?"":"en"}`};
+     return `<p><b>${ds.length} ${ds.length===1?"Gerät":"Geräte"} verbunden.</b> Alle sehen dieselbe Merkliste, denselben Einkaufszettel und dieselben Coupons – Änderungen kommen automatisch überall an.</p>
+     <div class="devlist">${ds.map(([k,v])=>`<div class="dev${k===Sync.devId()?" me":""}"><span class="di">${ic[v.t]||"📱"}</span><span class="dt"><b>${esc(v.n||"Gerät")}</b><small>${k===Sync.devId()?"dieses Gerät":ago(v.at)}</small></span></div>`).join("")}</div>
+     <form class="addrow" id="devForm"><input id="devName" value="${esc(Sync.devName())}" maxlength="30" placeholder="Name dieses Geräts, z. B. Mamas Handy" autocomplete="off"><button class="btn ghost" type="submit">Name speichern</button></form>
      <p id="syncState">${esc(Sync.status||"Verbunden")}</p>
-     <p><b>Zweites Gerät verbinden:</b> Code kopieren, an dich selbst schicken (z. B. WhatsApp oder E-Mail) und auf dem anderen Gerät hier einfügen.</p>
+     <p><b>Weiteres Gerät verbinden</b> (beliebig viele, z. B. das Handy von Mama und Stefan, Tablet oder PC): Code kopieren, per WhatsApp schicken und auf dem anderen Gerät hier unter „Geräte verbinden“ einfügen. Wer den Code hat, sieht und ändert eure gemeinsamen Listen – also nur an Familie geben.</p>`})()+`
      <div class="links"><button class="btn sm" id="syncCopy">Code kopieren</button><button class="btn ghost sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
    :`<p>Damit du auf Handy und PC dieselbe Merkliste, denselben Einkaufszettel und dieselben Coupons siehst. Einmal pro Gerät den Schlüssel eintragen, danach läuft alles unsichtbar im Hintergrund.</p>
      <p><b>Schon ein Gerät verbunden?</b> Dort „Code kopieren“ drücken, dir schicken und hier einfügen. Fertig.</p>
@@ -1128,7 +1150,8 @@ document.addEventListener("click",e=>{
   if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
   if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
   if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
-  if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);save();render();return}
+  if(b.dataset.wsel!=null&&b.dataset.wsel!==""){const i=+b.dataset.wsel;S.wsel=S.wsel===i?null:i;render();return}
+  if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
@@ -1169,6 +1192,7 @@ document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
   if(e.target.id==="extraForm"){e.preventDefault();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p}:{id,n:x.n});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
+  if(e.target.id==="devForm"){e.preventDefault();const v=document.getElementById("devName").value.trim().slice(0,30);store.set("devName",v);Sync.push().then(()=>{toast(v?`Dieses Gerät heißt jetzt „${v}“`:"Name zurückgesetzt");render()});return}
   if(e.target.id==="syncForm"){e.preventDefault();const t=document.getElementById("syncToken").value.trim();
     if(!/^(ghp_|github_pat_)/.test(t)){toast("Das sieht nicht wie ein GitHub-Schlüssel aus (beginnt mit ghp_).");return}
     toast("Verbinde …");Sync.connect(t).then(()=>{toast("Verbunden! Deine Listen sind jetzt auf allen Geräten gleich.");render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
