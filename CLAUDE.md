@@ -16,7 +16,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
   - `app.js` – gesamte Logik; Daten liegen pro Gerät in `localStorage` (Merkliste, Einkaufszettel, Coupons).
   - `data/offers.json` und `data/history.json` – werden vom Abruf geschrieben, nicht von Hand ändern.
 - `fetcher/fetch_offers.py` – täglicher Angebots-Abruf, nur Python-Standardbibliothek.
-- `.github/workflows/angebote.yml` – Abruf jeden Morgen ca. 5:15/6:15 Uhr und zusätzlich **sonntags ca. 18:15/19:15 Uhr** (Kevins Wunsch: neue Wochenprospekte von Rewe/Edeka sobald verfügbar, noch vor Montag), committet nach `docs/data/`.
+- `.github/workflows/angebote.yml` – Abruf jeden Morgen ca. 5:15/6:15 Uhr und zusätzlich **Fr, Sa, So ca. 18:15/19:15 Uhr** (Kevins Wunsch: schon ab Freitag wissen, was nächste Woche im Angebot ist; Lidl/Netto erscheinen ab Freitag, Rewe/Edeka meist am Wochenende), committet nach `docs/data/`.
 - `android/` – Android-App (WebView auf die Pages-URL), `desktop/src-tauri/` – Windows-App (Tauri 2, WebView2).
 - `.github/workflows/apps.yml` – baut `SparRadar.apk` und `SparRadar-Setup.exe` und lädt sie in den Release `apps` hoch. Beide Apps zeigen immer die Online-Version, müssen also nur bei Änderungen in `android/` oder `desktop/` neu gebaut werden.
 - **Windows-Updater:** `desktop/src-tauri/src/main.rs` prüft beim Start und alle 6 h `version.json` (Feld `desktop`), lädt bei neuerer Version `SparRadar-Setup.exe`, schließt sich, installiert still (`/S`) und startet neu. Version = `1.0.<Anzahl Commits in desktop/>`. Die Windows-Datei muss also nie von Hand ersetzt werden.
@@ -65,7 +65,7 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Hinweis beim Öffnen:** neue Merklisten-Treffer seit dem letzten Öffnen (`seenHits`) – kein Push, nur in der App.
 - **Vorschläge/Suche:** `BASE_WORDS` + `docs/data/names.json` (alle je gesehenen Artikelnamen, auch Lidl ohne Rabatt). Suche nur in Name, Marke, Markt; Kategoriename nur bei exakter Eingabe.
 - **Bedienung:** „A+“-Knopf (3 Schriftstufen per CSS-`zoom`), am Handy Märkte/Kategorien/Sortierung im Fenster „Märkte & Filter“. Look: Farbverläufe in `docs/look.css`.
-- **Sperren nicht umgehen:** rewe.de und netto-online.de blocken automatische Abrufe (403). Diese Sperren nicht umgehen, keine API-Schlüssel aus Websites auslesen (z. B. bei Marktguru). Nur öffentliche Seiten, die robots.txt erlaubt, mit ehrlichem User-Agent, höchstens einmal pro Tag (Ausnahme: zusätzlicher Sonntagabend-Abruf) und mit Pausen (`PAUSE`).
+- **Sperren nicht umgehen:** rewe.de und netto-online.de blocken automatische Abrufe (403). Diese Sperren nicht umgehen, keine API-Schlüssel aus Websites auslesen (z. B. bei Marktguru). Nur öffentliche Seiten, die robots.txt erlaubt, mit ehrlichem User-Agent, höchstens einmal pro Tag (Ausnahme: zusätzliche Abend-Abrufe Fr/Sa/So) und mit Pausen (`PAUSE`).
 - Das Repository ist öffentlich (nötig für kostenloses GitHub Pages). Keine Passwörter, Tokens oder persönlichen Daten hineinschreiben.
 
 ## Automatische Rabatt-Prüfung (Kevins Wunsch: hohe Rabatte genauestens prüfen, echte dürfen NICHT abgewertet werden)
