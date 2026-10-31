@@ -82,3 +82,11 @@ header.top,#filters,main{grid-template-columns:minmax(0,1fr)}
 .sugg em{flex:none;font-style:normal;font-size:.75rem;color:var(--muted)}
 .sugg em.on{color:#fff;background:var(--grad-save,#0B8F62);border-radius:999px;padding:2px 8px;font-weight:700}
 input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
+/* WhatsApp-Knopf */
+.btn.wa{background:linear-gradient(135deg,#2BD96B,#128C7E);color:#fff;box-shadow:0 4px 14px rgba(18,140,126,.3)}
+/* Suche: Artikel, die gerade nicht im Angebot sind */
+.mrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--line);min-width:0}
+.mrow:first-child{border-top:0}
+.mrow span{min-width:0;font-weight:600}
+.mrow em{flex:none;font-style:normal;font-size:.8rem;color:var(--save);font-weight:700}
+.newsico{width:38px;height:38px;border-radius:11px;background:var(--grad-brand,#7A3CF0);color:#fff;display:grid;place-items:center;flex:none}

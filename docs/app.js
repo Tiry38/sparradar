@@ -211,7 +211,8 @@ async function load(){
   }
   OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});
   const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
-  render();  Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
+  render();  if(OFFERS.length)checkNews();
+  Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
 }
 // Wie aktuell sind die Prospekte? Häufigster Zeitraum je Markt, dazu wann die nächsten starten
 function flyerInfo(){
@@ -255,6 +256,15 @@ function suggHTML(q,kind){const list=suggest(q);if(!list.length)return "";
 function showSugg(id,q,kind){const el=document.getElementById(id);if(el)el.innerHTML=suggHTML(q,kind)}
 const hideSugg=()=>["qSugg","kwSugg"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=""});
 
+// ---------- Teilen ----------
+const APP_URL="https://tiry38.github.io/sparradar/",APK_URL="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-App.apk";
+// wa.me öffnet WhatsApp (Handy-App bzw. WhatsApp Web am PC), dort nur noch den Kontakt antippen
+const waLink = t => "https://wa.me/?text="+encodeURIComponent(t);
+const SHARE_TXT = `Schau mal: SparRadar zeigt alle Angebote rund um Wörth am Rhein (Lidl, Aldi, Rewe, Netto, Edeka, dm) 🛒\n${APP_URL}\n\nAls Android-App zum Installieren:\n${APK_URL}`;
+function listText(){const items=S.list.map(byId).filter(Boolean),g={};items.forEach(o=>(g[o.s]=g[o.s]||[]).push(o));
+  return "🛒 Einkaufszettel\n\n"+Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${o.n}${o.d?" ("+o.d+")":""} ${eur(fin(o))}${comboLabels(o).length?" mit "+comboLabels(o).join(" + "):""}`).join("\n")).join("\n\n")}
+const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
+
 // ---------- Ansichten ----------
 function card(o,bestIds){
   const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o);
@@ -291,7 +301,39 @@ function renderOffers(){
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
+   ${S.q.trim()?moreArticles(r):""}
    <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Scheck-In und Serpa trägst du über „+ Angebot eintragen“ selbst ein. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
+
+// Suche: auch Artikel zeigen, die gerade nicht im Angebot sind, damit man sie auf die Merkliste setzen kann
+function moreArticles(shown){
+  const t=S.q.trim().split(/\s+/).map(norm).filter(Boolean);if(!t.length)return "";
+  const have=new Set(shown.map(o=>norm(o.n)));
+  const cand=[...new Set([...BASE_WORDS,...NAMES])].filter(n=>{const k=norm(n);return t.every(x=>k.includes(x))&&![...have].some(h=>k.includes(h)||h.includes(k))});
+  cand.sort((a,b)=>(norm(b).startsWith(t[0])-norm(a).startsWith(t[0]))||a.length-b.length);
+  if(!cand.length)return "";
+  return `<section class="panel"><h3>Gerade nicht im Angebot</h3><p>Auf die Merkliste setzen: Sobald einer dieser Artikel im Angebot ist, zeigt SparRadar es dir beim Öffnen.</p>
+   <div class="rows">${cand.slice(0,15).map(n=>{const on=S.watch.some(w=>norm(w.k)===norm(n));
+    return `<div class="mrow"><span>${esc(n)}</span>${on?`<em>✓ auf der Merkliste</em>`:`<button class="btn ghost sm" data-watchname="${esc(n)}">${IC.star}Merken</button>`}</div>`}).join("")}</div></section>`}
+
+// Beim Öffnen: was von der Merkliste ist neu im Angebot? (nur Neues seit dem letzten Hinweis)
+function checkNews(){
+  if(S.sheet)return;
+  const hits=[...new Map(watchHits(0).flatMap(x=>x.hits).map(o=>[o.id,o])).values()];
+  const seen=new Set(store.get("seenHits",[])),fresh=hits.filter(o=>!seen.has(o.id));
+  store.set("seenHits",hits.map(o=>o.id));
+  if(!fresh.length)return;
+  S.news=fresh.sort((a,b)=>offPct(b)-offPct(a));S.sheet="news";render()}
+function renderNews(){
+  const n=S.news||[];
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Neu im Angebot">
+   <div class="sheet-h"><span class="newsico">${IC.bell}</span><h2>Von deiner Merkliste im Angebot</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <p style="margin:-6px 0 0;color:var(--muted)">${n.length===1?"Ein Artikel":n.length+" Artikel"} von deiner Merkliste ${n.length===1?"ist":"sind"} neu im Angebot:</p>
+   <div class="rows">${n.slice(0,12).map(o=>{const inL=S.list.includes(o.id);return `<div class="drow"><div class="mini" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}</div>
+     <div class="t">${esc(o.n)}<small>${esc(sname(o.s))}${o.b?" · "+esc(o.b):""} · ${validTxt(o)}</small></div>
+     <div class="pr"><b>${eur(fin(o))}</b>${offPct(o)?`<span class="off" style="font-size:.8rem">−${offPct(o)} %</span>`:""}<div style="margin-top:4px"><button class="ibtn add" data-add="${esc(o.id)}" aria-pressed="${inL}" aria-label="${inL?"Vom Einkaufszettel nehmen":"Auf den Einkaufszettel"}">${inL?IC.check:IC.plus}</button></div></div></div>`}).join("")}</div>
+   ${n.length>12?`<p style="margin:0;color:var(--muted)">… und ${n.length-12} weitere</p>`:""}
+   <div class="factions"><button class="btn ghost" data-newsdone="watch">Alle Treffer</button><button class="btn" data-newsdone="ok">Alles klar</button></div>
+  </div>`}
 
 function weekPlan(){const by={};S.watch.forEach(w=>{const h=weekOffers().filter(o=>hitW(o,w)).sort((a,b)=>(unit(a)??fin(a))-(unit(b)??fin(b)))[0];if(h){(by[h.s]=by[h.s]||{items:[],save:0});if(!by[h.s].items.includes(h)){by[h.s].items.push(h);by[h.s].save+=ref(h)-fin(h)}}});
   return Object.entries(by).sort((a,b)=>b[1].items.length-a[1].items.length)}
@@ -370,7 +412,7 @@ function renderList(){
      ${os.map(o=>`<div class="rline"><span>${esc(o.n)}${comboLabels(o).length?" *":""}</span><span>${eur(fin(o))}</span><button data-add="${esc(o.id)}" aria-label="${esc(o.n)} entfernen">${IC.x}</button></div>`).join("")}</div>`).join("")}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
-   <div class="ractions"><button class="btn" id="copyList">Als Text kopieren</button><button class="btn ghost" id="clearList">Zettel leeren</button></div>`}
+   <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button><button class="btn ghost" id="clearList">Zettel leeren</button></div>`}
 
 function renderCoupons(){
   const act=S.coupons.map((c,i)=>({c,i})).filter(x=>cpActive(x.c));
@@ -411,6 +453,12 @@ function renderSync(){
      <p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p>`}
   </section>`}
 
+function renderShare(){
+  return `<section class="panel" id="sharePanel"><h3>SparRadar teilen</h3>
+   <p>Schick SparRadar an Familie und Freunde. WhatsApp öffnet sich, du tippst nur noch den Kontakt an.</p>
+   <div class="links"><a class="btn wa" href="${waLink(SHARE_TXT)}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp teilen</a>${navigator.share?'<button class="btn ghost" id="shareOther">Anders teilen …</button>':""}</div>
+  </section>`}
+
 function renderTips(){
   const T=[
    ["lidl","Lidl Plus","Personalisierte Coupons, günstigere App-Preise und Belohnungen ab einem bestimmten Monatseinkauf. Coupons vor dem Einkauf aktivieren."],
@@ -428,7 +476,7 @@ function renderTips(){
    [IC.scale,"Grundpreis zählt","Vergleiche immer den Preis pro kg oder l. Die Großpackung ist nicht automatisch günstiger."],
    [IC.cal,"Montag und Donnerstag","An diesen Tagen starten bei Lidl und Aldi die neuen Aktionen. Unter „Demnächst“ siehst du sie schon vorher."],
    [IC.bag,"Too Good To Go","Bäcker und Märkte geben abends übrig gebliebene Lebensmittel als Überraschungstüte ab, meist für etwa ein Drittel des Werts."]];
-  return `${renderCoupons()}${renderSync()}
+  return `${renderCoupons()}${renderShare()}${renderSync()}
    <h3 class="sec-h">Spartipps</h3>
    <section class="panel"><h3>Geht „Extreme Couponing“ wie in den USA auch hier?</h3>
    <p>Nur teilweise. In Deutschland sind Coupons fast immer Händler-Coupons in Apps, oft auf ein Stück pro Einkauf begrenzt. Einen 200-€-Wagen für 0 € schaffst du hier nicht. Einzelne Artikel umsonst oder mit Plus gehen aber, wenn du Händler-App, Payback oder Rewe Bonus, Cashback-Apps und „Gratis testen“-Aktionen der Hersteller kombinierst.</p></section>
@@ -480,7 +528,7 @@ function render(){
   document.getElementById("qclear").hidden=!S.q;
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
-  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=S.sheet==="add"?renderAdd():S.sheet==="filter"?renderFilter():renderKracher();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
+  if(S.sheet){const y=sh.firstElementChild?.scrollTop||0;sh.innerHTML=S.sheet==="add"?renderAdd():S.sheet==="filter"?renderFilter():S.sheet==="news"?renderNews():renderKracher();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}
 }
 
 // kaputte Fotos durch Illustration ersetzen
@@ -521,9 +569,10 @@ document.addEventListener("click",e=>{
   if(b.id==="goWatch"){S.tab="watch";render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){S.list=[];save();render();return}
-  if(b.id==="copyList"){
-    const items=S.list.map(byId).filter(Boolean),g={};items.forEach(o=>(g[o.s]=g[o.s]||[]).push(o));
-    copy(Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${o.n}${o.d?" ("+o.d+")":""} ${eur(fin(o))}${comboLabels(o).length?" mit "+comboLabels(o).join(" + "):""}`).join("\n")).join("\n\n"),"Einkaufszettel kopiert");return}
+  if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
+  if(b.id==="shareOther"){navigator.share({title:"SparRadar",text:SHARE_TXT}).catch(()=>{});return}
+  if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){S.watch.push({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
+  if(b.dataset.newsdone){S.sheet=null;if(b.dataset.newsdone==="watch")S.tab="watch";render();return}
 });
 function copy(txt,ok){const fail=()=>toast("Kopieren hat nicht geklappt. Bitte Text markieren und von Hand kopieren.");try{navigator.clipboard.writeText(txt).then(()=>toast(ok),fail)}catch(e){fail()}}
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.sheet){S.sheet=null;render()}});

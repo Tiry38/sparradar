@@ -164,6 +164,10 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
     return o
 
 
+# Alle Artikelnamen, die beim Abruf vorbeikommen (auch ohne Rabatt): für die Vorschläge in Suche und Merkliste
+SEEN_NAMES = set()
+
+
 # ---------- Lidl ----------
 def fetch_lidl():
     out = []
@@ -184,6 +188,8 @@ def fetch_lidl():
                 v = (lp.get("price") or {}).get("price") if isinstance(lp.get("price"), dict) else lp.get("price")
                 if isinstance(v, (int, float)):
                     plus = v
+            if g.get("fullTitle") or g.get("title"):
+                SEEN_NAMES.add(re.sub(r"\s+", " ", (g.get("fullTitle") or g.get("title")).strip()))
             if not (disc or (old and p and old > p) or plus):
                 continue  # nur Angebote
             kf = g.get("keyfacts") or {}
@@ -378,6 +384,8 @@ def update_names(offers, today):
         n, b = o["n"], (o.get("b") or "").strip()
         text = n if not b or norm(b) in norm(n) else f"{b} {n}"
         names[text[:80]] = today
+    for n in SEEN_NAMES:
+        names[n[:80]] = today
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=400)).isoformat()
     names = {k: v for k, v in names.items() if v >= cutoff}
     names = dict(sorted(names.items(), key=lambda kv: kv[1], reverse=True)[:6000])
