@@ -185,3 +185,7 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .exitbox h3{margin:0;font-family:var(--f-display);font-size:1.2rem}
 .exitbox .factions{position:static;background:none;width:100%;grid-template-columns:1fr 1fr}
 .logo-mark img,.inv-logo img{display:block}
+/* Wisch-Leisten schneiden alles am Rand ab -> Innenabstand, damit Umrandung und Schatten ganz sichtbar sind */
+.chips{padding:6px 6px 12px;margin:-6px -6px -12px;scroll-padding-inline:6px}
+.mtile{border-width:2px;border-color:var(--line)}
+.mtile[aria-pressed="true"]{border-color:#1E9E5A;box-shadow:0 6px 18px rgba(30,158,90,.28)}
