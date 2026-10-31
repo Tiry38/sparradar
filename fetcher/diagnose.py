@@ -18,8 +18,10 @@ for store, url in f.KD_STORES.items():
         continue
     pi = json.loads(m.group(1))["props"]["pageProps"]["pageInformation"]
     for key, lst in (pi.get("brochures") or {}).items():
-        for b in lst or []:
+        for b in (lst if isinstance(lst, list) else []):
             if isinstance(b, dict):
+                if key != "viewer" and (b.get("validFrom") or "")[:10] <= today:
+                    continue  # nur Hauptprospekt + alles, was erst künftig gilt
                 print("KD", store, key, "|", str(b.get("title"))[:50], "|", b.get("validFrom"), "->", b.get("validUntil"),
                       "| Seiten", b.get("pageCount"), "| id", b.get("id") or b.get("contentId"))
     items = (pi.get("offers") or {}).get("main", {}).get("items") or []
