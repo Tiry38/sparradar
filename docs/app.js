@@ -231,10 +231,10 @@ function perk(o){
   let r=null;const k=coreKey(o),q=packQty(o.d);
   const same=OFFERS.filter(x=>x!==o&&x.s===o.s&&x.p>o.p+.009&&(x.from||"")<(o.from||"")&&coreKey(x)===k&&((q&&packQty(x.d)&&Math.abs(packQty(x.d).v-q.v)/q.v<.05)||(!q&&x.d===o.d))).sort((a,b)=>(b.from||"").localeCompare(a.from||""))[0];
   if(same){const pct=Math.round((1-o.p/same.p)*100);
-    if(pct>=3)r={pct,b:`−${pct} % ggü. bisher`,s:`bisher ${eur(same.p)}`,l:`Bei ${sname(o.s)} kostet dieselbe Packung bis ${same.to?fmtDate(same.to):"jetzt"} ${eur(same.p)}, ab ${fmtDate(shopDay(o.from))} nur ${eur(o.p)}. Das sind ${pct} % weniger.`}}
+    if(pct>=3)r={pct,w:same.p,b:`−${pct} % ggü. bisher`,s:`bisher ${eur(same.p)}`,l:`Bei ${sname(o.s)} kostet dieselbe Packung bis ${same.to?fmtDate(same.to):"jetzt"} ${eur(same.p)}, ab ${fmtDate(shopDay(o.from))} nur ${eur(o.p)}. Das sind ${pct} % weniger.`}}
   const h=histOf(o),last=h.length?h[h.length-1]:0;
   if(!r&&last>o.p+.009){const pct=Math.round((1-o.p/last)*100);
-    if(pct>=3)r={pct,b:`−${pct} % ggü. zuletzt`,s:`zuletzt ${eur(last)}`,l:`Bei ${sname(o.s)} kostete dieser Artikel zuletzt ${eur(last)}, jetzt ${eur(o.p)}. Das sind ${pct} % weniger (aus dem SparRadar-Preisverlauf, kein „statt“-Preis des Händlers).`}}
+    if(pct>=3)r={pct,w:last,b:`−${pct} % ggü. zuletzt`,s:`zuletzt ${eur(last)}`,l:`Bei ${sname(o.s)} kostete dieser Artikel zuletzt ${eur(last)}, jetzt ${eur(o.p)}. Das sind ${pct} % weniger (aus dem SparRadar-Preisverlauf, kein „statt“-Preis des Händlers).`}}
   if(!r&&o.gp&&o.gp.v>0){
     const sm=OFFERS.filter(x=>x!==o&&x.s===o.s&&x.p>0&&x.p<o.p&&x.gp&&x.gp.u===o.gp.u&&x.gp.v>o.gp.v*1.03&&coreKey(x)===k).sort((a,b)=>a.gp.v-b.gp.v)[0];
     if(sm){const pct=Math.round((1-o.gp.v/sm.gp.v)*100);
@@ -447,7 +447,7 @@ function card(o,bestIds){
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
-     <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
+     <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}">${validTxt(o)}</span>
@@ -586,9 +586,10 @@ function renderDetail(){
     ${o.d?`<p class="dsub">${esc(o.d)}</p>`:""}
     ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
-     <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
+     <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
     ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${o.ous&&o.o?`<div class="rk perkbox"><h4>🏷️ Kostet eigentlich ${eur(o.o)}</h4><p>Das ist die UVP (Preisempfehlung des Herstellers). ${esc(sname(o.s))} nennt im Prospekt keinen „statt“-Preis – die UVP stammt von ${esc(sname(o.ous))} für denselben Markenartikel in gleicher Menge.</p></div>`:""}
     ${perk(o)?`<div class="rk perkbox"><h4>💡 Dein Vorteil</h4><p>${esc(perk(o).l)}</p></div>`:""}
     ${compareHTML(o)}
     <dl class="dfacts">
@@ -614,6 +615,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  59:["Durchgestrichener Preis „kostet eigentlich“ jetzt auch bei Rewe und Edeka: Nennt der Prospekt keinen „statt“-Preis, zeigt SparRadar die echte UVP desselben Markenartikels (gleiche Menge) von einem anderen Markt – oder den bisherigen Preis im selben Markt.","Kaffeemaschinen, Wasserkocher & Co. stehen jetzt unter Technik statt unter Kaffee & Tee."],
   58:["Kategorien: Du kannst jetzt mehrere gleichzeitig auswählen, z. B. Obst & Gemüse und Fleisch & Fisch. Nochmal antippen nimmt eine Kategorie wieder raus, „Alle Kategorien“ setzt alles zurück.","Prospekte, die erst am Montag erscheinen, werden jetzt auch sofort geholt."],
   57:["Einkaufszettel als Einkaufswagen: Im Laden antippen, was im Wagen liegt. Am Handy schließt der letzte Artikel den Einkauf ab – mit kurzem Bericht und „Zurückholen“.","Neu unter dem Zettel: „Meine Einkäufe“ mit Monatsbericht (ausgegeben, gespart, nach Markt) und allen Einkäufen zum Nachlesen.","Mengen (2×, 3×), eigene Einträge mit Preis („Brot 1,99“), Budget, „Wieder kaufen“ aus deinen letzten Einkäufen. Beim Einkaufen bleibt der Bildschirm an."],
   56:["Neue Filter unter „Kategorien & Filter“: Mindest-Ersparnis (z. B. ab 30 %), Preis bis (z. B. bis 2 €), nur Bio, vegan, nur echte Rabatte, ohne App & Karte und Tiefstpreis. Die Auswahl bleibt gespeichert, „Filter aus“ setzt sie mit einem Tipp zurück."],

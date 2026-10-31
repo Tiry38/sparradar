@@ -49,7 +49,7 @@ Shampoo Duschbad Deodorant Zahncreme Toilettenpapier Rasierer Seife Kosmetik
 Waschmittel Spuelmittel Windeln Hundefutter Katzenstreu Werkzeug Fernseher Kopfhoerer Staubsauger
 Bettwaesche Pfanne Spielzeug Fahrrad Jacke Schuhe Pflanzen""".split()
 
-DROGERIE = (r"eyeliner|kajal|concealer|gesichtsmaske|lippenbalsam|wimpern|lidschatten|foundation|duschgel|schaumbad|haarentfern|epilier|duschbad|dusche\b|shampoo|sp[üu]lung|conditioner|\bdeo\b|deodorant|deospray|antitranspirant|"
+DROGERIE = (r"eyeliner|augenpads|augen-pads|augenpflege|kajal|concealer|gesichtsmaske|lippenbalsam|wimpern|lidschatten|foundation|duschgel|schaumbad|haarentfern|epilier|duschbad|dusche\b|shampoo|sp[üu]lung|conditioner|\bdeo\b|deodorant|deospray|antitranspirant|"
             r"zahncreme|zahnpasta|zahnb[üu]rste|zahnseide|mundsp[üu]l|(?<![a-zäöü])seife|fl[üu]ssigseife|handseife|cremeseife|bodylotion|k[öo]rperlotion|k[öo]rpermilch|body ?butter|"
             r"gesichtscreme|gesichtspflege|tagescreme|nachtcreme|handcreme|hautcreme|hautpflege|pflegecreme|sonnencreme|sonnenspray|lippenpflege|"
             r"make-?up|mascara|lippenstift|nagellack|parfum|parf[üu]m|eau de|kosmetik|rasier|damenbinde|\bbinden\b|tampon|slipeinlage|"
@@ -61,7 +61,7 @@ CATS = [  # Reihenfolge = Priorität
     ("katze", r"katzen|\bkatze|sheba|whiskas|felix|kitekat|gourmet gold|perfect fit|catessy|cat'?s? ?(?:food|snack)"),
     ("drogerie", DROGERIE),
     ("tk", r"tiefk[üu]hl|eisbecher|ice cream|magnum|langnese|cremissimo|h[äa]+gen[ -]?dazs|nuggets|vanilleeis|die ofenfrische|pizzeria|iglo\b|coppenrath|fischst|\btk\b|tk-|gefroren|fischst[äa]bchen|pommes|eiscreme|\beis\b|speiseeis|pizza|kroketten|gyoza|dumplings|bibigo"),
-    ("kaffee", r"kaffee|matcha|caf[eéè] latte|caff[eèé] latte|kamille|pfefferminztee|kr[äa]utertee|fr[üu]chtetee|(?<!eis)tee\b|kr[öo]nung|tchibo|jacobs|dallmayr|lavazza|melitta|espresso|cappuccino|crema|kapseln|pads\b|\btee\b|teebeutel|kakao"),
+    ("kaffee", r"kaffee|matcha|caf[eéè] latte|caff[eèé] latte|kamille|pfefferminztee|kr[äa]utertee|fr[üu]chtetee|(?<!eis)tee\b|kr[öo]nung|tchibo|jacobs|dallmayr|lavazza|melitta|espresso|cappuccino|crema|kapseln|kaffee-?pads|senseo|dolce gusto|nespresso|tassimo|\btee\b|teebeutel|kakao"),
     ("getraenke", r"getr[äa]nk|(?<!-)bier\b|(?<!trauben )\bhell\b|mixery|rockstar|granini|trinkgenuss|mocktail|black tower|biermarken|biersorten|helles\b|lager\b|export\b|krombacher|bitburger|veltins|paulaner|erdinger|beck'?s\b|radeberger|k[öo]nig pilsener|\blicher\b|jever|hasseröder|flensburger|franziskaner|hofbr[äa]u|warsteiner|pils\b|pilsener|radler\b|stubbi|weizenbier|weissbier|wei[ßs]bier|warsteiner|spaten|rothaus|tannenz[äa]pfle|m[öo]nchshof|budweiser|tyskie|corona|guinness|desperados|heineken|sternburg|br[äa]u\b|brauspezial|aperitif|aperol|lillet|bacardi|tequila|\bkorn\b|doppelkorn|kornmarken|edelbrand|obstbrand|destillat|schnaps|pastis|brandy|weinbrand|berentzen|wilthener|goldkrone|piccolo|henkell|zweigelt|m[üu]ller-thurgau|cuv[ée]e|rebsorten|7 ?up|pepsi|schwip schwap|fassbrause|hohes c|capri-sun|saftmarken|softdrink|adelholzener|spreequell|shots?\b|wasser\b|mineralwasser|saft\b|s[äa]fte\b|fruchtsaft|nektar|ouzo|amaro|kr[äa]uterlik|obstbrand|volvic|gerolsteiner|\bcola\b|limo\b|limonade|schorle|\bbier\b|pils|radler|weizenbier|hefeweizen|(?<![a-zäöüß])weine?\b|rotwein\b|wei[ßs]wein\b|ros[ée]wein\b|gl[üu]hwein\b|punsch\b|riesling\b|sekt\b|prosecco\b|secco|spirituos|lik[öo]r|whisk|wodka|vodka|\bgin\b|\brum\b|energy|eistee|smoothie|sprudel"),
     ("suess", r"s[üu][ßs]waren|s[üu][ßs]igkeiten|geb[äa]ck|knusperflocken|cashew|mandeln|macadamia|pistazie|pinienkern|studentenfutter|maronen|nougat|toffifee|[üu]berraschungs ?ei|marzipan|pl[äa]tzchen|kipferl|soft cake|jaffa|kinder country|kinder bueno|oreo|schoko|praline|bonbon|gummi|fruchtgummi|chips|snack|keks|cookie|riegel|waffel|lebkuchen|spekulatius|stollen|n[üu]sse\b|(?<!ge)n[üu]ss(?!ig)|erdn[üu]ss|popcorn|cracker|salzst|haribo|goldb[äa]ren|bahlsen|leibniz|milka\b|ritter sport|lindt|ferrero(?! milch)|merci\b"),
     ("fleisch", r"fleisch|chorizo|corned beef|serrano|jam[óo]n|landj[äa]ger|peitsche|pfefferbei[ßs]er|wagyu|patties|\bburger|-burger|griller|r[äa]ucherling|wurst|w[üu]rstchen|schinken|h[äa]hnchen|huhn|gefl[üu]gel|pute\b|puten|\brind(?!e\b|en\b)|rinder|schwein|\bhack|hackfleisch|steak|schnitzel|gulasch|salami|aufschnitt|leberk[äa]se|lachs|fisch(?!er)|forelle|thunfisch|garnele|shrimps|hering|kassler|filet|bacon|speck|saumagen|frikadell|braten\b|tafelspitz|nacken|kotelett|schweinehals|spareribs|ribs\b|\bleber\b|\bwade\b|\bente\b|entenbrust|entenkeule|entenschenkel|entenpfanne|\bgans\b|g[äa]nsebrust|g[äa]nsekeule|cordon bleu|entrec[ôo]te|kaninchen|h[üu]fte\b|roastbeef|pulled (?:beef|pork)|kabanos|\blamm(?!fell)|kalbs|hirsch|wildschwein"),
@@ -162,6 +162,9 @@ def classify(title, brand="", food=True, cats=None):
             return "kuehl"
     if re.search(r"gutschein|geschenkkarte|guthabenkarte", name):
         return "sonstiges"
+    # Geräte und Zubehör sind kein Kaffee/Tee, auch wenn „Kaffee“ im Namen steht (Kaffeevollautomat, Wasserkocher)
+    if re.search(r"(?:kaffee|espresso|tee|milch|wasser|cappuccino|latte)-?(?:voll)?(?:automat|maschine|kocher|m[üu]hle|aufsch[äa]umer|bereiter)|siebtr[äa]ger|vollautomat|kaffeemaschine|pad-?maschine|kapselmaschine", name + " / " + ct):
+        return "technik"
     if "langnese" in ident and "honig" in ident:
         return "vorrat"  # Langnese gibt es als Honig und als Eis
     if ALCOHOL.search(ident) and not re.search(r"glas|gl[äa]ser|k[üu]hler|dekanter|essig|sauce|so[ßs]e", name):
@@ -838,9 +841,74 @@ def collect(items):
         COLLECTED.extend(items)
 
 
-def finalize(offers):
+# ---------- „Kostet eigentlich“: UVP von anderen Märkten übernehmen ----------
+# Rewe/Edeka-Prospekte nennen fast nie einen „statt“-Preis. Die UVP (Preisempfehlung des Herstellers) gilt aber
+# für denselben Markenartikel überall. Steht derselbe Artikel (gleiche Marke, gleiche Wörter, gleiche Menge ±3 %)
+# bei einem anderen Markt mit UVP (Lidl/kaufDA-Angabe „UVP“), übernimmt SparRadar sie – mit Quelle (ous).
+# Gemerkt wird sie in uvp.json (180 Tage), damit sie auch gilt, wenn der andere Markt den Artikel nicht mehr anbietet.
+def uvp_key(o):
+    b = norm(o.get("b") or "")
+    if not b or not o.get("gp") or not o.get("p"):
+        return None
+    toks = sorted({norm(t) for t in re.findall(r"[a-zäöüß0-9]+", f"{o.get('b')} {o.get('n')}".lower())} - {""})
+    return b + "|" + " ".join(toks)
+
+
+def uvp_amount(o):
+    gp = o.get("gp") or {}
+    try:
+        v = float(gp.get("v") or 0)
+    except (TypeError, ValueError):
+        return None
+    return (round(o["p"] / v, 4), gp.get("u")) if v > 0 and gp.get("u") else None
+
+
+def learn_uvp(offers, mem, today):
+    for o in offers:
+        if o.get("ou") != 1 or o.get("ous") or not o.get("o") or o["o"] <= o.get("p", 0):
+            continue
+        k, a = uvp_key(o), uvp_amount(o)
+        if not k or not a:
+            continue
+        lst = [e for e in mem.get(k, []) if not (e["gu"] == a[1] and abs(e["a"] - a[0]) / a[0] < .03)]
+        lst.append({"u": o["o"], "gu": a[1], "a": a[0], "s": o["s"], "d": today})
+        mem[k] = lst[-6:]
+    old = (dt.date.today() - dt.timedelta(days=180)).isoformat()
+    for k in list(mem):
+        mem[k] = [e for e in mem[k] if e["d"] >= old]
+        if not mem[k]:
+            del mem[k]
+    return mem
+
+
+def borrow_uvp(offers, mem):
+    n = 0
+    for o in offers:
+        if o.get("ous"):  # alte Übernahme neu berechnen
+            for f in ("o", "ou", "ous"):
+                o.pop(f, None)
+        if o.get("o") or not o.get("p"):
+            continue
+        k, a = uvp_key(o), uvp_amount(o)
+        if not k or not a:
+            continue
+        hit = [e for e in mem.get(k, []) if e["s"] != o["s"] and e["gu"] == a[1] and abs(e["a"] - a[0]) / a[0] < .03
+               and o["p"] * 1.03 < e["u"] <= o["p"] * 3]
+        if hit:
+            e = max(hit, key=lambda e: e["d"])
+            o["o"], o["ou"], o["ous"] = e["u"], 1, e["s"]
+            n += 1
+    return n
+
+
+def finalize(offers, save_uvp=False):
     today = dt.date.today().isoformat()
     offers = drop_previews(merge(offers))
+    mem = learn_uvp(offers, load("uvp.json", {}), today)
+    n = borrow_uvp(offers, mem)
+    if save_uvp:
+        save("uvp.json", mem)
+        log("UVP übernommen:", n, "| UVP-Gedächtnis:", len(mem))
     offers = [o for o in offers if not o.get("to") or o["to"] >= today]  # abgelaufene raus
     offers.sort(key=lambda o: (o["s"], o["c"], o["n"]))
     return offers
@@ -910,7 +978,7 @@ def main():
     run("kaufDA", fetch_kaufda)
     for t in threads:
         t.join()
-    offers = finalize([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau") for o in results.get(name, [])])
+    offers = finalize([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau") for o in results.get(name, [])], save_uvp=True)
     if len(offers) < 30:
         log("! Zu wenige Angebote, alte Daten bleiben stehen.")
         sys.exit(1)
