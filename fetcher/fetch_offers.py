@@ -47,7 +47,7 @@ Shampoo Duschbad Deodorant Zahncreme Toilettenpapier Rasierer Seife Kosmetik
 Waschmittel Spuelmittel Windeln Hundefutter Katzenstreu Werkzeug Fernseher Kopfhoerer Staubsauger
 Bettwaesche Pfanne Spielzeug Fahrrad Jacke Schuhe Pflanzen""".split()
 
-DROGERIE = (r"duschgel|duschbad|dusche\b|shampoo|sp[üu]lung|conditioner|\bdeo\b|deodorant|deospray|antitranspirant|"
+DROGERIE = (r"duschgel|schaumbad|haarentfern|epilier|duschbad|dusche\b|shampoo|sp[üu]lung|conditioner|\bdeo\b|deodorant|deospray|antitranspirant|"
             r"zahncreme|zahnpasta|zahnb[üu]rste|zahnseide|mundsp[üu]l|seife|bodylotion|k[öo]rperlotion|k[öo]rpermilch|body ?butter|"
             r"gesichtscreme|gesichtspflege|tagescreme|nachtcreme|handcreme|hautcreme|hautpflege|pflegecreme|sonnencreme|sonnenspray|lippenpflege|"
             r"make-?up|mascara|lippenstift|nagellack|parfum|parf[üu]m|eau de|kosmetik|rasier|damenbinde|\bbinden\b|tampon|slipeinlage|"
@@ -59,7 +59,7 @@ CATS = [  # Reihenfolge = Priorität
     ("katze", r"katzen|\bkatze|sheba|whiskas|felix|kitekat|gourmet gold|perfect fit|catessy|cat'?s? ?(?:food|snack)"),
     ("drogerie", DROGERIE),
     ("tk", r"tiefk[üu]hl|\btk\b|tk-|gefroren|fischst[äa]bchen|pommes|eiscreme|\beis\b|speiseeis|pizza"),
-    ("kaffee", r"kaffee|espresso|cappuccino|crema|kapseln|pads\b|\btee\b|teebeutel|kakao"),
+    ("kaffee", r"kaffee|kr[öo]nung|l[ée]g[èe]re|tchibo|jacobs|dallmayr|lavazza|melitta|espresso|cappuccino|crema|kapseln|pads\b|\btee\b|teebeutel|kakao"),
     ("getraenke", r"getr[äa]nk|wasser\b|mineralwasser|saft\b|s[äa]fte\b|fruchtsaft|nektar|ouzo|amaro|kr[äa]uterlik|obstbrand|volvic|gerolsteiner|\bcola\b|limo\b|limonade|schorle|\bbier\b|pils|radler|weizenbier|hefeweizen|(?<![a-zäöüß])weine?\b|rotwein|wei[ßs]wein|ros[ée]wein|gl[üu]hwein|punsch|riesling|sekt|prosecco|secco|spirituos|lik[öo]r|whisk|wodka|vodka|\bgin\b|\brum\b|energy|eistee|smoothie|sprudel"),
     ("suess", r"s[üu][ßs]waren|oreo|schoko|praline|bonbon|gummi|fruchtgummi|chips|snack|keks|cookie|riegel|waffel|lebkuchen|spekulatius|stollen|n[üu]sse|nuss|erdn[üu]ss|popcorn|cracker|salzst"),
     ("fleisch", r"fleisch|wurst|w[üu]rstchen|schinken|h[äa]hnchen|huhn|gefl[üu]gel|pute|rind|schwein|hack|steak|schnitzel|gulasch|salami|aufschnitt|leberk[äa]se|lachs|fisch|forelle|thunfisch|garnele|shrimps|hering|kassler|filet|bacon|speck|saumagen|frikadell|braten\b|tafelspitz|nacken|kotelett|schweinehals|spareribs|ribs\b|leber\b|wade\b|ente\b|entenpfanne|gans\b|cordon bleu"),
@@ -70,13 +70,15 @@ CATS = [  # Reihenfolge = Priorität
 ]
 # Alles außer Essen & Drogerie. Reihenfolge = Priorität, gilt nur für Artikel ohne Lebensmittel-Hinweis der Quelle
 NF_CATS = [
+    # Spielzeug zuerst, sonst landet z. B. ein Kinder-Werkzeugset unter Garten & Heimwerken
+    ("freizeit", r"rollenspiel|spielzeug|spielset|spieltier|spielk[üu]che|kindersofa|activity|lego|playmobil|puppe|pl[üu]sch|ballzauber"),
     ("tier", r"\bhund|katzenstreu|streu\b|vogel|nager|aquarium|tierbedarf|kratzbaum|halsband|\bleine\b"),
     ("baby", r"baby|windel|kinderwagen|schnuller|feuchtt[üu]cher"),
     ("haushalt", r"waschmittel|weichsp[üu]l|reiniger|sp[üu]lmittel|geschirrsp[üu]l|putz|m[üu]llbeutel|frischhaltefolie|alufolie|backpapier|schw[äa]mm|wischmop|batterie|gl[üu]hbirne|leuchtmittel|haushalt"),
-    ("garten", r"garten|pflanze|blume|\berde\b|d[üu]nger|rasen|\bgrill\b|werkzeug|bohr|schrauber|s[äa]ge\b|schrauben|heimwerk|leiter\b|\bauto\b|kfz|fahrrad|e-bike"),
+    ("garten", r"garten|pflanze(?!nfett)|blume|\berde\b|d[üu]nger|rasen|grillrost|holzkohle|gasgrill|kugelgrill|elektrogrill|grillzange|werkzeug|bohr|schrauber|s[äa]ge\b|schrauben|heimwerk|leiter\b|\bauto\b|kfz|fahrrad|e-bike"),
     ("technik", r"elektr|\btv\b|fernseher|laptop|notebook|tablet\b|smartphone|handy|kopfh[öo]rer|lautsprecher|kabel|ladeger|\bakku|powerbank|kamera|drucker|monitor|konsole|playstation|gaming|haartrockner|f[öo]hn\b|mixer|k[üu]chenmaschine|kaffeemaschine|wasserkocher|toaster|fritteuse|hei[ßs]luft|staubsauger|lampe|leuchte|\bled\b"),
     ("mode", r"kleid|hose\b|jacke|mantel|pullover|pulli|shirt|bluse|socke|strumpf|unterw[äa]sche|\bslip|schuh|stiefel|sneaker|m[üu]tze|\bschal\b|handschuh|pyjama|schlafanzug|bekleidung|jeans|leggings|weste\b"),
-    ("wohnen", r"m[öo]bel|glas\b|regal|tisch\b|stuhl|sofa|\bbett|kissen|decke\b|matratze|teppich|handtuch|gardine|vorhang|deko|weihnachtsbaum|kerze|vase|pfanne|\btopf|geschirr|besteck|gl[äa]ser\b|aufbewahrung|adventskalender"),
+    ("wohnen", r"m[öo]bel|k[üu]chenutensil|\bkrug\b|glas\b|regal|tisch\b|stuhl|sofa|\bbett|kissen|decke\b|matratze|teppich|handtuch|gardine|vorhang|deko|weihnachtsbaum|kerze|vase|pfanne|\btopf|geschirr|besteck|gl[äa]ser\b|aufbewahrung|adventskalender"),
     ("freizeit", r"spielzeug|spiel\b|spiele\b|lego|puppe|pl[üu]sch|puzzle|sport|fitness|yoga|camping|zelt|koffer|rucksack|\breisen?\b|rundreise|kreuzfahrt|urlaub|\bhotel|netto-reisen|\bbuch\b|b[üu]cher|basteln"),
 ]
 
