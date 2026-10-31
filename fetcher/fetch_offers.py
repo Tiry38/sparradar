@@ -142,6 +142,26 @@ CAT_HINTS = [
 ]
 
 
+# Geräte sind kein Essen, auch wenn „Kaffee“ oder „Pizza“ im Namen steht (Kaffeevollautomat, Pizzaofen, Wasserkocher).
+# Spielzeug-Geräte (Kinder-Pizzaofen, Spiel-Tischgrill) -> Freizeit.
+APPLIANCE = re.compile(r"(?:kaffee|espresso|tee|milch|wasser|cappuccino|latte)-?(?:voll)?(?:automat|maschine|kocher|m[üu]hle|aufsch[äa]umer|bereiter)|"
+                       r"siebtr[äa]ger|vollautomat|kaffeemaschine|pad-?maschine|kapselmaschine|pizza-?ofen|back-?ofen|mini-?ofen|d[öo]rr-?automat|"
+                       r"tischgrill|kontakt-?grill|raclette|fondue-?set|fritteuse|airfryer|toaster|sandwichmaker|waffeleisen|handmixer|standmixer|"
+                       r"st[äa]bmixer|zerkleinerer|k[üu]chenmaschine|eierkocher|reiskocher|slow-?cooker|multikocher|thermomix|monsieur cuisine|"
+                       r"entsafter|smoothie-?maker|joghurtbereiter|popcorn-?maschine|vakuumierer|elektrogrill|induktionskochplatte|kochplatte")
+TOY = re.compile(r"spielzeug|kinder|lupilu|playtive|spiel|zaubertopf")
+
+
+def appliance(title, cats=None):
+    ct = " / ".join(c for c in (cats or []) if isinstance(c, str)).lower()
+    t = (title or "").lower()
+    if not APPLIANCE.search(t + " / " + " / ".join(c for c in (cats or [])[-2:] if isinstance(c, str)).lower()):
+        return None
+    if re.search(r"pizza|brot|br[öo]tchen|fisch|lachs|k[äa]se|chips|kartoffel", t) and not APPLIANCE.search(t):
+        return None  # Steinofenpizza: Warengruppe nennt evtl. Ofen, der Name ist aber Essen
+    return "freizeit" if TOY.search(t + " / " + ct) else "technik"
+
+
 def classify(title, brand="", food=True, cats=None):
     """Kevins Vorgabe: Die Beschreibung (Werbetext, „passt zu Fisch“) beeinflusst die Kategorie NICHT.
     Es zählen nur Artikelname, Marke und die zwei genauesten Warengruppen des Händlers (z. B. „Mischbrot“).
@@ -162,9 +182,9 @@ def classify(title, brand="", food=True, cats=None):
             return "kuehl"
     if re.search(r"gutschein|geschenkkarte|guthabenkarte", name):
         return "sonstiges"
-    # Geräte und Zubehör sind kein Kaffee/Tee, auch wenn „Kaffee“ im Namen steht (Kaffeevollautomat, Wasserkocher)
-    if re.search(r"(?:kaffee|espresso|tee|milch|wasser|cappuccino|latte)-?(?:voll)?(?:automat|maschine|kocher|m[üu]hle|aufsch[äa]umer|bereiter)|siebtr[äa]ger|vollautomat|kaffeemaschine|pad-?maschine|kapselmaschine", name + " / " + ct):
-        return "technik"
+    dev = appliance(title, cats)
+    if dev:
+        return dev
     if "langnese" in ident and "honig" in ident:
         return "vorrat"  # Langnese gibt es als Honig und als Eis
     if ALCOHOL.search(ident) and not re.search(r"glas|gl[äa]ser|k[üu]hler|dekanter|essig|sauce|so[ßs]e", name):
@@ -904,6 +924,10 @@ def borrow_uvp(offers, mem):
 def finalize(offers, save_uvp=False):
     today = dt.date.today().isoformat()
     offers = drop_previews(merge(offers))
+    for o in offers:  # auch schon gespeicherte Angebote nach den Geräte-Regeln einordnen
+        dev = appliance(o.get("n"), o.get("cat"))
+        if dev and o.get("c") != dev:
+            o["c"] = dev
     mem = learn_uvp(offers, load("uvp.json", {}), today)
     n = borrow_uvp(offers, mem)
     if save_uvp:
