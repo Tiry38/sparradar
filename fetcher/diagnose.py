@@ -1,4 +1,4 @@
-"""Einmalige Diagnose: Themen-Unterseiten je Markt bei kaufDA (Nur von Hand, wenige Abrufe.)"""
+"""Einmalige Diagnose: Sortiment-Seiten je Markt bei kaufDA (Nur von Hand, wenige Abrufe.)"""
 import json
 import re
 import time
@@ -15,28 +15,26 @@ def page(url):
     return json.loads(m.group(1))["props"]["pageProps"]
 
 
-pp = page(f.KD_STORES["lidl"])
-pi = pp.get("pageInformation") or {}
-tc = (pi.get("template") or {}).get("content") or {}
-links = ((tc.get("OfferLinkbox") or {}).get("PublisherOfferLinkbox") or {}).get("links") or []
-print("Themen-Links auf der Lidl-Seite:", len(links))
-for l in links[:20]:
-    print("  ", json.dumps(l, ensure_ascii=False)[:200])
-print("Produkte des Händlers:", json.dumps((pi.get("publisher") or {}).get("products", [])[:5], ensure_ascii=False)[:600])
-tests = []
-for l in links[:3]:
-    u = l.get("url") or l.get("href") or l.get("link")
-    if u:
-        tests.append(u if u.startswith("http") else "https://www.kaufda.de" + u)
-tests += ["https://www.kaufda.de/Woerth-am-Rhein/Lidl/Kaffee", "https://www.kaufda.de/Karlsruhe/Lidl/Kaffee",
-          "https://www.kaufda.de/Woerth-am-Rhein/Angebote/Kaffee", "https://www.kaufda.de/Angebote/Tassimo"]
-for u in tests:
+for u in ["https://www.kaufda.de/Lidl/Sortiment/Kaffee", "https://www.kaufda.de/Woerth-am-Rhein/Lidl/Sortiment/Kaffee",
+          "https://www.kaufda.de/Lidl/Sortiment/Tassimo", "https://www.kaufda.de/Lidl/Sortiment/Butter",
+          "https://www.kaufda.de/Netto-Marken-Discount/Sortiment/Butter", "https://www.kaufda.de/REWE/Sortiment/Butter",
+          "https://www.kaufda.de/EDEKA/Sortiment/Butter", "https://www.kaufda.de/dm-drogerie-markt/Sortiment/Shampoo",
+          "https://www.kaufda.de/ALDI-SUED/Sortiment/Butter"]:
     p = page(u)
     if not p:
-        print("X", u, "-> keine Daten")
+        print("X", u)
         continue
-    main = ((p.get("pageInformation") or {}).get("offers") or {}).get("main") or {}
-    pubs = {}
-    for it in main.get("items") or []:
+    pi = p.get("pageInformation") or {}
+    main = (pi.get("offers") or {}).get("main") or {}
+    items = main.get("items") or []
+    pubs, br = {}, set()
+    for it in items:
         pubs[it.get("publisherName")] = pubs.get(it.get("publisherName"), 0) + 1
-    print("OK", u, "->", len(main.get("items") or []), "von", main.get("totalItems"), pubs)
+        br.add((it.get("parentContent") or {}).get("id"))
+    print("OK", u, "->", len(items), "von", main.get("totalItems"), pubs, "Prospekte:", len(br))
+    for it in items[:4]:
+        print("     ", it.get("title"), "|", (it.get("prices") or {}).get("mainPrice"), "|", it.get("validFrom", "")[:10], "-", it.get("validUntil", "")[:10])
+    tc = (pi.get("template") or {}).get("content") or {}
+    links = ((tc.get("OfferLinkbox") or {}).get("PublisherOfferLinkbox") or {}).get("links") or []
+    if links:
+        print("      weitere Themen:", [l.get("link_text") for l in links][:20])
