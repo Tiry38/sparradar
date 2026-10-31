@@ -394,6 +394,7 @@ function renderLightbox(){const u=S.lightbox;return u?`<div class="lightbox" id=
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  36:["SparRadar verschenken: schöne Einladung mit Logo per WhatsApp, Installation ohne Warnungen."],
   35:["Jeden Artikel antippen: Detailansicht mit großem Bild, Beschreibung, Preisrechnung und Preisverlauf. Bild antippen zum Vergrößern."],
   34:["Angebote stehen immer nach dem stärksten Rabatt sortiert, auch bei der Suche.","Die Einstellungen findest du jetzt ganz unten im Tab „Coupons“."],
   32:["Viel mehr Angebote: Vorher fehlten bei jedem Markt viele Angebote (z. B. bei Lidl), jetzt kommen alle aus den Prospekten.","Lidl-Plus-Preise, App-Preise und Rewe-Bonus stehen direkt beim Angebot."],
@@ -568,13 +569,21 @@ function renderSync(){
      <p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p>`}
   </section>`}
 
+// Einladung: schöne Landingpage (einladung.html) mit Logo-Vorschau in WhatsApp; Name steht nur im Link
+const inviteUrl = () => { const n=(store.get("inviteName","")||"").trim(); return APP_URL+"einladung.html"+(n?"?von="+encodeURIComponent(n):""); };
+const inviteText = () => { const n=(store.get("inviteName","")||"").trim();
+  return `🎁 Persönliche Einladung${n?" von "+n:""}\n\nIch habe dich für SparRadar ausgewählt – meine Spar-App mit allen Angeboten von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth.\n\n👉 Einfach antippen und installieren:\n${inviteUrl()}`; };
 function renderShare(){
-  return `<section class="panel" id="sharePanel"><h3>SparRadar teilen</h3>
-   <p>Schick SparRadar an Familie und Freunde. WhatsApp öffnet sich, du tippst nur noch den Kontakt an.</p>
-   <div class="links"><a class="btn wa" href="${waLink(SHARE_TXT)}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp teilen</a>${navigator.share?'<button class="btn ghost" id="shareOther">Anders teilen …</button>':""}</div>
+  const n=store.get("inviteName","");
+  return `<section class="panel invite" id="sharePanel">
+   <div class="inv-head"><span class="inv-logo" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#16191C" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="#16191C"/></svg></span>
+    <div><span class="inv-badge">🎁 PERSÖNLICHE EINLADUNG</span><h3>SparRadar verschenken</h3></div></div>
+   <p>Lade Familie und Freunde ein. Sie bekommen eine Einladung mit Logo, tippen auf <b>„SparRadar installieren“</b> und haben die App auf dem Startbildschirm – ohne Warnungen, mit automatischen Updates.</p>
+   <label class="inv-name">Dein Name auf der Einladung<input id="inviteName" value="${esc(n)}" placeholder="z. B. Kevin" maxlength="30" autocomplete="off"></label>
+   <div class="links"><a class="btn wa inv-btn" id="inviteWa" href="${waLink(inviteText())}" target="_blank" rel="noopener">${WA_ICON}Einladung per WhatsApp senden</a>${navigator.share?'<button class="btn ghost" id="shareOther">Anders teilen …</button>':""}
+    <a class="btn ghost sm" href="${inviteUrl()}" target="_blank" rel="noopener">Vorschau ansehen</a></div>
   </section>`}
 
-// Verstecktes Einstellungs-Menü (Zahnrad oben): Teilen, Geräte verbinden, Apps, Infos
 function renderSettings(){
   const g=META.generated?new Date(META.generated):null;
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Einstellungen">
@@ -755,7 +764,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
   if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
-  if(b.id==="shareOther"){navigator.share({title:"SparRadar",text:SHARE_TXT}).catch(()=>{});return}
+  if(b.id==="shareOther"){navigator.share({title:"Persönliche Einladung zu SparRadar",text:inviteText()}).catch(()=>{});return}
   if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){S.watch.push({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
   if(b.dataset.newsdone){S.sheet=null;if(b.dataset.newsdone==="watch")S.tab="watch";render();return}
 });
@@ -790,7 +799,8 @@ document.addEventListener("submit",e=>{
 document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render();showSugg("qSugg",S.q,"q")});
 document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.target.value,"q"));
-document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw")});
+document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");
+  if(e.target.id==="inviteName"){store.set("inviteName",e.target.value.trim());const a=document.getElementById("inviteWa");if(a)a.href=waLink(inviteText())}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key==="Enter"&&e.target.id==="q"){hideSugg();e.target.blur()}});
 // Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
 const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];
