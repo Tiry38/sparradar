@@ -61,7 +61,11 @@ for path in links:
 fut = {}
 for q in ("&category.id=10068374", "&q=angebot"):
     raw = f.http("https://www.lidl.de/q/api/search?assortment=DE&locale=de_DE&version=2.1.0&store=1" + q + "&fetchsize=60&offset=0")
-    for it in (json.loads(raw).get("items") or []) if raw else []:
+    try:
+        items = json.loads(raw).get("items") or []
+    except (TypeError, ValueError):
+        items = []
+    for it in items:
         pr = ((it.get("gridbox") or {}).get("data") or {}).get("price") or {}
         d = str(pr.get("startDate") or "")[:10]
         if d > today:
