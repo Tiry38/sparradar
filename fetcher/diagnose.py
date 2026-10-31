@@ -1,19 +1,29 @@
-"""Diagnose (nur von Hand): Preisfelder von lidl.de bei reduzierten Artikeln (UVP / 30-Tage-Preis?)."""
+"""Diagnose (nur von Hand): Welche Preisfelder liefert Aldi Süd bei reduzierten Artikeln (UVP / 30-Tage-Preis?)."""
 import json
+import re
 
 import fetch_offers as f
 
+h = f.http("https://www.aldi-sued.de/de/angebote.html")
+data = json.loads(re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h, re.S).group(1))
 n = 0
-for q in ("butter", "eis", "kaffee", "kissen"):
-    raw = f.http(f"https://www.lidl.de/q/api/search?assortment=DE&locale=de_DE&version=2.1.0&store=1&q={q}&fetchsize=60&offset=0")
-    for it in json.loads(raw).get("items") or []:
-        g = ((it.get("gridbox") or {}).get("data")) or {}
-        pr = g.get("price") or {}
-        if pr.get("oldPrice") or pr.get("discount"):
-            n += 1
-            print("LIDL", g.get("fullTitle"), json.dumps({"price": pr, "lidlPlus": g.get("lidlPlus")}, ensure_ascii=False)[:1200])
-        if n >= 8:
-            break
-    if n >= 8:
+for i, v in enumerate(data):
+    if not (isinstance(v, dict) and "price" in v and "name" in v and "sku" in v):
+        continue
+    it = f.nuxt_resolve(data, i)
+    pr = it.get("price") or {}
+    if pr.get("wasPriceDisplay") or n < 2:
+        n += 1
+        print("ALDI", it.get("name"), json.dumps(pr, ensure_ascii=False)[:800])
+        print("   weitere Felder:", sorted(k for k in it.keys()))
+        for k, val in it.items():
+            if isinstance(val, str) and re.search(r"uvp|30 tage|niedrigst|statt|streich", val, re.I):
+                print("   TEXT", k, val[:200])
+    if n >= 10:
         break
-print("gefunden:", n)
+# Texte auf der Seite zu UVP / 30-Tage-Preis
+for m in re.finditer(r"[^<>\"]{0,80}(?:UVP|30 Tage|niedrigste[rn]? Preis)[^<>\"]{0,80}", h):
+    print("SEITE", m.group(0)[:200])
+    n += 1
+    if n > 25:
+        break
