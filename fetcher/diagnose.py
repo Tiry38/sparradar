@@ -1,4 +1,5 @@
-"""Diagnose (nur von Hand): Aufbau der Prospekt-Daten auf prospektewoche.de (Rewe, dm, Edeka)."""
+"""Diagnose (nur von Hand): prospektewoche.de – stimmen die Daten der Woche 2 (02.11.) wirklich?
+Vergleicht Produktkarten im HTML und die Seiten-JSONs /images/prospekte/<markt>/weekN/<seite>.json."""
 import json
 import re
 import urllib.request
@@ -15,36 +16,26 @@ def get(url):
         return getattr(e, "code", str(e)[:60]), ""
 
 
-st, sm = get("https://prospektewoche.de/sitemap.xml")
-locs = re.findall(r"<loc>([^<]+)</loc>", sm)
-print("SITEMAP", st, len(locs), [u for u in locs if re.search(r"dm|drog|edeka|rewe|netto|aldi|lidl", u, re.I)][:40])
+def cards(h):
+    out = []
+    for m in re.finditer(r'class="product-card-price">([\d.,]+)<', h):
+        seg = h[max(0, m.start() - 2500):m.start()]
+        t = re.findall(r'class="product-card-(?:title|name|brand)[^"]*"[^>]*>([^<]+)<', seg)
+        out.append((t[-2:] if t else "?", m.group(1)))
+    return out
 
-for path in ("/rewe", "/rewe?week=1", "/rewe?week=2", "/edeka", "/dm-drogerie-markt", "/dm-drogerie"):
-    st, h = get("https://prospektewoche.de" + path)
-    print(f"\n=== {path} {st} {len(h)}")
-    for m in re.findall(r'<script type="application/ld\+json"[^>]*>(.*?)</script>', h, re.S):
-        try:
-            j = json.loads(m)
-        except Exception as e:
-            print("  LD-Fehler", e, m[:200])
-            continue
-        if j.get("@type") == "ItemList":
-            el = j.get("itemListElement") or []
-            print("  ITEMLIST", j.get("name"), j.get("numberOfItems"), len(el))
-            for x in el[:4]:
-                print("   ", json.dumps(x, ensure_ascii=False)[:900])
-            keys = {}
-            for x in el:
-                it = x.get("item") or {}
-                for k, v in it.items():
-                    keys.setdefault(k, 0)
-                    keys[k] += 1
-                    if isinstance(v, dict):
-                        for k2 in v:
-                            keys.setdefault(k + "." + k2, 0)
-                            keys[k + "." + k2] += 1
-            print("  FELDER", keys)
-            print("  OHNE PREIS", [((x.get("item") or {}).get("name")) for x in el if not ((x.get("item") or {}).get("offers") or {}).get("price")][:20])
-    i = h.find("Knoppers")
-    if i > 0:
-        print("  HTML um Knoppers:", re.sub(r"\s+", " ", h[i - 1500:i + 1500]))
+
+for shop in ("rewe",):
+    for wk in ("1", "2"):
+        st, h = get(f"https://prospektewoche.de/{shop}?week={wk}")
+        c = cards(h)
+        print(f"\n=== {shop} week={wk} {st} Karten={len(c)}")
+        print("  ", c[:15])
+        print("  Klassen:", sorted(set(re.findall(r'class="(product-card[^"]*)"', h)))[:30])
+        print("  JSON-URLs:", sorted(set(re.findall(r'data-json-url="([^"]+)"', h)))[:30])
+        print("  Tabs:", re.findall(r'tab-dates">([^<]+)<', h))
+    for wk in ("week1", "week2"):
+        for pg in (1, 2):
+            st, t = get(f"https://prospektewoche.de/images/prospekte/{shop}/{wk}/{pg}.json")
+            print(f"\n--- {wk}/{pg}.json {st} {len(t)}")
+            print("  ", t[:1500])
