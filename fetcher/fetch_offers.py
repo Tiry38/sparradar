@@ -575,6 +575,7 @@ def fetch_kaufda():
 # kaufDA zeigt auf der Händlerseite nur 16 Angebote. Die öffentlichen Sortiment-Seiten
 # (kaufda.de/<Händler>/Sortiment/<Begriff>) zeigen je Begriff alle passenden Angebote des Händlers.
 # Sie sind bundesweit -> nur Angebote aus Prospekten behalten, die auch für Wörth/Jockgrim gelten.
+KD_PUB_IDS = {"edeka": "DE-220164", "rewe": "DE-1062"}  # kaufDA-Händlerkennung der Region (Edeka Südwest, Rewe)
 KD_SLUGS = {"lidl": ["Lidl"], "netto": ["Netto-Marken-Discount"], "rewe": ["REWE"], "edeka": ["Edeka"],
             "dm": ["dm-drogerie-markt", "Dm"]}
 SORTIMENT = """Butter Milch Kaese Joghurt Quark Sahne Eier Mozzarella Margarine Pudding Skyr Frischkaese Gouda
@@ -635,10 +636,12 @@ def fetch_sortiment(regional=None):
             # künftigen Prospekte desselben Händlers (gleiche Händler-Kennung) von den Sortiment-Seiten übernehmen.
             # Sobald der lokale Prospekt online ist, greift wieder der Inhaltsabgleich (same_flyer).
             preview = set()
-            if not local.get("future") and local.get("pubs"):
+            # Händler-Kennung der Region; ist die lokale Seite leer (z. B. Samstagabend, alter Prospekt weg), die bekannte nehmen
+            pubs = local.get("pubs") or {KD_PUB_IDS[store]}
+            if not local.get("future"):
                 today = dt.date.today().isoformat()
                 preview = {str((it.get("parentContent") or {}).get("id")) for it in found
-                           if str(it.get("validFrom") or "")[:10] > today and it.get("publisherId") in local["pubs"]}
+                           if str(it.get("validFrom") or "")[:10] > today and it.get("publisherId") in pubs}
                 if preview:
                     log(f"  {store}: Vorschau nächste Woche aus Prospekt(en) {sorted(preview)}")
             ok = ok | preview
@@ -875,7 +878,7 @@ def early_save(why):
         try:
             for cmd in (["git", "add", "docs/data/offers.json", "docs/data/stand.json"],
                         ["git", "commit", "-q", "-m", f"Angebote {dt.date.today()} (Zwischenstand: {', '.join(gained)})"],
-                        ["git", "pull", "-q", "--rebase", "--autostash"], ["git", "push", "-q"]):
+                        ["git", "pull", "-q", "--rebase", "-X", "theirs", "--autostash"], ["git", "push", "-q"]):
                 subprocess.run(cmd, cwd=ROOT, check=True, timeout=120)
         except Exception as e:
             log("  ! Zwischenstand nicht hochgeladen:", e)

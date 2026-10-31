@@ -43,5 +43,5 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add docs/data
           git diff --cached --quiet || git commit -m "Angebote $(date +%F)"
-          git pull --rebase --autostash
+          git pull --rebase -X theirs --autostash   # bei Überschneidung mit einem anderen Lauf gelten die neuen Daten
           git push
