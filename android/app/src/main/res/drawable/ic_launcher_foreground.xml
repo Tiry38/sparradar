@@ -19,6 +19,20 @@
             android:strokeLineJoin="round" />
         <path
             android:fillColor="#FFFFFF"
-            android:pathData="M154,176a22,22 0,1 0,44 0a22,22 0,1 0,-44 0Z" />
+            android:pathData="M146,168a22,22 0,1 0,44 0a22,22 0,1 0,-44 0Z" />
+        <!-- Prozentzeichen -->
+        <path
+            android:pathData="M218,318L312,214"
+            android:strokeWidth="26"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M204,230a22,22 0,1 0,44 0a22,22 0,1 0,-44 0"
+            android:strokeWidth="17"
+            android:strokeColor="#FFFFFF" />
+        <path
+            android:pathData="M282,302a22,22 0,1 0,44 0a22,22 0,1 0,-44 0"
+            android:strokeWidth="17"
+            android:strokeColor="#FFFFFF" />
     </group>
 </vector>

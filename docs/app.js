@@ -394,7 +394,7 @@ function renderLightbox(){const u=S.lightbox;return u?`<div class="lightbox" id=
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  38:["Neues Logo in Anthrazit und Grün."],
+  38:["Neues Logo in Anthrazit und Grün – mit Prozentzeichen."],
   37:["Zurück-Taste: geht immer nur einen Schritt zurück, ganz am Ende fragt SparRadar, ob du die App schließen willst."],
   36:["SparRadar verschenken: schöne Einladung mit Logo per WhatsApp, Installation ohne Warnungen."],
   35:["Jeden Artikel antippen: Detailansicht mit großem Bild, Beschreibung, Preisrechnung und Preisverlauf. Bild antippen zum Vergrößern."],
@@ -578,7 +578,7 @@ const inviteText = () => { const n=(store.get("inviteName","")||"").trim();
 function renderShare(){
   const n=store.get("inviteName","");
   return `<section class="panel invite" id="sharePanel">
-   <div class="inv-head"><span class="inv-logo" aria-hidden="true"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8Z"/><circle cx="7.5" cy="7.5" r="1.5" fill="#FFFFFF"/></svg></span>
+   <div class="inv-head"><span class="inv-logo" aria-hidden="true"><img src="logo-tag.svg" alt="" width="36" height="36"></span>
     <div><span class="inv-badge">🎁 PERSÖNLICHE EINLADUNG</span><h3>SparRadar verschenken</h3></div></div>
    <p>Lade Familie und Freunde ein. Sie bekommen eine Einladung mit Logo, tippen auf <b>„SparRadar installieren“</b> und haben die App auf dem Startbildschirm – ohne Warnungen, mit automatischen Updates.</p>
    <label class="inv-name">Dein Name auf der Einladung<input id="inviteName" value="${esc(n)}" placeholder="z. B. Kevin" maxlength="30" autocomplete="off"></label>

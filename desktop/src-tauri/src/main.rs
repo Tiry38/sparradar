@@ -1,7 +1,7 @@
 // SparRadar für Windows: zeigt die Web-App in einem eigenen Fenster (WebView2).
 // Links zu anderen Seiten (Prospekte, Händler) öffnen im Standardbrowser.
 // Das Programm aktualisiert sich selbst: neue Version installieren und neu starten.
-// Symbol: wird beim Bauen aus docs/icon.svg erzeugt (Anthrazit/Grün).
+// Symbol: wird beim Bauen aus docs/icon.svg erzeugt (Anthrazit/Grün mit Prozentzeichen).
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use tauri::{WebviewUrl, WebviewWindowBuilder};
