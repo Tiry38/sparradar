@@ -371,7 +371,20 @@ const BASE_WORDS=("Butter,Milch,H-Milch,Hafermilch,Käse,Gouda,Mozzarella,Feta,J
 // Großer Artikelstamm (Open Food Facts / Open Beauty Facts), wird erst beim ersten Tippen geladen
 let CATALOG=null,CATALOG_N=null,catLoading=false;
 function loadCatalog(then){if(CATALOG||catLoading)return;catLoading=true;
-  fetch("data/catalog.json").then(r=>r.json()).then(a=>{CATALOG=Array.isArray(a)?a:[];CATALOG_N=CATALOG.map(norm);then&&then()}).catch(()=>{CATALOG=[];CATALOG_N=[]})}
+  fetch("data/catalog.json").then(r=>r.json()).then(a=>{CATALOG=Array.isArray(a)?a:[];CATALOG_N=CATALOG.map(norm);CAT_IDX=null;then&&then()}).catch(()=>{CATALOG=[];CATALOG_N=[]})}
+// Kleine Bilder in der Vorschlagsliste: aus den Angeboten, aus names-img.json (z. B. Lidl-Sortiment)
+// und aus catalog-img.json (Open Food Facts / Open Beauty Facts). Wird erst beim ersten Vorschlag geladen.
+let SIMG=null,simgLoading=false,CAT_IDX=null;
+function loadSugImgs(then){if(SIMG||simgLoading)return;simgLoading=true;
+  Promise.all([fetch("data/names-img.json").then(r=>r.json()).catch(()=>({})),fetch("data/catalog-img.json").then(r=>r.json()).catch(()=>[])])
+    .then(([n,c])=>{SIMG={names:n&&typeof n==="object"?n:{},cat:Array.isArray(c)?c:[]};then&&then()})}
+function sugImg(t){
+  const k=norm(t),o=OFFERS.find(x=>x.img&&(norm(x.n)===k||norm((x.b||"")+x.n)===k));if(o)return sharp(o.img);
+  if(!SIMG)return "";
+  const n=SIMG.names[t];if(n)return n;
+  if(CATALOG_N&&SIMG.cat.length){if(!CAT_IDX){CAT_IDX=new Map();CATALOG_N.forEach((x,i)=>{if(!CAT_IDX.has(x))CAT_IDX.set(x,i)})}
+    const c=SIMG.cat[CAT_IDX.get(k)];if(c)return (c[0]==="b"?"https://images.openbeautyfacts.org":"https://images.openfoodfacts.org")+"/images/products/"+c.slice(2)+".jpg"}
+  return ""}
 function suggest(q){
   const k=norm(q),tk=(q.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(Boolean);if(k.length<2)return [];
   const out=[],seen=new Set(),add=t=>{const n=norm(t);if(!n||seen.has(n))return;seen.add(n);out.push(t)};
@@ -384,7 +397,8 @@ function suggest(q){
     a.sort((x,y)=>x.length-y.length);b.sort((x,y)=>x.length-y.length);[...a,...b].forEach(add)}
   const wo=weekOffers();return out.slice(0,30).map(t=>({t,n:wo.filter(o=>watchMatch(o,t)).length}))}
 function suggHTML(q,kind){const list=suggest(q);if(!list.length)return "";
-  return `<div class="sugg" role="listbox" aria-label="Vorschläge">${list.map(x=>`<button type="button" role="option" data-sugg="${kind}" data-v="${esc(x.t)}"><span>${esc(x.t)}</span>${x.n?`<em class="on">${x.n} im Angebot</em>`:`<em>nicht im Angebot</em>`}</button>`).join("")}</div>`}
+  if(!SIMG)loadSugImgs(()=>{const box=document.getElementById(kind==="q"?"qSugg":"kwSugg");if(box&&box.innerHTML)showSugg(box.id,kind==="q"?S.q:(document.getElementById("kwIn")?.value||""),kind)});
+  return `<div class="sugg" role="listbox" aria-label="Vorschläge">${list.map(x=>{const im=sugImg(x.t);return `<button type="button" role="option" data-sugg="${kind}" data-v="${esc(x.t)}"><i class="simg">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'}</i><span class="st">${esc(x.t)}</span>${x.n?`<em class="on">${x.n} im Angebot</em>`:`<em>nicht im Angebot</em>`}</button>`}).join("")}</div>`}
 function showSugg(id,q,kind){const el=document.getElementById(id);if(!el)return;el.innerHTML=suggHTML(q,kind);
   if(!CATALOG)loadCatalog(()=>{const inp=document.getElementById(kind==="q"?"q":"kwIn");if(inp&&document.activeElement===inp)showSugg(id,inp.value,kind)})}
 const hideSugg=()=>["qSugg","kwSugg"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=""});
@@ -565,6 +579,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  50:["Vorschläge beim Tippen (Suche und Merkliste) zeigen jetzt kleine Produktbilder."],
   49:["Der Knopf „Demnächst“ heißt jetzt „Nächste Woche“ (bzw. „Ab Donnerstag“, wenn noch diese Woche etwas startet).","Neu: Angebote ohne „statt“-Preis zeigen jetzt ihren Vorteil – blau markiert: günstiger als zuletzt, Großpackung günstiger pro Kilo oder günstigster Markt.","Filter überarbeitet: Kategorien richten sich nur noch nach Artikelname, Marke und Warengruppe, nicht mehr nach der Beschreibung."],
   48:["Neu: Barcode-Scanner. Im Laden auf das Strichcode-Symbol im Suchfeld tippen, Artikel scannen und sehen, ob er gerade irgendwo im Angebot ist.","Neu: Preisvergleich in der Artikelansicht – derselbe Artikel bei den anderen Märkten.","Einkaufszettel: Summe pro Markt und Tipp, wenn es einen Artikel woanders günstiger gibt (mit „Tauschen“).","Neu: Gespart-Zähler. Was du auf dem Zettel abhakst, zählt als gekauft: diese Woche, diesen Monat, insgesamt."],
   47:["Kracher der Woche: zählt jetzt nur belegte Rabatte. Rabatte gegenüber der UVP (Preisempfehlung des Herstellers) stehen in der Liste mit vollem Prozentwert, werden aber nicht mehr zum Kracher.","Bei UVP steht jetzt „UVP“ statt „statt“ am Preis."],

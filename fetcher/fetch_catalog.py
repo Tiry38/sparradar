@@ -22,6 +22,7 @@ import urllib.request
 UA = "SparRadar/1.0 (private Angebotsuebersicht; https://github.com/Tiry38/sparradar)"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "docs", "data", "catalog.json")
+OUT_IMG = os.path.join(ROOT, "docs", "data", "catalog-img.json")  # kleines Produktbild je Eintrag (gleiche Reihenfolge)
 EXPORTS = [
     "https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz",
     "https://static.openbeautyfacts.org/data/en.openbeautyfacts.org.products.csv.gz",
@@ -77,6 +78,8 @@ def scan(url):
         i_n, i_b, i_q, i_c = (col[h] for h in need)
         i_s = col.get("stores")
         i_u = col.get("unique_scans_n")
+        i_i = col.get("image_small_url")
+        host = "b" if "beauty" in url else "f"  # f = Open Food Facts, b = Open Beauty Facts
         width = max(col.values()) + 1
         for row in reader:
             rows += 1
@@ -90,7 +93,12 @@ def scan(url):
                 scans = int(float(row[i_u])) if i_u is not None and row[i_u] else 0
             except ValueError:
                 scans = 0
-            found.append((ours, scans, n))
+            img = ""
+            if i_i is not None:
+                m = re.search(r"/images/products/(.+?)\.jpg$", row[i_i] or "")
+                if m:
+                    img = host + ":" + m.group(1)  # kurz: "f:400/041/702/5005/front_de.12.200"
+            found.append((ours, scans, n, img))
     log(f"  {url.split('/')[2]}: {rows} Zeilen gelesen, {len(found)} Artikel aus Deutschland")
     return found
 
@@ -105,11 +113,13 @@ def main():
     # zuerst Artikel unserer Märkte, dann nach Beliebtheit (Scans)
     allf.sort(key=lambda t: (not t[0], -t[1]))
     seen, out = set(), []
-    for _, _, n in allf:
+    out_img = []
+    for _, _, n, img in allf:
         k = norm(n)
         if k and k not in seen:
             seen.add(k)
             out.append(n)
+            out_img.append(img)
             if len(out) >= MAX_ITEMS:
                 break
     log("Artikelstamm:", len(out), "Artikel, davon bei unseren Märkten:", sum(1 for t in allf if t[0]))
@@ -121,6 +131,9 @@ def main():
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",", ":"))
     os.replace(tmp, OUT)
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(out_img, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(tmp, OUT_IMG)
 
 
 if __name__ == "__main__":

@@ -254,7 +254,7 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
 
 
 # Alle Artikelnamen, die beim Abruf vorbeikommen (auch ohne Rabatt): für die Vorschläge in Suche und Merkliste
-SEEN_NAMES = set()
+SEEN_NAMES = {}  # Name -> Bild (für die Vorschläge beim Tippen)
 
 
 # ---------- Lidl ----------
@@ -294,7 +294,7 @@ def fetch_lidl():
                 if isinstance(v, (int, float)):
                     plus = v
             if g.get("fullTitle") or g.get("title"):
-                SEEN_NAMES.add(re.sub(r"\s+", " ", (g.get("fullTitle") or g.get("title")).strip()))
+                SEEN_NAMES[re.sub(r"\s+", " ", (g.get("fullTitle") or g.get("title")).strip())] = g.get("image") or ""
             if not (disc or (old and p and old > p) or plus):
                 continue  # nur Angebote
             kf = g.get("keyfacts") or {}
@@ -636,16 +636,22 @@ def update_history(offers, today):
 def update_names(offers, today):
     """Artikelnamen für die Vorschläge beim Tippen sammeln (auch wenn sie später nicht mehr im Angebot sind)."""
     names = load("names.json", {})
+    imgs = load("names-img.json", {})  # kleines Produktbild je Name, für die Vorschlagsliste
     for o in offers:
         n, b = o["n"], (o.get("b") or "").strip()
         text = n if not b or norm(b) in norm(n) else f"{b} {n}"
         names[text[:80]] = today
-    for n in SEEN_NAMES:
+        if o.get("img"):
+            imgs[text[:80]] = o["img"]
+    for n, img in SEEN_NAMES.items():
         names[n[:80]] = today
+        if img:
+            imgs[n[:80]] = img
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=400)).isoformat()
     names = {k: v for k, v in names.items() if v >= cutoff}
     names = dict(sorted(names.items(), key=lambda kv: kv[1], reverse=True)[:6000])
     save("names.json", names)
+    save("names-img.json", {k: v for k, v in imgs.items() if k in names and isinstance(v, str) and v.startswith("https://")})
 
 
 def main():
