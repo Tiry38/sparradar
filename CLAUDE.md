@@ -47,7 +47,9 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 
 ## Was in die App gehört
 - **Alle Angebote** der Märkte (Wunsch von Kevin, auch für seine Mutter): Lebensmittel, Getränke, Katzenfutter, Drogerie & Pflege **und Non-Food** (Haushalt, Tierbedarf, Baby, Technik, Mode, Wohnen, Garten, Freizeit/Reisen, Sonstiges).
-- Kategorien: `CATS` (Essen & Drogerie) und `NF_CATS` (Non-Food) + `classify()` in `fetcher/fetch_offers.py`. Erst nach Artikelname, dann nach ganzem Text. Die Kategorie-Schlüssel müssen mit `CATS` in `docs/app.js` übereinstimmen.
+- Kategorien: `CATS` (Essen & Drogerie) und `NF_CATS` (Non-Food) + `classify()` in `fetcher/fetch_offers.py`. Die Kategorie-Schlüssel müssen mit `CATS` in `docs/app.js` übereinstimmen.
+- **Kevins Vorgabe: Die Artikelbeschreibung darf die Kategorie NICHT beeinflussen** (Wein mit „passt zu Fisch“ landete bei Fleisch & Fisch). `classify(title, brand, food, cats)` nutzt nur Artikelname + Marke + die **zwei genauesten** Händler-Warengruppen (`cats[-2:]`; weiter oben sortiert kaufDA oft falsch, z. B. Jackfrucht unter „Tierfutter“). Reihenfolge: Langnese-Honig -> Alkohol (`ALCOHOL`) -> Regeln der eigenen Welt (Lebensmittel bzw. Non-Food, je nach Quelle) auf Name, dann auf Warengruppe (`CAT_HINTS`) -> Regeln der anderen Welt.
+- Wortgrenzen beachten (Rinde≠Rind, Kleber≠Leber, Genuss≠Nuss, Altenburger≠Burger, Vollkorn≠Korn, Rotweinsauce≠Rotwein). Marken wie Lupilu (Kleidung UND Spielzeug) nicht als Kategorie-Hinweis nutzen.
 
 ## Prüfen vor jedem Push (immer, für Handy UND Windows-App)
 - Jeder Tab, jede Kategorie, jeder Markt anklickbar; jede Seite und jedes Fenster bis ganz unten scrollbar; kein seitliches Scrollen.
