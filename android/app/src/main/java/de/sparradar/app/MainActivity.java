@@ -53,6 +53,8 @@ public class MainActivity extends Activity {
         s.setDatabaseEnabled(true);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setSupportMultipleWindows(false);
+        // Versionsnummer für die Anzeige in den Einstellungen der Web-App
+        s.setUserAgentString(s.getUserAgentString() + " SparRadarAndroid/" + installedVersion());
 
         web.setWebViewClient(new WebViewClient() {
             @Override

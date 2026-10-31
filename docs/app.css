@@ -106,3 +106,4 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .valid.last{color:var(--alert);font-weight:800}
 .totop{position:fixed;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:7;width:46px;height:46px;border-radius:50%;border:0;background:var(--grad-brand,#3552F5);color:#fff;display:grid;place-items:center;box-shadow:0 6px 20px rgba(53,82,245,.35)}
 @media (min-width:721px){.totop{bottom:24px}}
+.verline{text-align:center;color:var(--muted);font-size:.8rem;padding:4px 0 8px}

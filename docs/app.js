@@ -482,7 +482,16 @@ function renderSettings(){
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
    <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen gegen 5:15 Uhr neu abgerufen${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
     <div class="links"><button class="btn ghost sm" id="reloadApp">App neu laden</button></div></section>
+   <div class="verline">${versionText()} · <span id="verState">wird geprüft …</span></div>
   </div>`}
+// Versionsnummern: Web-App (app.js?v=) und, falls vorhanden, Android-App bzw. Windows-Programm
+function versionText(){
+  const a=navigator.userAgent.match(/SparRadarAndroid\/(\d+)/),w=window.__SR_DESKTOP__;
+  return `SparRadar Version ${MYV||"?"}${a?` · Android-App 1.${a[1]}`:""}${w?` · Windows-Programm ${esc(w)}`:""}`}
+async function checkVersion(){const el=document.getElementById("verState");if(!el)return;
+  try{const v=(await (await fetch("index.html",{cache:"no-store"})).text()).match(/app\.js\?v=(\d+)/)?.[1];
+    el.innerHTML=v&&v!==MYV?`<b style="color:var(--alert)">neue Version ${v} da</b> – „App neu laden“ tippen`:`<b style="color:var(--save)">✓ neueste Version</b>`}
+  catch(e){el.textContent="offline, nicht prüfbar"}}
 
 function renderTips(){
   const T=[
@@ -572,7 +581,7 @@ document.addEventListener("click",e=>{
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
   if(b.id==="openFilter"){S.sheet="filter";render();return}
-  if(b.id==="settingsBtn"){S.sheet="settings";render();return}
+  if(b.id==="settingsBtn"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="reloadApp"){location.reload();return}
   if(b.id==="syncCopy"){copy(Sync.cfg().token,"Code kopiert. Jetzt an dich selbst schicken und auf dem anderen Gerät einfügen.");return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}

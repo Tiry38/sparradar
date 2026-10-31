@@ -57,12 +57,15 @@ fn check_for_update(_version: &str) {}
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
+            let version = app.package_info().version.to_string();
             WebviewWindowBuilder::new(app, "main", WebviewUrl::External(APP_URL.parse().unwrap()))
                 .title("SparRadar")
                 .inner_size(1200.0, 850.0)
                 .maximized(true)
                 .min_inner_size(380.0, 600.0)
                 .initialization_script(SAME_WINDOW_LINKS)
+                // Versionsnummer für die Anzeige in den Einstellungen der Web-App
+                .initialization_script(&format!("window.__SR_DESKTOP__ = '{}';", version))
                 .on_navigation(|url| {
                     if is_app(url) {
                         return true;
@@ -74,7 +77,6 @@ fn main() {
                 })
                 .build()?;
             // beim Start und dann alle 6 Stunden nach einer neuen Programmversion schauen
-            let version = app.package_info().version.to_string();
             std::thread::spawn(move || loop {
                 check_for_update(&version);
                 std::thread::sleep(CHECK_EVERY);
