@@ -1,49 +1,42 @@
-"""Einmalige Diagnose: Wie blättert kaufDA weiter? (Nur von Hand starten, wenige Abrufe.)"""
+"""Einmalige Diagnose: Themen-Unterseiten je Markt bei kaufDA (Nur von Hand, wenige Abrufe.)"""
 import json
 import re
 import time
 
 import fetch_offers as f
 
-URL = f.KD_STORES["netto"]
 
-
-def ids(h):
+def page(url):
+    h = f.http(url)
+    time.sleep(2)
     m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
     if not m:
-        return set(), None, None
-    d = json.loads(m.group(1))
-    pi = d["props"]["pageProps"].get("pageInformation") or {}
-    main = (pi.get("offers") or {}).get("main") or {}
-    return {it.get("id") for it in main.get("items") or []}, main.get("totalItems"), d.get("buildId")
+        return None
+    return json.loads(m.group(1))["props"]["pageProps"]
 
 
-h1 = f.http(URL); time.sleep(2)
-a, total, build = ids(h1)
-h1b = f.http(URL); time.sleep(2)
-b, _, _ = ids(h1b)
-print("Seite 1 zweimal: gleiche Angebote?", a == b, len(a), "von", total, "buildId", build)
-for m in sorted(set(re.findall(r'<link[^>]+rel="(?:next|prev|canonical)"[^>]*>', h1 or "")))[:10]:
-    print("LINK", m)
-for m in sorted(set(re.findall(r'href="([^"]*(?:page|seite|offset|p=)[^"]*)"', h1 or "", re.I)))[:20]:
-    print("HREF", m)
-for m in sorted(set(re.findall(r'"(/api/[^"]{3,120})"', h1 or "")))[:20]:
-    print("API", m)
-for m in sorted(set(re.findall(r'(https?://[a-z0-9.-]*(?:bonial|kaufda)[a-z0-9.-]*/[^"\s]{0,80})', h1 or "")))[:40]:
-    if "content-media" not in m and ".jpg" not in m and ".png" not in m:
-        print("URL", m)
-for q in ("?page=2", "?offset=16", "?p=2", "?seite=2"):
-    hh = f.http(URL + q); time.sleep(2)
-    s, t, _ = ids(hh)
-    print(q, "->", len(s), "Angebote, neu gegenüber Seite 1:", len(s - a - b))
-if build:
-    path = URL.split("kaufda.de")[1]
-    for q in ("", "?page=2"):
-        raw = f.http(f"https://www.kaufda.de/_next/data/{build}/de-DE{path}.json{q}"); time.sleep(2)
-        try:
-            d = json.loads(raw or "")
-            main = d["pageProps"]["pageInformation"]["offers"]["main"]
-            s = {it.get("id") for it in main.get("items") or []}
-            print("_next/data", q, "->", len(s), "neu:", len(s - a - b), "Schlüssel:", [k for k in main if k != "items"])
-        except Exception as e:
-            print("_next/data", q, "->", repr(e)[:120])
+pp = page(f.KD_STORES["lidl"])
+pi = pp.get("pageInformation") or {}
+tc = (pi.get("template") or {}).get("content") or {}
+links = ((tc.get("OfferLinkbox") or {}).get("PublisherOfferLinkbox") or {}).get("links") or []
+print("Themen-Links auf der Lidl-Seite:", len(links))
+for l in links[:20]:
+    print("  ", json.dumps(l, ensure_ascii=False)[:200])
+print("Produkte des Händlers:", json.dumps((pi.get("publisher") or {}).get("products", [])[:5], ensure_ascii=False)[:600])
+tests = []
+for l in links[:3]:
+    u = l.get("url") or l.get("href") or l.get("link")
+    if u:
+        tests.append(u if u.startswith("http") else "https://www.kaufda.de" + u)
+tests += ["https://www.kaufda.de/Woerth-am-Rhein/Lidl/Kaffee", "https://www.kaufda.de/Karlsruhe/Lidl/Kaffee",
+          "https://www.kaufda.de/Woerth-am-Rhein/Angebote/Kaffee", "https://www.kaufda.de/Angebote/Tassimo"]
+for u in tests:
+    p = page(u)
+    if not p:
+        print("X", u, "-> keine Daten")
+        continue
+    main = ((p.get("pageInformation") or {}).get("offers") or {}).get("main") or {}
+    pubs = {}
+    for it in main.get("items") or []:
+        pubs[it.get("publisherName")] = pubs.get(it.get("publisherName"), 0) + 1
+    print("OK", u, "->", len(main.get("items") or []), "von", main.get("totalItems"), pubs)
