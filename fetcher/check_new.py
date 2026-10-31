@@ -1,7 +1,7 @@
 """SparRadar: Prospekt-Wächter (läuft Do–So alle 2 Stunden, .github/workflows/prospekte.yml).
 
 Schaut nur auf die 5 kaufDA-Händlerseiten, 2 kaufDA-Sortimentseiten, prospektewoche.de/rewe und die Aldi-Angebotsseite und meldet, ob dort
-ein Prospekt bzw. Angebote mit Startdatum in der Zukunft stehen, die SparRadar noch nicht abgerufen hat.
+ein Prospekt bzw. Angebote mit Startdatum ab heute stehen (auch montags erscheinende Prospekte, die am selben Tag starten), die SparRadar noch nicht abgerufen hat.
 Nur dann startet der Workflow den kompletten Abruf (fetch_offers.py). So stehen die Angebote der nächsten
 Woche so früh wie möglich in der App, ohne die Quellen ständig komplett abzufragen.
 
@@ -35,11 +35,11 @@ def future_marks():
             lst = (pi.get("brochures") or {}).get(key)
             for b in lst if isinstance(lst, list) else []:
                 start = str((b or {}).get("validFrom") or "")[:10]
-                if start > today:
+                if start >= today:
                     marks[f"{store}:{b.get('id') or b.get('contentId')}"] = start
         for it in ((pi.get("offers") or {}).get("main") or {}).get("items") or []:
             start = str(it.get("validFrom") or "")[:10]
-            if start > today:
+            if start >= today:
                 pc = (it.get("parentContent") or {}).get("id")
                 if pc:
                     marks[f"{store}:{pc}"] = start
@@ -53,18 +53,18 @@ def future_marks():
         pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
         for it in ((pi.get("offers") or {}).get("main") or {}).get("items") or []:
             start = str(it.get("validFrom") or "")[:10]
-            if start > today and it.get("publisherId") == pub:
+            if start >= today and it.get("publisherId") == pub:
                 marks[f"{store}:{(it.get('parentContent') or {}).get('id')}"] = start
     # Rewe-Vorschau: neue Woche bei prospektewoche.de (nur die Startseite mit den Wochen-Reitern)
     h = f.http(f"{f.PW}/rewe") or ""
     time.sleep(f.PAUSE)
     for t in re.findall(r'tab-dates">([^<]+)<', h):
         span = f.pw_dates(t, dt.date.today())
-        if span and span[0] > today:
+        if span and span[0] >= today:
             marks[f"rewe-pw:{span[0]}"] = span[0]
     h = f.http("https://www.aldi-sued.de/de/angebote.html") or ""
     for day, _ in f.aldi_days(h):  # Aldi-Tagesseiten der nächsten Woche (z. B. /angebote/2026-11-02)
-        if day > today:
+        if day >= today:
             marks[f"aldi:{day}"] = day
     m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
     if m:
@@ -72,7 +72,7 @@ def future_marks():
         for i, v in enumerate(data):
             if isinstance(v, dict) and "onSaleDate" in v and "sku" in v:
                 start = str(f.nuxt_resolve(data, i).get("onSaleDate") or "")[:10]
-                if start > today:
+                if start >= today:
                     marks[f"aldi:{start}"] = start  # Aldi: je Starttag ein Merkmal
     return marks
 

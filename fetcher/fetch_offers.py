@@ -472,7 +472,7 @@ def kd_page(url):
         "links": [l.get("link_href") for l in links if isinstance(l, dict) and l.get("link_href")],
         "known": {(norm(it.get("title")), round(float((it.get("prices") or {}).get("mainPrice") or 0), 2)) for it in items},
         "pubs": {it.get("publisherId") for it in items if it.get("publisherId")},  # Händler-Kennung, z. B. EDEKA = DE-220164
-        "future": any(str((b or {}).get("validFrom") or "")[:10] > dt.date.today().isoformat()
+        "future": any(str((b or {}).get("validFrom") or "")[:10] >= dt.date.today().isoformat()
                       for key in ("viewer", "publisher") for b in (br.get(key) if isinstance(br.get(key), list) else [])),
     }
     return items, int(main.get("totalItems") or 0)
@@ -643,7 +643,7 @@ def fetch_sortiment(regional=None):
             if not local.get("future"):
                 today = dt.date.today().isoformat()
                 preview = {str((it.get("parentContent") or {}).get("id")) for it in found
-                           if str(it.get("validFrom") or "")[:10] > today and it.get("publisherId") in pubs}
+                           if str(it.get("validFrom") or "")[:10] >= today and it.get("publisherId") in pubs}
                 if preview:
                     log(f"  {store}: Vorschau nächste Woche aus Prospekt(en) {sorted(preview)}")
             ok = ok | preview
@@ -691,7 +691,7 @@ def fetch_prospektewoche(shop="rewe", store="rewe"):
     tabs = [pw_dates(t, today) for t in re.findall(r'tab-dates">([^<]+)<', h)]
     out = []
     for wk, span in enumerate(tabs, 1):
-        if not span or span[0] <= today.isoformat():
+        if not span or span[0] < today.isoformat():  # auch die Woche, die heute beginnt (Montag)
             continue  # nur Wochen, die noch nicht begonnen haben
         time.sleep(PAUSE)
         hw = http(f"{PW}/{shop}?week={wk}") or ""
@@ -850,7 +850,7 @@ def future_counts(offers):
     today = dt.date.today().isoformat()
     c = {}
     for o in offers:
-        if (o.get("from") or "") > today:
+        if (o.get("from") or "") >= today:
             c[o["s"]] = c.get(o["s"], 0) + 1
     return c
 

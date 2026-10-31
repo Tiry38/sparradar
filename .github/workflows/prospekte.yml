@@ -6,7 +6,8 @@ name: Prospekt-Wächter
 on:
   schedule:
     - cron: "40 4-21 * * 4,5,6,0"     # Do, Fr, Sa, So ca. 5:40–22:40 Uhr (Sommerzeit 6:40–23:40), jede Stunde
-    - cron: "40 4,9,15 * * 1,2,3"     # Mo, Di, Mi 3× am Tag (dm startet neue Aktionen auch unter der Woche)
+    - cron: "40 4-20 * * 1"           # Mo ca. 5:40–21:40 Uhr jede Stunde (falls ein Prospekt erst am Montag kommt)
+    - cron: "40 4,9,15 * * 2,3"       # Di, Mi 3× am Tag (dm startet neue Aktionen auch unter der Woche)
   workflow_dispatch: {}
 
 permissions:
