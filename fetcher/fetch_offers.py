@@ -172,6 +172,12 @@ def classify(title, brand="", food=True, cats=None):
         for key, rx in [h for h in CAT_HINTS if h[0] in keys] + rules:  # nur Hinweise dieser Welt
             if ct and re.search(rx, ct):
                 return key
+    # letzte Chance vor der Notlösung: alle Warengruppen des Händlers (z. B. „Whiskey“ weiter oben in der Liste)
+    ca = " / ".join(c for c in (cats or []) if isinstance(c, str)).lower()
+    for rules in (first, second):
+        for key, rx in rules:
+            if ca and key != "tier" and re.search(rx, ca):
+                return key
     return "vorrat" if food else "sonstiges"
 
 
