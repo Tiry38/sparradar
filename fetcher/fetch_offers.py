@@ -1002,7 +1002,18 @@ def main():
     run("kaufDA", fetch_kaufda)
     for t in threads:
         t.join()
-    offers = finalize([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau") for o in results.get(name, [])], save_uvp=True)
+    new = [o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau") for o in results.get(name, [])]
+    # Sortiment-Abgleich: Jeder Abruf baut die Liste neu auf – neue Artikel kommen dazu, verschwundene fliegen raus.
+    # Ausnahme: Liefert ein Markt plötzlich fast nichts (Seite kurz down, Sperre, Umbau), bleiben seine noch gültigen
+    # alten Angebote stehen, statt dass der ganze Markt bis zum nächsten Abruf leer ist.
+    valid = [o for o in OLD_OFFERS if not o.get("to") or o["to"] >= today]
+    for st in {o["s"] for o in valid}:
+        n_old = sum(o["s"] == st for o in valid)
+        n_new = sum(o["s"] == st for o in new)
+        if n_old >= 20 and n_new < n_old * 0.3:
+            log(f"  ! {st}: nur {n_new} statt bisher {n_old} Angebote – Quelle gestört? Alte gültige Angebote bleiben.")
+            new += [dict(o) for o in valid if o["s"] == st]
+    offers = finalize(new, save_uvp=True)
     if len(offers) < 30:
         log("! Zu wenige Angebote, alte Daten bleiben stehen.")
         sys.exit(1)
