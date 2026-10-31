@@ -25,15 +25,22 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 - **Android-App-Hülle möglichst nie mehr ändern** (Kevins Wunsch): Jedes APK-Update verlangt in Android Bestätigungen und Warnungen. Alles Neue kommt über die Web-App. Der grüne Update-Balken für Android ist deshalb abgeschaltet; nur in den Einstellungen „Nach App-Update suchen“. Empfohlen für neue Nutzer: **Web-App über Chrome installieren** („App installieren“), ganz ohne APK und ohne Warnungen.
 - **Android-Updater:** Die APK prüft beim Start `version.json` im Release `apps` und bietet „Aktualisieren“ an (PackageInstaller, Android fragt selbst nach). Die Versionsnummer = 100 + Anzahl Commits in `android/`. Signiert wird mit dem festen Schlüssel aus dem GitHub-Secret `ANDROID_KEYSTORE` (Base64 einer PKCS12-Datei, Alias `sparradar`). Den Schlüssel **nie** ins Repo legen und nicht austauschen, sonst schlagen alle Updates fehl und jeder muss neu installieren.
 
+## Design und Bedienung (Stand 31.10.)
+- **Logo:** weißes Preisschild mit Prozentzeichen auf Farbverlauf Anthrazit -> Grün (`docs/icon.svg`, `icon-maskable.svg`, `logo-tag.svg` für die Logo-Kacheln, PNGs, `og.png`, `og-einladung.png`, Android `ic_launcher_*.xml`). Bei Logo-Änderung alle diese Dateien neu erzeugen und die Windows-Version (Commit in `desktop/`) hochzählen.
+- **Einladung:** `docs/einladung.html?von=<Name>` (Name nur im Link, nicht im Repo), installiert die Web-App über Chrome (keine APK, keine Warnung). Empfohlener Weg für alle Nutzer.
+- **Detailansicht:** Artikel antippen -> großes Bild, weitere Bilder (`il`, `ims`), Beschreibung (`inf`), Kategorien (`cat`), Prospektseite (`pg`), Preisrechnung, Preisverlauf; Bild antippen = Vollbild.
+- **Zurück-Taste:** History-Einträge (`navSync`) + Schutz-Eintrag; ganz am Ende Frage „wirklich schließen?“ (Android: `SparRadarApp.exitApp()`).
+- **Android-Updater:** Download-Manager + Androids Installer (nicht PackageInstaller-Session, die startete nicht zuverlässig); automatischer Hinweis nur einmal pro Version.
+
 ## Märkte (Region Wörth am Rhein, ca. 20 km)
 | Markt | Quelle |
 |---|---|
-| Lidl | lidl.de Such-API, Kategorie „Essen & Trinken“ (`category.id=10068374`), nur `store=1` (Filiale) mit Rabatt; plus kaufDA |
+| Lidl | lidl.de Such-API (`fetchsize` max. 60, mit `offset` blättern) + kaufDA Händlerseite + kaufDA-Sortiment-Seiten |
 | Aldi Süd | aldi-sued.de/de/angebote.html, Daten aus `__NUXT_DATA__` |
 | Rewe | kaufDA `Woerth-am-Rhein/REWE/p-r101` |
 | Netto Marken-Discount | kaufDA `Woerth-am-Rhein/Netto-Marken-Discount/p-r9` |
-| Edeka **Jockgrim** | kaufDA `Jockgrim/EDEKA/p-r107` (ausdrücklich der Markt in Jockgrim) |
-| dm | kaufDA `Woerth-am-Rhein/dm-drogerie-markt/p-r104` |
+| Edeka **Jockgrim** | kaufDA `Jockgrim/EDEKA/p-r107` + Sortiment-Seiten `Edeka/Sortiment/…` + Stichwortseiten Karlsruhe, nur Prospekte mit gleichem Inhalt wie Jockgrim (`same_flyer`). edeka.de sperrt automatische Abrufe (403). |
+| dm | kaufDA Händlerseite + Stichwortseiten Karlsruhe (keine Sortiment-Seiten; die dm-Produktsuche verbietet Abrufe per robots.txt) |
 | Scheck-In (Wörth, Maximiliancenter) | nicht automatisch – Nutzer trägt Angebote in der App selbst ein |
 | Serpa Markt (Wörth) | nicht automatisch – Nutzer trägt Angebote in der App selbst ein |
 
