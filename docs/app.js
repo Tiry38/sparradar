@@ -55,7 +55,7 @@ const IC = {
 
 // ---------- Zustand ----------
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
-const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,noapp:0,low:0},store.get("flt",{})),useApp:store.get("useApp",true),
+const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,noapp:0,low:0},store.get("flt",{})),useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),sheet:null,limit:60};
 let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
@@ -315,8 +315,8 @@ function filtered(){
   const qt=S.q.trim().split(/\s+/).filter(Boolean);S._catOff=false;
   if(qt.length){r=searchOffers(r,S.q);
     // Suche findet in der gewählten Kategorie nichts? Dann in allen Kategorien suchen statt „nicht im Angebot“
-    if(S.cat){const rc=r.filter(o=>o.c===S.cat);if(rc.length||!r.length)r=rc;else S._catOff=true}}
-  else if(S.cat)r=r.filter(o=>o.c===S.cat);
+    if(S.cats.size){const rc=r.filter(o=>S.cats.has(o.c));if(rc.length||!r.length)r=rc;else S._catOff=true}}
+  else if(S.cats.size)r=r.filter(o=>S.cats.has(o.c));
   r=r.filter(fltOk);
   const f0={off:(a,b)=>sortPct(b)-sortPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
   // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
@@ -462,7 +462,10 @@ function kracherBtn(){const k=ranked()[0];if(!k)return"";
    <span class="big"><b>${eur(fin(k))}</b>${offPct(k)?`<span>−${offPct(k)} %</span>`:""}</span></button>`}
 
 // Märkte ohne Angebote in der gewählten Woche (z. B. Prospekt für nächste Woche noch nicht veröffentlicht)
-function missingHTML(){if(S.q.trim()||S.cat)return "";
+// mehrere Kategorien gleichzeitig (Kevins Wunsch)
+const catNames=()=>[...S.cats].filter(k=>CATS[k]).map(k=>CATS[k]);
+const catTitle=()=>{const n=catNames();return n.length>3?`${n.length} Kategorien`:n.join(" · ")};
+function missingHTML(){if(S.q.trim()||S.cats.size)return "";
   const have=new Set((S.week||WEEKEND?weekOffers():OFFERS.filter(o=>!o.from||o.from<=SHOP)).map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s));
   if(!miss.length)return "";
   const dm=miss.includes("dm")?` <span class="dmnote">dm veröffentlicht seine Aktionen nicht vorab und hat sonst Dauerpreise (mind. 4 Monate garantiert) – ohne Aktion lohnt kein Warten.</span>`:"";
@@ -470,16 +473,16 @@ function missingHTML(){if(S.q.trim()||S.cat)return "";
 function renderOffers(){
   if(!OFFERS.length)return `<div class="empty"><b>Noch keine Angebote</b>Sobald der tägliche Abruf gelaufen ist, erscheinen hier die Angebote.</div>`;
   const r=filtered(),bestIds=new Set();
-  if((S.q.trim()||S.cat)&&r.length>1){const by={};r.forEach(o=>{if(unit(o)==null)return;const k=o.gp.u;if(!by[k]||unit(o)<unit(by[k]))by[k]=o});Object.values(by).forEach(o=>bestIds.add(o.id))}
+  if((S.q.trim()||S.cats.size)&&r.length>1){const by={};r.forEach(o=>{if(unit(o)==null)return;const k=o.gp.u;if(!by[k]||unit(o)<unit(by[k]))by[k]=o});Object.values(by).forEach(o=>bestIds.add(o.id))}
   const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
-  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cat?CATS[S.cat]:(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):WEEKEND?"Angebote ab Montag":"Angebote, die jetzt gelten");
+  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):WEEKEND?"Angebote ab Montag":"Angebote, die jetzt gelten");
   const shown=r.slice(0,S.limit);
   return `${kracherBtn()}
    ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${missingHTML()}
    ${fltCount()?`<p class="catoff fact">Filter aktiv: <b>${fltSummary().map(esc).join(" · ")}</b> <button class="linkbtn" data-fclear="1">Filter aus</button></p>`:""}
-   ${S._catOff?`<p class="catoff">In „${esc(CATS[S.cat])}“ nichts gefunden – hier die Treffer aus allen Kategorien.</p>`:""}
+   ${S._catOff?`<p class="catoff">In „${esc(catNames().join(", "))}“ nichts gefunden – hier die Treffer aus allen Kategorien.</p>`:""}
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
    ${S.q.trim()?moreArticles(r):""}
@@ -611,6 +614,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  58:["Kategorien: Du kannst jetzt mehrere gleichzeitig auswählen, z. B. Obst & Gemüse und Fleisch & Fisch. Nochmal antippen nimmt eine Kategorie wieder raus, „Alle Kategorien“ setzt alles zurück.","Prospekte, die erst am Montag erscheinen, werden jetzt auch sofort geholt."],
   57:["Einkaufszettel als Einkaufswagen: Im Laden antippen, was im Wagen liegt. Am Handy schließt der letzte Artikel den Einkauf ab – mit kurzem Bericht und „Zurückholen“.","Neu unter dem Zettel: „Meine Einkäufe“ mit Monatsbericht (ausgegeben, gespart, nach Markt) und allen Einkäufen zum Nachlesen.","Mengen (2×, 3×), eigene Einträge mit Preis („Brot 1,99“), Budget, „Wieder kaufen“ aus deinen letzten Einkäufen. Beim Einkaufen bleibt der Bildschirm an."],
   56:["Neue Filter unter „Kategorien & Filter“: Mindest-Ersparnis (z. B. ab 30 %), Preis bis (z. B. bis 2 €), nur Bio, vegan, nur echte Rabatte, ohne App & Karte und Tiefstpreis. Die Auswahl bleibt gespeichert, „Filter aus“ setzt sie mit einem Tipp zurück."],
   55:["Neue Angebote kommen jetzt viel schneller in die App: Sobald ein Markt seinen neuen Prospekt veröffentlicht, ist er nach wenigen Minuten drin, statt erst nach dem kompletten Abruf. Die App schaut alle 5 Minuten nach neuen Daten."],
@@ -992,8 +996,8 @@ function renderFilter(){
    <h3 class="fh">Märkte</h3>
    <div class="fchips">${chip("data-store","","Alle Märkte",!S.stores.size," plain")}${Object.keys(STORES).filter(k=>counts[k]).map(k=>chip("data-store",k,sb(k)+esc(STORES[k].n)+`<em>${counts[k]}</em>`,S.stores.has(k))).join("")}</div>
    <h3 class="fh">Essen &amp; Drogerie</h3>
-   <div class="fchips">${chip("data-cat","","Alle Kategorien",!S.cat," plain")}${food.map(([k,v])=>chip("data-cat",k,esc(v),S.cat===k," plain")).join("")}</div>
-   ${nf.length?`<h3 class="fh">Weitere Angebote</h3><div class="fchips">${nf.map(([k,v])=>chip("data-cat",k,esc(v),S.cat===k," plain")).join("")}</div>`:""}
+   <div class="fchips">${chip("data-cat","","Alle Kategorien",!S.cats.size," plain")}${food.map(([k,v])=>chip("data-cat",k,esc(v),S.cats.has(k)," plain")).join("")}</div>
+   ${nf.length?`<h3 class="fh">Weitere Angebote</h3><div class="fchips">${nf.map(([k,v])=>chip("data-cat",k,esc(v),S.cats.has(k)," plain")).join("")}</div>`:""}
    <h3 class="fh">Sortieren</h3>
    <div class="fchips">${Object.entries(SORTS).map(([k,v])=>chip("data-sort",k,v,S.sort===k," plain")).join("")}</div>
    <h3 class="fh">Mindest-Ersparnis</h3>
@@ -1046,10 +1050,10 @@ function render(){
   const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
   // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
   document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mn">Alle</span><em>${OFFERS.length}</em></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></button>`).join("");
-  document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cat===k).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
+  document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cats.size}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cats.has(k)).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cats.has(k)}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("sort").value=S.sort;
-  const act=[].concat(S.cat?[CATS[S.cat]]:[],S.sort!=="off"?[SORTS[S.sort]]:[],fltSummary());
+  const act=[].concat(S.cats.size?[catTitle()]:[],S.sort!=="off"?[SORTS[S.sort]]:[],fltSummary());
   const f2=document.getElementById("fcount2");if(f2){f2.textContent=fltCount();f2.hidden=!fltCount()}
   document.getElementById("fsum").textContent=act.length?act.join(" · "):"Alle Kategorien";
   const fc=document.getElementById("fcount");fc.textContent=act.length;fc.hidden=!act.length;
@@ -1100,7 +1104,7 @@ document.addEventListener("click",e=>{
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
   if(b.dataset.toggleapp){S.useApp=!S.useApp;save();render();return}
-  if(b.dataset.freset){S.stores.clear();S.cat=null;S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
+  if(b.dataset.freset){S.stores.clear();S.cats.clear();S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
   if(b.dataset.fmin!=null){S.flt.min=+b.dataset.fmin;S.limit=60;store.set("flt",S.flt);render();return}
   if(b.dataset.fmax!=null){S.flt.max=+b.dataset.fmax;S.limit=60;store.set("flt",S.flt);render();return}
   if(b.dataset.fflag){const k=b.dataset.fflag;S.flt[k]=S.flt[k]?0:1;S.limit=60;store.set("flt",S.flt);render();return}
@@ -1109,14 +1113,14 @@ document.addEventListener("click",e=>{
   if(b.id==="closeSheet"){S.sheet=null;render();return}
   if(b.id==="more"){S.limit+=60;render();return}
   if(b.dataset.store!==undefined){const k=b.dataset.store;if(!k)S.stores.clear();else S.stores.has(k)?S.stores.delete(k):S.stores.add(k);S.limit=60;render();return}
-  if(b.dataset.cat!==undefined){S.cat=b.dataset.cat||null;S.limit=60;render();return}
+  if(b.dataset.cat!==undefined){const k=b.dataset.cat;if(!k)S.cats.clear();else S.cats.has(k)?S.cats.delete(k):S.cats.add(k);S.limit=60;render();return}
   if(b.id==="appSw"){S.useApp=!S.useApp;save();render();return}
   if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
   if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
   if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0)S.list.splice(i,1);else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);save();render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
-  if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cat=null;S.limit=60;render();scrollTo({top:0});return}
+  if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
