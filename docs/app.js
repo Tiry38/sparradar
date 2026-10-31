@@ -545,6 +545,18 @@ function renderFilter(){
    <button class="btn ghost sm" data-openadd="1" style="justify-self:start">+ Angebot selbst eintragen</button>
   </div>`}
 
+// Zurück-Taste/-Wischgeste (Handy) und Browser-Zurück: schließt zuerst ein offenes Fenster,
+// dann geht es zurück zu „Angebote“, erst danach wird die App verlassen.
+let NAV=0,IGNORE_POP=0;
+function navSync(){const want=(S.tab!=="offers"?1:0)+(S.sheet?1:0);
+  while(NAV<want){history.pushState({sr:NAV+1},"");NAV++}
+  if(NAV>want){const n=NAV-want;NAV=want;IGNORE_POP++;history.go(-n)}}
+addEventListener("popstate",()=>{
+  if(IGNORE_POP>0){IGNORE_POP--;return}
+  NAV=Math.max(0,NAV-1);
+  if(S.sheet)S.sheet=null;else if(S.tab!=="offers"){S.tab="offers";scrollTo({top:0})}
+  render()});
+
 function render(){
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
@@ -568,6 +580,7 @@ function render(){
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  navSync();
 }
 
 // kaputte Fotos durch Illustration ersetzen
