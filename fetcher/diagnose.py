@@ -1,5 +1,4 @@
-"""Diagnose (nur von Hand): Wo stehen dm-Angebote für nächste Woche? (meinprospekt, kaufDA, dm.de, Portale)"""
-import collections
+"""Diagnose (nur von Hand): dm – wer steckt hinter den Prospekten ab 02.11., was bietet dm.de selbst (Sitemaps, Content-Dienste)?"""
 import json
 import re
 import urllib.parse
@@ -29,56 +28,39 @@ def allowed(url):
         rp = urllib.robotparser.RobotFileParser()
         rp.parse(txt.splitlines())
         RP[base] = rp
-        print(f"\n##### {base}/robots.txt {st}\n" + "\n".join(l for l in txt.splitlines() if l.strip() and not l.startswith("#"))[:1500])
+        print(f"\n##### {base}/robots.txt {st}\n" + "\n".join(l for l in txt.splitlines() if l.strip())[:800])
     return RP[base].can_fetch(f.UA, url)
 
 
-def nd(h):
-    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
-    return json.loads(m.group(1)) if m else {}
+# 1) kaufDA dm-Seite: Prospekte mit Herausgeber
+st, h = get("https://www.kaufda.de/Woerth-am-Rhein/dm-drogerie-markt/p-r104")
+m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
+pi = ((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {} if m else {}
+for key, lst in (pi.get("brochures") or {}).items():
+    for b in lst if isinstance(lst, list) else []:
+        if isinstance(b, dict):
+            print("KAUFDA", key, "|", b.get("title"), "|", str(b.get("validFrom"))[:10], "-", str(b.get("validUntil"))[:10], "|",
+                  b.get("publisherName") or (b.get("publisher") or {}).get("name") if isinstance(b.get("publisher"), dict) else b.get("publisherName"),
+                  b.get("publisherId"), b.get("type"))
 
+# 2) dm.de Sitemaps
+st, sm = get("https://www.dm.de/sitemap.xml")
+print("\nDM SITEMAP", st, sm[:600])
+subs = re.findall(r"<loc>([^<]+)</loc>", sm)
+for u in subs[:12]:
+    st, x = get(u)
+    locs = re.findall(r"<loc>([^<]+)</loc>", x)
+    hit = [l for l in locs if re.search(r"angebot|aktion|prospekt|coupon|rabatt|sale|neu|deal|spar", l, re.I)]
+    print("  SUB", u, st, len(locs), hit[:25])
 
-def walk(o, found, path=""):
-    if isinstance(o, dict):
-        if ("validFrom" in o or "validUntil" in o or "validTo" in o) and ("title" in o or "name" in o or "productName" in o):
-            found.append(o)
-        for k, v in o.items():
-            walk(v, found, path + "." + k)
-    elif isinstance(o, list):
-        for v in o:
-            walk(v, found, path)
-
-
-def show(label, url):
-    ok = allowed(url)
-    st, h = get(url) if ok else ("robots-verboten", "")
-    print(f"\n=== {label} {url} erlaubt={ok} status={st} len={len(h)}")
-    if not h:
-        return
-    found = []
-    walk(nd(h), found)
-    c = collections.Counter((str(x.get("validFrom"))[:10], str(x.get("validUntil") or x.get("validTo"))[:10],
-                             x.get("publisherName") or x.get("type")) for x in found)
-    print("  Zeiträume:", c.most_common(15))
-    for x in found[:6]:
-        print("   ·", {k: x.get(k) for k in ("title", "name", "brandName", "publisherName", "validFrom", "validUntil", "type") if k in x})
-    print("  Datumsangaben im Text:", collections.Counter(re.findall(r"\d\d\.\d\d\.20\d\d", h)).most_common(10))
-
-
-show("meinprospekt dm", "https://www.meinprospekt.de/dm-de")
-show("meinprospekt dm Karlsruhe", "https://www.meinprospekt.de/karlsruhe/dm-de")
-show("kaufDA dm Wörth", f.KD_STORES.get("dm", "https://www.kaufda.de/Woerth-am-Rhein/dm-drogerie-markt/p-r104"))
-show("kaufDA dm Karlsruhe", "https://www.kaufda.de/Karlsruhe/dm-drogerie-markt/p-r104")
-show("kaufDA dm Geschäfte", "https://www.kaufda.de/Geschaefte/DM")
-for u in ("https://www.dm.de/", "https://www.dm.de/angebote", "https://www.dm.de/aktionen", "https://www.dm.de/prospekt",
-          "https://www.dm.de/services/services-im-markt/prospekt", "https://www.dm.de/tipps-und-trends", "https://www.dm.de/sitemap.xml",
-          "https://www.prospektguru.de/prospekt/dm", "https://www.marktguru.de/rp/dm-drogerie-markt-prospekte",
-          "https://www.kimbino.de/dm-drogerie/", "https://www.prospektangebote.de/geschaefte/dm-prospekte.html",
-          "https://onlineprospekt.com/prospekte/dm/", "https://www.wogibtswas.de/dm-drogerie-markt"):
+# 3) dm-Content-Dienste (laden die Inhalte von dm.de) – nur wenn robots.txt es erlaubt
+for u in ("https://content.services.dmtech.com/rootpage-dm-shop-de-de/angebote",
+          "https://content.services.dmtech.com/rootpage-dm-shop-de-de/aktionen",
+          "https://content.services.dmtech.com/rootpage-dm-shop-de-de/",
+          "https://product-search.services.dmtech.com/de/search/static?query=angebot",
+          "https://www.dm.de/content/angebote"):
     ok = allowed(u)
-    st, h = get(u) if ok else ("robots-verboten", "")
-    print(f"\n--- {u} erlaubt={ok} {st} {len(h)}")
-    if h:
-        print("  Daten:", collections.Counter(re.findall(r"\d\d\.\d\d\.(?:20)?\d\d", h)).most_common(10))
-        print("  Links:", sorted(set(re.findall(r'href="([^"]*(?:angebot|aktion|prospekt|leaflet|brochure)[^"]*)"', h, re.I)))[:25])
-        print("  JSON-LD:", [m[:300] for m in re.findall(r'<script type="application/ld\+json"[^>]*>(.*?)</script>', h, re.S)][:3])
+    st, x = get(u) if ok else ("robots-verboten", "")
+    print(f"\n--- {u} erlaubt={ok} {st} {len(x)}")
+    if x:
+        print("   ", x[:700].replace("\n", " "))
