@@ -55,6 +55,29 @@ Start-Process -FilePath '{exe}'"#,
 #[cfg(not(windows))]
 fn check_for_update(_version: &str) {}
 
+/// Nach einem Update (neue Version beim Start) Windows einmal die Symbole neu laden lassen,
+/// sonst zeigen Taskleiste und Desktop-Verknüpfung noch das alte Logo aus dem Symbol-Zwischenspeicher.
+#[cfg(windows)]
+fn refresh_icons_after_update(version: &str) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let Ok(base) = std::env::var("LOCALAPPDATA") else { return };
+    let dir = std::path::Path::new(&base).join("SparRadar");
+    let file = dir.join("symbol-version.txt");
+    if std::fs::read_to_string(&file).map(|v| v.trim() == version).unwrap_or(false) {
+        return;
+    }
+    let _ = std::process::Command::new("ie4uinit.exe")
+        .arg("-show")
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn();
+    let _ = std::fs::create_dir_all(&dir);
+    let _ = std::fs::write(&file, version);
+}
+
+#[cfg(not(windows))]
+fn refresh_icons_after_update(_version: &str) {}
+
 fn main() {
     tauri::Builder::default()
         .setup(|app| {
@@ -77,6 +100,7 @@ fn main() {
                     false
                 })
                 .build()?;
+            refresh_icons_after_update(&version);
             // beim Start und dann alle 6 Stunden nach einer neuen Programmversion schauen
             std::thread::spawn(move || loop {
                 check_for_update(&version);
