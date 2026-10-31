@@ -9,7 +9,6 @@ header.top{position:static}
 .btn.sm{padding:6px 12px;font-size:.84rem;border-radius:10px}
 .more{justify-self:center}
 .src{font-size:.7rem;color:var(--muted)}
-.manual{font-size:.7rem;font-weight:700;color:var(--app);background:var(--app-bg);border-radius:6px;padding:1px 6px;justify-self:start}
 .form{display:grid;gap:10px}
 .form label{display:grid;gap:4px;font-weight:600;font-size:.85rem}
 .form input,.form select{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:12px;padding:10px 12px;min-width:0}

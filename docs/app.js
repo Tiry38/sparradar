@@ -7,8 +7,6 @@ const STORES = {
   rewe:   {n:"Rewe",          m:"Re", c:"#D9363E", app:"Rewe Bonus", link:"https://www.kaufda.de/Woerth-am-Rhein/REWE/p-r101", dom:"rewe.de"},
   netto:  {n:"Netto",         m:"Ne", c:"#C99400", app:"Netto App",  link:"https://www.kaufda.de/Woerth-am-Rhein/Netto-Marken-Discount/p-r9", dom:"netto-online.de"},
   edeka:  {n:"Edeka Jockgrim",m:"Ed", c:"#1F5FAF", app:"Payback",    link:"https://www.kaufda.de/Jockgrim/EDEKA/p-r107", dom:"edeka.de"},
-  scheck: {n:"Scheck-In",     m:"SI", c:"#2E9E5B", app:"Payback",    link:"https://www.scheck-in.de/", manual:true, dom:"scheck-in.de"},
-  serpa:  {n:"Serpa Markt",   m:"Se", c:"#D97A12",                   link:"https://www.google.com/search?q=Serpa+Markt+W%C3%B6rth+am+Rhein+Prospekt", manual:true},
   dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/", dom:"dm.de"}
 };
 const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käse & Eier",brot:"Brot & Backwaren",vorrat:"Vorrat",tk:"Tiefkühl",suess:"Süßes & Snacks",kaffee:"Kaffee & Tee",getraenke:"Getränke",katze:"Katzenfutter",drogerie:"Drogerie & Pflege",
@@ -59,7 +57,7 @@ const IC = {
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
-  manual:store.get("manual",[]),coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),sheet:null,limit:60};
+  coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),sheet:null,limit:60};
 let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {};
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
@@ -80,26 +78,28 @@ const logoUrl = s => STORES[s]?.dom ? `https://www.google.com/s2/favicons?domain
 const sb = (s,lg) => `<span class="sb${lg?" lg":""}" style="--c:${(STORES[s]||{}).c||"#888"}" aria-hidden="true">${(STORES[s]||{}).m||"?"}${logoUrl(s)?`<img src="${logoUrl(s)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-logo="1">`:""}</span>`;
 const sname = s => (STORES[s]||{}).n || s;
 let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
-const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);Sync.changed()};
+// Scheck-In/Serpa und „Angebot eintragen“ wurden entfernt: alte Einträge vom Gerät löschen
+try{localStorage.removeItem("sr_manual")}catch(e){}
+S.coupons=S.coupons.filter(c=>c.s==="all"||STORES[c.s]);
+const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);Sync.changed()};
 
 // ---------- Geräte verbinden (Handy <-> PC) ----------
-// Merkliste, Einkaufszettel, Coupons und eigene Angebote liegen zusätzlich in einem geheimen Gist im
+// Merkliste, Einkaufszettel und Coupons liegen zusätzlich in einem geheimen Gist im
 // GitHub-Konto des Nutzers. Der Schlüssel (nur Recht "gist") bleibt auf dem Gerät, nie im Repo.
 const Sync = {
   API:"https://api.github.com", FILE:"sparradar-sync.json", DESC:"SparRadar-Sync (Merkliste, Einkaufszettel, Coupons)",
   cfg(){return store.get("sync",null)}, timer:null, busy:false, status:"",
-  data(){return {watch:S.watch,list:S.list,manual:S.manual,coupons:S.coupons,extra:S.extra,checked:S.checked}},
+  data(){return {watch:S.watch,list:S.list,coupons:S.coupons,extra:S.extra,checked:S.checked}},
   snap(){return JSON.stringify(this.data())},
   async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
     if(r.status===401)throw new Error("Schlüssel ungültig oder abgelaufen");if(!r.ok)throw new Error("GitHub antwortet nicht ("+r.status+")");return r.json()},
-  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.manual=d.manual||[];S.coupons=d.coupons||[];S.extra=d.extra||[];S.checked=d.checked||[];
+  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.coupons=d.coupons||[];S.extra=d.extra||[];S.checked=d.checked||[];
     store.set("extra",S.extra);store.set("checked",S.checked);
-    store.set("watch2",S.watch);store.set("list",S.list);store.set("manual",S.manual);store.set("coupons",S.coupons);
-    OFFERS=OFFERS.filter(o=>!o.manual).concat(manualOffers())},
+    store.set("watch2",S.watch);store.set("list",S.list);store.set("coupons",S.coupons);},
   // beide Seiten geändert: nichts verlieren, alles zusammenführen
   merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
     return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
-      manual:u(a.manual||[],b.manual||[],m=>m.id),coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|")),
+      coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|")),
       extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])]}},
   async connect(token){store.set("sync",{token});
     try{const gs=await this.req("/gists?per_page=100");let g=gs.find(x=>x.description===this.DESC&&x.files[this.FILE]);
@@ -143,7 +143,7 @@ function steps(o){if(!o.p)return [{l:"Bonus-Aktion",v:0,t:"base"}]; // Rewe-Bonu
 // ---------- Meine Coupons ----------
 const PROGS = ["Lidl Plus","Rewe Bonus","Payback","Netto App","Edeka App","dm App","Cashback-App","Hersteller-Coupon","Sonstiges"];
 const CP_TYPES = {euro:"€ Rabatt / Guthaben",pct:"% Rabatt",preis:"Coupon-Preis (zahlst nur …)",punkte:"Payback-Extrapunkte"};
-const defaultProg = s => ({lidl:"Lidl Plus",rewe:"Rewe Bonus",netto:"Payback",edeka:"Payback",scheck:"Payback",dm:"dm App",all:"Cashback-App"})[s]||"Sonstiges";
+const defaultProg = s => ({lidl:"Lidl Plus",rewe:"Rewe Bonus",netto:"Payback",edeka:"Payback",dm:"dm App",all:"Cashback-App"})[s]||"Sonstiges";
 const cpActive = c => !c.to || c.to>=TODAY;
 const couponsFor = o => S.coupons.filter(c=>cpActive(c)&&(c.s==="all"||c.s===o.s)&&c.k.split(/\s+/).every(w=>matches(o,w)));
 function cpValue(c,cur){
@@ -207,44 +207,49 @@ function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonst
 
 // ---------- Daten ----------
 // ---------- Automatische Rabatt-Prüfung ----------
-// Jeder Rabatt wird beim Laden geprüft. Falsche „statt“-Preise fliegen raus; hohe Rabatte (ab 50 %)
+// Jeder Rabatt wird beim Laden geprüft. Falsche „statt“-Preise fliegen raus; Rabatte ab 40 %
 // werden zusätzlich gegengecheckt. Zweifelhafte bekommen ein „?“ und rutschen in Sortierung und Kracher nach hinten.
 function packQty(t){ // Menge aus „6 x 1,5 Liter“, „200-g-Pckg.“, „750 g“ -> {v,u} in kg/l; Spannen/mehrere Größen -> null
-  t=String(t||"");const m=[...t.matchAll(/(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*-?\s*(kg|g|ml|l|liter)\b/gi)];
+  t=String(t||"");const m=[...t.matchAll(/(?:(\d+)\s*[x×]\s*)?(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*-?\s*(kg|g|ml|l|liter)\b/gi)];
   if(m.length!==1||/\d\s*[\/–-]\s*\d/.test(t))return null;
-  const [,n,v,u0]=m[0],u=u0.toLowerCase(),x=parseFloat(v.replace(",","."))*(+n||1);
+  const [,n,n2,v,u0]=m[0],u=u0.toLowerCase(),x=parseFloat(v.replace(",","."))*(+n||1)*(+n2||1);
   return u==="g"?{v:x/1000,u:"kg"}:u==="ml"?{v:x/1000,u:"l"}:{v:x,u:u==="kg"?"kg":"l"}}
 function sizes(t){ // alle Größen im Text in kg/l: „250 – 750 ml“ -> [0.25, 0.75]
   return [...String(t||"").matchAll(/(\d+(?:[.,]\d+)?)\s*(?=(?:(?:-|–|\/|bis)\s*\d+(?:[.,]\d+)?\s*)*(kg|g|ml|l|liter)\b)/gi)].map(m=>{const v=parseFloat(m[1].replace(",","."));return /^(g|ml)$/i.test(m[2])?v/1000:v})}
 function checkDeal(o){
-  if(!o.p||o.manual)return o;
+  if(!o.p)return o;
   const txt=`${o.n} ${o.d||""}`;
   // 1) „statt“ = Kilo-/Literpreis  2) „statt“ = Preis der ganzen Packung (10 x 0,75 € = 7,50 €)
   if(o.o){const kilo=o.gp&&Math.abs(o.gp.v-o.o)<.006,pack=[...txt.matchAll(/(\d+)\s*[x×]\s*\d/g)].find(m=>+m[1]>1&&+m[1]<=48&&Math.abs(o.p*m[1]-o.o)<.02);
     const big=!kilo&&!pack&&o.gp&&sizes(txt).some(v=>v>0&&Math.abs(o.gp.v*v-o.o)<.02)&&sizes(txt).some(v=>v>0&&Math.abs(o.gp.v*v-o.p)<.02);
     if(big)return {...o,o:null,rk:{t:"fix",l:[`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist aber der Preis der größeren Packung (gleicher Grundpreis ${eur(o.gp.v)}/${o.gp.u}), kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`]}};
     if(kilo||pack)return {...o,o:null,rk:{t:"fix",l:[kilo?`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist aber der Preis pro ${o.gp.u==="l"?"Liter":"Kilo"}, kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`:`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist der Preis für alle ${pack[1]} Stück zusammen (${pack[1]} × ${eur(o.p)}), kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`]}};}
-  const e=o.ap&&o.ap<o.p?o.ap:o.p,base=o.o||o.p,pct=Math.round((1-e/base)*100);if(pct<50)return o;
-  const ok=[],bad=[],q=packQty(o.d);let real=null;
+  const e=o.ap&&o.ap<o.p?o.ap:o.p,base=o.o||o.p,pct=Math.round((1-e/base)*100);if(pct<40)return o;
+  const ok=[],bad=[],q=packQty(o.d);let real=null,ext=0; // ext = Bestätigungen von außen (anderer Markt, Preisverlauf)
   // 3) Passt der Grundpreis zum Preis (Angebot oder App-Preis)?
   if(o.gp&&q&&q.u===o.gp.u&&q.v>0){const near=v=>Math.abs(v/q.v-o.gp.v)/o.gp.v<.12;
     if(near(o.p)||near(e))ok.push("Grundpreis passt zum Angebotspreis");
     else if(o.o&&near(o.o))bad.push("Der Grundpreis gehört zum „statt“-Preis, nicht zum Angebot – die Preisangabe im Prospekt wirkt fehlerhaft");
     else bad.push("Grundpreis und Preis passen nicht zusammen");}
-  // 4) Gleicher Artikel bei anderen Märkten: wie teuer ist er dort regulär?
-  const k=norm((o.b||"")+o.n),cmp=RAW.filter(x=>x!==o&&x.s!==o.s&&x.p>0&&norm((x.b||"")+x.n)===k);
-  if(cmp.length){const best=cmp.reduce((a,b)=>(a.o||a.p)<=(b.o||b.p)?a:b),n=best.o||best.p;
-    if(n<base*.7){real=Math.max(0,Math.round((1-e/n)*100));bad.push(`„statt“-Preis ${eur(base)} ist zu hoch angesetzt: bei ${sname(best.s)} kostet derselbe Artikel ${eur(n)}. Realistische Ersparnis: ${real} %`)}
-    else ok.push(`Normalpreis passt zu anderen Märkten (${sname(best.s)}: ${eur(n)})`);}
+  // 4) Gleicher Artikel bei anderen Märkten: wie teuer ist er dort regulär? Verglichen wird pro kg/l
+  //    (Grundpreis) oder bei gleicher Packungsgröße – nie 100 g gegen 1 kg.
+  const k=norm((o.b||"")+o.n),uOf=x=>x.gp&&x.gp.v>0?{v:x.gp.v/x.p,u:x.gp.u}:null,mine=uOf(o); // Faktor Preis -> Grundpreis
+  const cmp=RAW.filter(x=>x!==o&&x.s!==o.s&&x.p>0&&norm((x.b||"")+x.n)===k).map(x=>{const u=uOf(x);
+    if(mine&&u&&u.u===mine.u)return {s:x.s,n:(x.o||x.p)*u.v/mine.v}; // regulärer Preis, umgerechnet auf unsere Packungsgröße
+    const a=packQty(o.d),b=packQty(x.d);if(a&&b&&a.u===b.u&&Math.abs(a.v-b.v)/a.v<.05)return {s:x.s,n:x.o||x.p};return null}).filter(Boolean);
+  if(cmp.length){const best=cmp.reduce((a,b)=>a.n<=b.n?a:b),n=Math.round(best.n*100)/100;
+    if(n<base*.7){real=Math.max(0,Math.round((1-e/n)*100));bad.push(`„statt“-Preis ${eur(base)} ist zu hoch angesetzt: bei ${sname(best.s)} kostet derselbe Artikel (gleiche Menge) regulär ${eur(n)}. Realistische Ersparnis: ${real} %`)}
+    else {ok.push(`Normalpreis passt zu anderen Märkten (${sname(best.s)}: ${eur(n)})`);ext++}}
   // 5) Preisverlauf: war er schon öfter so günstig?
   const h=histOf(o);if(h.length>=3){const avg=h.reduce((a,b)=>a+b,0)/h.length;
-    if(avg<=e*1.1)bad.push(`Kostete zuletzt meist ${eur(avg)} – der Rabatt besteht nur auf dem Papier`);else ok.push(`Vorher meist ${eur(avg)} – echter Preissturz`)}
+    if(avg<=e*1.1)bad.push(`Kostete zuletzt meist ${eur(avg)} – der Rabatt besteht nur auf dem Papier`);else {ok.push(`Vorher meist ${eur(avg)} – echter Preissturz`);ext++}}
   // 6) „statt“ genau 3-, 4-, 5- … faches des Angebots: meist eine Mehrfachpackung
   const mult=o.o?Math.round(o.o/o.p):0;if(mult>=3&&Math.abs(o.p*mult-o.o)<.015)bad.push(`„statt“-Preis ist genau ${mult} × der Angebotspreis – vermutlich der Preis einer Mehrfach- oder Großpackung`);
   // 7) Ungewöhnlich hoch. Lebensmittel haben immer einen Grundpreis; teure Artikel ohne Grundpreis = Non-Food
   const nonfood=NONFOOD_CATS.includes(o.c)||(!o.gp&&base>=15);
-  if(!nonfood&&pct>=70&&!ok.length)bad.push("Ungewöhnlich hoher Rabatt für ein Lebensmittel – Preis im Laden kurz prüfen");
-  if(nonfood&&o.o&&pct>=60)bad.push("„statt“-Preis ist bei Non-Food meist die Preisempfehlung des Herstellers (UVP) – so teuer war es im Laden oft nie");
+  // Lebensmittel: 82 % aller Rabatte liegen unter 40 %, nur gut 1 % bei 60 % und mehr -> ab 60 % nur mit Bestätigung von außen
+  if(!nonfood&&pct>=60&&!ext)bad.push(`Kritisch hoher Rabatt (${pct} %): bei Lebensmitteln sehr selten und weder durch einen anderen Markt noch durch den Preisverlauf bestätigt – Preis im Laden prüfen`);
+  if(nonfood&&o.o&&pct>=60&&!ext)bad.push("„statt“-Preis ist bei Non-Food meist die Preisempfehlung des Herstellers (UVP) – so teuer war es im Laden oft nie");
   if(o.ap&&e<o.p)ok.push(`Der stärkste Preis gilt nur mit ${o.s==="lidl"?"Lidl Plus":"der App"} – ohne App ${eur(o.p)}`);
   return {...o,rk:bad.length?{t:"warn",l:bad,real}:{t:"ok",l:ok.length?ok:["Keine Auffälligkeiten (Packung, Grundpreis und Kilopreis geprüft)"]}}}
 const dealWarn = o => !!(o.rk&&o.rk.t==="warn");
@@ -267,20 +272,19 @@ const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(v
 const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
 
-function manualOffers(){return S.manual.filter(m=>!m.to||m.to>=TODAY).map(m=>({...m,src:"selbst eingetragen",manual:true}))}
 async function load(){
   try{
     const [o,h,nm]=await Promise.all([fetch("data/offers.json",{cache:"no-store"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({})),fetch("data/names.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({}))]);
     NAMES=Object.keys(nm||{});
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
-    RAW=o.offers.filter(x=>!x.to||x.to>=TODAY);OFFERS=RAW.map(checkDeal).concat(manualOffers());
+    RAW=o.offers.filter(x=>!x.to||x.to>=TODAY);OFFERS=RAW.map(checkDeal);
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
     document.getElementById("flyerInfo").innerHTML=pr.rows;
   }catch(e){
-    OFFERS=manualOffers();
+    OFFERS=[];
     document.getElementById("stand").textContent="Wörth am Rhein · Angebote konnten nicht geladen werden";
     toast("Angebote konnten nicht geladen werden. Bitte später neu öffnen.");
   }
@@ -297,7 +301,7 @@ function flyerInfo(){
   const wd=x=>new Date(x+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short"}).replace(".","")+" "+d(x);
   // Wochenprospekt = Enddatum in den nächsten 8 Tagen (Dauerangebote bis Jahresende zählen nicht)
   const soon=new Date(Date.now()+8*864e5).toISOString().slice(0,10),week=a=>{const w=a.filter(o=>o.to&&o.to<=soon);return w.length?w:a};
-  const auto=OFFERS.filter(o=>!o.manual),now=auto.filter(o=>!o.from||o.from<=TODAY),next=auto.filter(o=>o.from&&o.from>TODAY);
+  const auto=OFFERS,now=auto.filter(o=>!o.from||o.from<=TODAY),next=auto.filter(o=>o.from&&o.from>TODAY);
   const to=mode(week(now).map(o=>o.to)),nf=next.map(o=>o.from).sort()[0];
   const sum=[to?"Prospekte bis "+wd(to):"",nf?"neue ab "+wd(shopDay(nf)):""].filter(Boolean).join(" · ");
   const rows=Object.keys(STORES).filter(s=>auto.some(o=>o.s===s)).map(s=>{
@@ -358,7 +362,6 @@ function card(o,bestIds){
   return `<article class="card" data-detail="${esc(o.id)}" tabindex="0" aria-label="${esc(o.n)}: Details anzeigen">${thumb(o)}
    <div class="body">
    <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}</span>
-   ${o.manual?'<span class="manual">selbst eingetragen</span>':""}
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
@@ -390,7 +393,7 @@ function renderOffers(){
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
    ${S.q.trim()?moreArticles(r):""}
-   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Scheck-In und Serpa trägst du über „+ Angebot eintragen“ selbst ein. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
+   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
 
 // Suche: auch Artikel zeigen, die gerade nicht im Angebot sind, damit man sie auf die Merkliste setzen kann
 function moreArticles(shown){
@@ -446,6 +449,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  46:["Scheck-In und Serpa sind entfernt, ebenso „Angebot eintragen“.","Rabatt-Prüfung strenger: Ab 40 % wird jeder Rabatt geprüft, ab 60 % zählt er nur, wenn ein anderer Markt oder der Preisverlauf ihn bestätigt."],
   45:["Automatische Rabatt-Prüfung: Jeder hohe Rabatt wird gegengecheckt (Packung, Grundpreis, andere Märkte, Preisverlauf). Zweifelhafte zeigen ein „?“ und stehen nicht mehr ganz oben.","Falsche Riesen-Rabatte aussortiert (z. B. Kilopreis oder Packungspreis als „statt“-Preis).","Suche findet jetzt immer etwas, auch wenn gerade eine andere Kategorie gewählt ist.","Preise unter 1 € stehen jetzt richtig da (z. B. 0.88 statt -.88).","Neue Prospekte zeigen den echten ersten Einkaufstag (Montag statt Sonntag).","App-Preise sauber benannt, z. B. „Netto App-Preis“.","Lange Artikelbeschreibungen machen die Karten nicht mehr riesig – alles Weitere in der Detailansicht."],
   44:["Kein Knopf führt mehr unnötig aus der App heraus – alle Infos stehen direkt in SparRadar."],
   43:["Update-Fenster sieht sauber aus."],
@@ -541,24 +545,6 @@ function renderKracher(){
     <section class="panel"><h3 style="color:var(--alert)">Vorsicht, Fake-Rabatt</h3>${fakes.length?`<div class="rows">${fakes.map(o=>`<div style="font-size:.9rem"><b>${esc(o.n)}</b> <span style="color:var(--muted)">${esc(sname(o.s))}</span><br><span style="color:var(--muted)">${esc(verdict(o).l)}</span></div>`).join("")}</div>`:"<p>Keine verdächtigen Rabatte gefunden.</p>"}</section>
    </div></div>`}
 
-function renderAdd(){
-  const opts=Object.entries(STORES).map(([k,s])=>`<option value="${k}" ${k==="scheck"?"selected":""}>${esc(s.n)}</option>`).join("");
-  const copts=Object.entries(CATS).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
-  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Angebot eintragen">
-   <div class="sheet-h"><h2>Angebot eintragen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
-   <p style="margin:0;color:var(--muted)">Für Märkte ohne automatischen Abruf, zum Beispiel Scheck-In oder Serpa. Prospekt öffnen, Angebot abtippen, fertig. Es zählt dann bei Merkliste, Kracher und Einkaufszettel mit.</p>
-   <div class="links">${Object.entries(STORES).filter(([,s])=>s.manual).map(([k,s])=>`<a class="btn ghost sm" href="${s.link}" target="_blank" rel="noopener">${esc(s.n)}: Prospekt öffnen</a>`).join("")}</div>
-   <form class="form" id="addForm">
-    <div class="row"><label>Markt<select id="fStore">${opts}</select></label><label>Kategorie<select id="fCat">${copts}</select></label></div>
-    <label>Artikel<input id="fName" required placeholder="z. B. Schweinenackensteaks" autocomplete="off"></label>
-    <label>Marke oder Menge (optional)<input id="fDesc" placeholder="z. B. 1 kg, mariniert" autocomplete="off"></label>
-    <div class="row"><label>Angebotspreis in €<input id="fPrice" required inputmode="decimal" placeholder="5,99"></label><label>Statt-Preis (optional)<input id="fOld" inputmode="decimal" placeholder="7,99"></label></div>
-    <div class="row"><label>Grundpreis € pro kg/l (optional)<input id="fGp" inputmode="decimal" placeholder="5,99"></label><label>Gültig bis<input id="fTo" type="date"></label></div>
-    <button class="btn" type="submit">${IC.plus}Angebot speichern</button>
-   </form>
-   ${S.manual.length?`<h3 class="sec-h">Deine Einträge</h3><div class="rows">${S.manual.map((m,i)=>`<div class="drow"><div class="mini" style="--cc:${CC[m.c]||CC.sonstiges}">${ILL[m.c]||ILL.sonstiges}</div><div class="t">${esc(m.n)}<small>${esc(sname(m.s))} · ${m.to?"bis "+fmtDate(m.to):"ohne Ende"}</small></div><div class="pr"><b>${eur(m.p)}</b><button class="ibtn" data-delman="${i}" aria-label="${esc(m.n)} löschen">${IC.x}</button></div></div>`).join("")}</div>`:""}
-  </div>`}
-
 function renderWatch(){
   const wh=watchHits(null);
   const hits=[...new Map(wh.flatMap(x=>x.hits).map(o=>[o.id,o])).values()].sort((a,b)=>offPct(b)-offPct(a));
@@ -618,7 +604,7 @@ function renderCoupons(){
 function renderSync(){
   const c=Sync.cfg();
   return `<section class="panel" id="syncPanel"><h3>📱 ↔ 💻 Geräte verbinden</h3>
-   ${c?.gist?`<p><b>Handy und PC sind verbunden.</b> Merkliste, Einkaufszettel, Coupons und eigene Angebote gleichen sich automatisch ab.</p>
+   ${c?.gist?`<p><b>Handy und PC sind verbunden.</b> Merkliste, Einkaufszettel und Coupons gleichen sich automatisch ab.</p>
      <p id="syncState">${esc(Sync.status||"Verbunden")}</p>
      <p><b>Zweites Gerät verbinden:</b> Code kopieren, an dich selbst schicken (z. B. WhatsApp oder E-Mail) und auf dem anderen Gerät hier einfügen.</p>
      <div class="links"><button class="btn sm" id="syncCopy">Code kopieren</button><button class="btn ghost sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
@@ -685,10 +671,8 @@ function renderTips(){
    ["rewe","Rewe Bonus","Seit dem Payback-Ausstieg Ende 2024 sammelst du in der Rewe-App Euro-Guthaben auf Aktionsartikel und Coupons. Ab 1 € an der Kasse einlösbar."],
    ["netto","Netto App + Payback","Netto Marken-Discount ist seit 2025 bei Payback. Dazu gibt es eigene Coupons in der Netto-App."],
    ["edeka","Payback + Edeka App","Edeka ist seit 2025 bei Payback. Punkte-Coupons vorher in der Payback-App aktivieren, dazu Coupons in der Edeka-App."],
-   ["scheck","Payback (Edeka-Verbund)","Scheck-In gehört zum Edeka-Verbund, auch dort gilt Payback. Angebote trägst du über „+ Angebot eintragen“ ein."],
    ["dm","dm App","Digitale Coupons und Aktionen, auch für Lebensmittel und Tierfutter."],
-   ["aldi","Aldi Süd","Kaum Coupons, dafür dauerhaft niedrige Preise. Neue Aktionsware kommt montags und donnerstags."],
-   ["serpa","Serpa Markt","Wochenprospekt prüfen und starke Angebote selbst eintragen."]];
+   ["aldi","Aldi Süd","Kaum Coupons, dafür dauerhaft niedrige Preise. Neue Aktionsware kommt montags und donnerstags."]];
   const G=[
    [IC.layers,"Stapeln","Angebotspreis, dann App-Preis, dann Coupon oder Bonus, dazu Payback-Punkte und am Ende Cashback per Kassenbon."],
    [IC.chart,"Fake-Rabatte erkennen","SparRadar speichert jeden Tag die Preise. Nach ein paar Wochen zeigt es dir, ob ein „statt“-Preis wirklich verlangt wurde."],
@@ -726,7 +710,6 @@ function renderFilter(){
    <div class="fchips">${Object.entries(SORTS).map(([k,v])=>chip("data-sort",k,v,S.sort===k," plain")).join("")}</div>
    <div class="frow"><button class="switch" data-toggleapp="1" role="switch" aria-checked="${S.useApp}" aria-label="Apps und Coupons einrechnen"></button><span>Apps &amp; Coupons einrechnen</span></div>
    <div class="factions"><button class="btn ghost" data-freset="1">Zurücksetzen</button><button class="btn" data-fdone="1">${n} Angebote zeigen</button></div>
-   <button class="btn ghost sm" data-openadd="1" style="justify-self:start">+ Angebot selbst eintragen</button>
   </div>`}
 
 // Zurück-Taste/-Wischgeste (Handy) und Browser-Zurück: schließt zuerst ein offenes Fenster,
@@ -766,7 +749,7 @@ function render(){
   const nc=S.coupons.filter(cpActive).length,cb=document.getElementById("cpBadge");cb.textContent=nc;cb.hidden=!nc;
   const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
   // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
-  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mn">Alle</span><em>${OFFERS.length}</em></button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></button>`).join("");
+  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mn">Alle</span><em>${OFFERS.length}</em></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cat===k).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("sort").value=S.sort;
@@ -777,7 +760,7 @@ function render(){
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
-  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,detail:renderDetail}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,detail:renderDetail}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -805,7 +788,6 @@ document.addEventListener("click",e=>{
   if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
   if(b.id==="wk0"||b.id==="wk1"){S.week=+b.id[2];S.limit=60;render();return}
   if(b.id==="openK"){S.sheet="k";render();return}
-  if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
   if(b.id==="openFilter"){S.sheet="filter";render();return}
   if(b.dataset.zoom){S.lightbox=b.dataset.zoom;render();return}
   if(b.dataset.dimg!==undefined){S.dImg=+b.dataset.dimg;render();return}
@@ -831,7 +813,6 @@ document.addEventListener("click",e=>{
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);save();render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cat=null;S.limit=60;render();scrollTo({top:0});return}
-  if(b.dataset.delman){const m=S.manual.splice(+b.dataset.delman,1)[0];OFFERS=OFFERS.filter(o=>!(o.manual&&o.id===m.id));save();render();return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
@@ -864,13 +845,6 @@ document.addEventListener("submit",e=>{
     S.coupons.push(c);save();
     const n=weekOffers().filter(o=>couponsFor(o).includes(c)).length;
     toast(n?`Coupon gespeichert, passt zu ${n} Angebot${n===1?"":"en"}`:"Coupon gespeichert. Gerade passt kein Angebot dazu.");render();return}
-  if(e.target.id==="addForm"){e.preventDefault();
-    const val=id=>document.getElementById(id).value.trim();
-    const p=parseNum(val("fPrice"));if(!p||!val("fName")){toast("Bitte Artikel und Preis eintragen.");return}
-    const gp=parseNum(val("fGp"));
-    const m={s:val("fStore"),c:val("fCat"),n:val("fName"),d:val("fDesc"),p,o:parseNum(val("fOld")),gp:gp?{v:gp,u:"kg"}:null,to:val("fTo")||null,x:[]};
-    m.id="m-"+norm(m.s+m.n)+"-"+Date.now();
-    S.manual.push(m);OFFERS.push({...m,src:"selbst eingetragen",manual:true});save();toast(`${m.n} eingetragen`);render()}
 });
 // Programm passend zum gewählten Markt vorschlagen
 document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});

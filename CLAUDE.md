@@ -13,7 +13,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 
 ## Aufbau
 - `docs/` – die App (statisches HTML/CSS/JS, kein Build-Schritt), läuft auf GitHub Pages. PWA mit `manifest.webmanifest` und `sw.js`.
-  - `app.js` – gesamte Logik; Daten liegen pro Gerät in `localStorage` (Merkliste, Einkaufszettel, eigene Angebote, Coupons).
+  - `app.js` – gesamte Logik; Daten liegen pro Gerät in `localStorage` (Merkliste, Einkaufszettel, Coupons).
   - `data/offers.json` und `data/history.json` – werden vom Abruf geschrieben, nicht von Hand ändern.
 - `fetcher/fetch_offers.py` – täglicher Angebots-Abruf, nur Python-Standardbibliothek.
 - `.github/workflows/angebote.yml` – Abruf jeden Morgen ca. 5:15/6:15 Uhr, committet nach `docs/data/`.
@@ -41,8 +41,6 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 | Netto Marken-Discount | kaufDA `Woerth-am-Rhein/Netto-Marken-Discount/p-r9` |
 | Edeka **Jockgrim** | kaufDA `Jockgrim/EDEKA/p-r107` + Sortiment-Seiten `Edeka/Sortiment/…` + Stichwortseiten Karlsruhe, nur Prospekte mit gleichem Inhalt wie Jockgrim (`same_flyer`). edeka.de sperrt automatische Abrufe (403). |
 | dm | kaufDA Händlerseite + Stichwortseiten Karlsruhe (keine Sortiment-Seiten; die dm-Produktsuche verbietet Abrufe per robots.txt) |
-| Scheck-In (Wörth, Maximiliancenter) | nicht automatisch – Nutzer trägt Angebote in der App selbst ein |
-| Serpa Markt (Wörth) | nicht automatisch – Nutzer trägt Angebote in der App selbst ein |
 
 **Wichtig:** kaufDA-Händlerseiten zeigen nur 16 Angebote, `?page=` blättert nicht (kaufDA mischt nur die Reihenfolge). Die übrigen Angebote kommen über die öffentlichen **Sortiment-Seiten** `kaufda.de/<Händler>/Sortiment/<Begriff>` (Lidl, Netto, REWE; `fetch_sortiment()`), bei Rewe/Edeka gefiltert auf die Prospekte der lokalen Händlerseite. Die interne kaufDA-Schnittstelle wird bewusst nicht genutzt.
 Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruhe/Angebote/<Begriff>`, Umlaute ausgeschrieben: Käse → Kaese). Für Wörth gibt es keine Stichwortseiten.
@@ -59,7 +57,7 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 ## Bewusste Entscheidungen – nicht ändern ohne ausdrücklichen Wunsch
 - **Keine Push-Benachrichtigungen.** Wurden gebaut und auf Wunsch wieder komplett entfernt. Der Nutzer schaut selbst in die App.
 - **Keine Logins** für Lidl Plus, Rewe Bonus, Payback o. Ä. Es gibt keine offiziellen Schnittstellen. Die Passwörter lägen im öffentlichen Repo, und es drohen Kontosperren. Stattdessen gibt es **„Meine Coupons“** zum Selbst-Eintragen (Tab „Coupons“).
-- **Geräte verbinden (Sync):** Merkliste, Einkaufszettel, Coupons und eigene Angebote synchronisieren über ein geheimes Gist im GitHub-Konto des Nutzers (`Sync` in `docs/app.js`, Datei `sparradar-sync.json`). Der GitHub-Schlüssel (nur Recht `gist`) wird pro Gerät im Tab „Coupons“ eingetragen und liegt nur im `localStorage`, nie im Repo. Konflikte werden zusammengeführt, nichts geht verloren.
+- **Geräte verbinden (Sync):** Merkliste, Einkaufszettel und Coupons synchronisieren über ein geheimes Gist im GitHub-Konto des Nutzers (`Sync` in `docs/app.js`, Datei `sparradar-sync.json`). Der GitHub-Schlüssel (nur Recht `gist`) wird pro Gerät im Tab „Coupons“ eingetragen und liegt nur im `localStorage`, nie im Repo. Konflikte werden zusammengeführt, nichts geht verloren.
 - **Einstellungen** (Teilen per WhatsApp, Geräte verbinden, App-Downloads, Infos) öffnen sich über den Knopf **„Einstellungen“ ganz unten im Tab „Coupons“** (Kevins Wunsch, das komplett Versteckte hat verwirrt). Zusätzlich weiterhin: SparRadar-Logo lange drücken oder 5× antippen.
 - **Einkaufszettel:** abhaken (antippen), eigene Einträge (`S.extra`), „Erledigte entfernen“; Teilen per `wa.me`-Link.
 - **Hinweis beim Öffnen:** neue Merklisten-Treffer seit dem letzten Öffnen (`seenHits`) – kein Push, nur in der App.
@@ -71,11 +69,11 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 ## Automatische Rabatt-Prüfung (Kevins Wunsch: hohe Rabatte genau prüfen)
 - `checkDeal()` in `docs/app.js` läuft bei jedem Laden über alle Angebote, `fake_old()` in `fetcher/fetch_offers.py` schon beim Abruf.
 - **Entfernt** (`rk.t="fix"`): „statt“-Preis = Kilo-/Literpreis, = Preis der ganzen Packung (`6 x … ` × Preis) oder = Preis der größeren Packung bei gleichem Grundpreis („250 – 750 ml“).
-- **Ab 50 % gegengecheckt:** Grundpreis passt zum Preis? Gleicher Artikel bei anderem Markt regulär günstiger (-> realistische Ersparnis)? Preisverlauf? „statt“ genau 3×/4×… der Preis? Non-Food ab 60 % = meist UVP. Lebensmittel ab 70 % ohne Bestätigung = prüfen.
+- **Ab 40 % gegengecheckt** (Daten 31.10.: 82 % der Lebensmittel-Rabatte liegen unter 40 %, nur ~1 % ab 60 %): Grundpreis passt zum Preis? Gleicher Artikel bei anderem Markt regulär günstiger (-> realistische Ersparnis)? Preisverlauf? „statt“ genau 3×/4×… der Preis? Non-Food ab 60 % = meist UVP. Lebensmittel ab 60 % = kritisch: zählt nur mit Bestätigung von außen (anderer Markt oder Preisverlauf).
 - Zweifelhafte (`rk.t="warn"`): graues „−xx % ?“, in Sortierung/Kracher nur mit realistischer Ersparnis (sonst max. 45 %). Detailansicht zeigt das Prüfergebnis.
 
 ## App-Funktionen (Überblick)
-Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil · eigene Angebote eintragen · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).
+Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).
 
 ## Testen
 - Abruf lokal: `python fetcher/fetch_offers.py` (dauert ca. 3–5 Minuten). Auf Kevins Windows-PC scheitert Aldi lokal an einem Zertifikatsfehler, auf GitHub funktioniert es.

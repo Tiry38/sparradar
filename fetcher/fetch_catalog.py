@@ -26,7 +26,7 @@ EXPORTS = [
     "https://static.openfoodfacts.org/data/en.openfoodfacts.org.products.csv.gz",
     "https://static.openbeautyfacts.org/data/en.openbeautyfacts.org.products.csv.gz",
 ]
-OUR_STORES = re.compile(r"lidl|aldi|rewe|netto|edeka|\bdm\b|dm-drogerie|scheck", re.I)
+OUR_STORES = re.compile(r"lidl|aldi|rewe|netto|edeka|\bdm\b|dm-drogerie", re.I)
 MAX_ITEMS = 70000  # Obergrenze, damit die Datei für die App klein bleibt (wird erst beim Tippen geladen)
 
 
