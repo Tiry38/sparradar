@@ -220,6 +220,7 @@ async function load(){
   OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});
   const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
   render();  if(OFFERS.length)checkNews();
+  checkWhatsNew(); // nur wenn kein anderes Fenster offen ist, sonst beim nächsten Öffnen
   Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
 }
 // Wie aktuell sind die Prospekte? Häufigster Zeitraum je Markt, dazu wann die nächsten starten
@@ -323,6 +324,33 @@ function moreArticles(shown){
   return `<section class="panel"><h3>Gerade nicht im Angebot</h3><p>Auf die Merkliste setzen: Sobald einer dieser Artikel im Angebot ist, zeigt SparRadar es dir beim Öffnen.</p>
    <div class="rows">${cand.slice(0,15).map(n=>{const on=S.watch.some(w=>norm(w.k)===norm(n));
     return `<div class="mrow"><span>${esc(n)}</span>${on?`<em>✓ auf der Merkliste</em>`:`<button class="btn ghost sm" data-watchname="${esc(n)}">${IC.star}Merken</button>`}</div>`}).join("")}</div></section>`}
+
+// ---------- „Was ist neu“ nach einem Update ----------
+// Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
+const CHANGES={
+  29:["Nach jedem Update erscheint dieses Fenster mit den Neuigkeiten.","Oben ein grüner Balken, wenn es eine neue App-Version zum Installieren gibt."],
+  27:["Die Zurück-Taste bzw. Wischgeste schließt zuerst offene Fenster statt der App."],
+  26:["Neue Farben: Anthrazit und Grün."],
+  24:["Märkte oben als Kacheln mit Logo und Anzahl der Angebote.","Die Suche ist genauer, beim Tippen gibt es Vorschläge."],
+  20:["Einkaufszettel: Artikel antippen zum Abhaken, eigene Einträge wie „Brot“.","Rot markiert: Angebote, die nur noch heute oder bis morgen gelten."]};
+// beim Start festhalten, ob SparRadar auf diesem Gerät schon benutzt wurde (vor diesem Öffnen)
+const WAS_USER=(()=>{try{return localStorage.getItem("sr_seenHits")!=null}catch(e){return false}})();
+function checkWhatsNew(){
+  if(!MYV)return;
+  const last=store.get("seenVersion",null);
+  // Erstinstallation: nichts zeigen. Wer SparRadar schon vorher benutzt hat, sieht die letzten Neuigkeiten.
+  if(last==null&&!WAS_USER){store.set("seenVersion",MYV);return}
+  if(S.sheet)return;
+  if(String(last)===String(MYV))return;
+  S.whatsNew=Object.keys(CHANGES).map(Number).filter(v=>v>(+last||0)&&v<=+MYV).sort((a,b)=>b-a).flatMap(v=>CHANGES[v]).slice(0,7);
+  store.set("seenVersion",MYV);S.sheet="whatsnew";render()}
+function renderWhatsNew(){const n=S.whatsNew||[];
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="SparRadar wurde aktualisiert">
+   <div class="sheet-h"><span class="newsico">✨</span><h2>SparRadar wurde aktualisiert</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <p style="margin:-6px 0 0;color:var(--muted)">Du hast jetzt <b>Version ${esc(MYV)}</b>.${n.length?" Das ist neu:":""}</p>
+   ${n.length?`<ul class="wn">${n.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:"<p>Kleine Verbesserungen und Fehlerkorrekturen.</p>"}
+   <div class="factions" style="grid-template-columns:1fr"><button class="btn" data-newsdone="ok">Super, danke</button></div>
+  </div>`}
 
 // Beim Öffnen: was von der Merkliste ist neu im Angebot? (nur Neues seit dem letzten Hinweis)
 function checkNews(){
@@ -592,7 +620,7 @@ function render(){
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
-  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({add:renderAdd,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   navSync();
 }

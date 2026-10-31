@@ -7,6 +7,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 - **Änderungen direkt auf `main` committen und pushen** (kein Pull Request), außer der Nutzer sagt etwas anderes. Nur `main` wird veröffentlicht.
 - Vor dem Push `git pull --rebase`: Der Bot committet jeden Morgen neue Daten nach `docs/data/`.
 - Nach Änderungen an `docs/app.js` oder `docs/app.css`/`style.css` die Versionsnummer in `docs/index.html` hochzählen (`app.js?v=…`), sonst hält der Browser-Cache die alte Version. Bei größeren Änderungen am Service Worker `CACHE` in `docs/sw.js` hochzählen.
+- **Bei jeder neuen App-Version** (`app.js?v=` hochgezählt) in `CHANGES` in `docs/app.js` einen kurzen Eintrag in einfachem Deutsch ergänzen. Den zeigt das Fenster „SparRadar wurde aktualisiert“ nach dem Update.
 - Commit-Nachrichten auf Deutsch.
 - Fehler rückgängig machen: `git revert` des letzten Commits und auf `main` pushen.
 
