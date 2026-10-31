@@ -147,6 +147,26 @@ def unit_price(text):
     return None
 
 
+def fake_old(price, old, up, text):
+    """kaufDA liefert als „statt“-Preis manchmal den Kilo-/Literpreis oder den Preis der ganzen Packung
+    (10 x 0,75 € -> „statt 7,50 €“). Das ist kein Rabatt."""
+    if not price or not old:
+        return False
+    if up and abs(float(up[0]) - float(old)) < 0.006:
+        return True
+    for n in re.findall(r"(\d+)\s*[x×]\s*\d", text or ""):
+        if 1 < int(n) <= 48 and abs(price * int(n) - old) < 0.02:
+            return True
+    # „250 – 750 ml“ für 1,49 € „statt 4,47 €“: gleicher Grundpreis, „statt“ = Preis der größeren Packung
+    if up:
+        sz = [float(v.replace(",", ".")) / (1000 if u.lower() in ("g", "ml") else 1)
+              for v, u in re.findall(r"(\d+(?:[.,]\d+)?)\s*(?=(?:(?:-|–|/|bis)\s*\d+(?:[.,]\d+)?\s*)*(kg|g|ml|l|liter)\b)", text or "", re.I)]
+        g = float(up[0])
+        if any(abs(g * v - old) < 0.02 for v in sz) and any(abs(g * v - price) < 0.02 for v in sz):
+            return True
+    return False
+
+
 def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=None, start=None, end=None,
           app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None, img_large=None, info=None, cats=None, page=None, images=None, brochure=None):
     title = re.sub(r"\s+", " ", (title or "").strip())
@@ -154,6 +174,8 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         return None
     price = price or 0
     up = unit_price(base) if isinstance(base, str) else base
+    if old and fake_old(price, old, up, f"{title} {desc or ''}"):
+        old = None
     o = {
         "s": store,
         "n": title,

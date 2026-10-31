@@ -195,3 +195,14 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 /* Vollbild: scrollbar und mit zwei Fingern zoombar (für Prospektseiten) */
 .lightbox.pg{overflow:auto;touch-action:pan-x pan-y pinch-zoom;place-items:start center;cursor:default}
 .lightbox img.page{max-height:none;max-width:min(100vw,1100px);width:100%}
+/* lange Beschreibungen auf der Karte kürzen (ganzer Text in der Detailansicht) */
+.card .name small{display:-webkit-box;-webkit-line-clamp:3;line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.catoff{margin:-4px 0 12px;padding:8px 12px;border-radius:12px;background:color-mix(in srgb,var(--accent) 12%,transparent);font-size:.88rem}
+/* automatische Rabatt-Prüfung */
+.off.q{background:linear-gradient(135deg,#8A939A,#5F686F)!important}
+.rk{border-radius:14px;padding:10px 14px;margin:2px 0 10px;border:1px solid var(--line)}
+.rk h4{margin:0 0 4px;font-size:.95rem}
+.rk ul{margin:0;padding-left:18px;font-size:.88rem;line-height:1.4}
+.rk.ok{background:color-mix(in srgb,#22C55E 12%,transparent)}
+.rk.warn{background:color-mix(in srgb,#F59E0B 16%,transparent)}
+.rk.fix{background:color-mix(in srgb,#3B82F6 12%,transparent)}

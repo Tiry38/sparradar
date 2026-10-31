@@ -68,6 +68,12 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Sperren nicht umgehen:** rewe.de und netto-online.de blocken automatische Abrufe (403). Diese Sperren nicht umgehen, keine API-Schlüssel aus Websites auslesen (z. B. bei Marktguru). Nur öffentliche Seiten, die robots.txt erlaubt, mit ehrlichem User-Agent, höchstens einmal pro Tag und mit Pausen (`PAUSE`).
 - Das Repository ist öffentlich (nötig für kostenloses GitHub Pages). Keine Passwörter, Tokens oder persönlichen Daten hineinschreiben.
 
+## Automatische Rabatt-Prüfung (Kevins Wunsch: hohe Rabatte genau prüfen)
+- `checkDeal()` in `docs/app.js` läuft bei jedem Laden über alle Angebote, `fake_old()` in `fetcher/fetch_offers.py` schon beim Abruf.
+- **Entfernt** (`rk.t="fix"`): „statt“-Preis = Kilo-/Literpreis, = Preis der ganzen Packung (`6 x … ` × Preis) oder = Preis der größeren Packung bei gleichem Grundpreis („250 – 750 ml“).
+- **Ab 50 % gegengecheckt:** Grundpreis passt zum Preis? Gleicher Artikel bei anderem Markt regulär günstiger (-> realistische Ersparnis)? Preisverlauf? „statt“ genau 3×/4×… der Preis? Non-Food ab 60 % = meist UVP. Lebensmittel ab 70 % ohne Bestätigung = prüfen.
+- Zweifelhafte (`rk.t="warn"`): graues „−xx % ?“, in Sortierung/Kracher nur mit realistischer Ersparnis (sonst max. 45 %). Detailansicht zeigt das Prüfergebnis.
+
 ## App-Funktionen (Überblick)
 Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil · eigene Angebote eintragen · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).
 

@@ -60,7 +60,7 @@ const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   manual:store.get("manual",[]),coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),sheet:null,limit:60};
-let OFFERS = [], HIST = {}, META = {}, NAMES = [], APPV = {};
+let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {};
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
 
@@ -71,6 +71,8 @@ const norm = s => (s||"").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").
 const safeUrl = u => /^https:\/\//i.test(u||"") ? u : "";
 const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 const parseNum = s => {const v=parseFloat(String(s||"").replace(",","."));return isFinite(v)&&v>0?v:null};
+// Prospekte „ab Sonntag“ starten im Laden erst am Montag (sonntags geschlossen)
+const shopDay = d => {if(!d)return d;const x=new Date(d+"T12:00:00");if(x.getDay()!==0)return d;x.setDate(x.getDate()+1);return x.toISOString().slice(0,10)};
 const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"}) : "";
 // Markt-Logo: das Website-Symbol des Markts (wird beim Öffnen geladen, liegt nicht im Repo).
 // Lädt es nicht, bleibt das farbige Kürzel darunter sichtbar.
@@ -133,7 +135,7 @@ function ref(o){if(o.o)return o.o;const h=histOf(o);return h.length>=3?Math.max(
 function steps(o){if(!o.p)return [{l:"Bonus-Aktion",v:0,t:"base"}]; // Rewe-Bonus ohne Preis im Prospekt
   const st=[{l:o.o?"Normalpreis":"Angebotspreis",v:o.o||o.p,t:"base"}];
   if(o.o)st.push({l:"Angebot",v:o.p-o.o,t:"of"});
-  if(S.useApp){if(o.ap)st.push({l:(STORES[o.s]||{}).app?STORES[o.s].app+" App-Preis":"App-Preis",v:o.ap-o.p,t:"app"});(o.x||[]).forEach(([t,l,v])=>st.push({l,v:-v,t}))
+  if(S.useApp){if(o.ap)st.push({l:o.s==="lidl"?"Lidl Plus App-Preis":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App-Preis":"App-Preis"),v:o.ap-o.p,t:"app"});(o.x||[]).forEach(([t,l,v])=>st.push({l,v:-v,t}))
     // eigene Coupons: werden in der eingetragenen Reihenfolge auf den jeweils aktuellen Preis angewendet
     couponsFor(o).forEach(c=>{const cur=st.reduce((a,s)=>a+s.v,0),d=cpValue(c,cur);if(d>0.004)st.push({l:cpLabel(c),v:-d,t:c.t==="punkte"||c.prog==="Cashback-App"?"cb":"coupon"})})}
   return st}
@@ -185,8 +187,8 @@ function watchMatch(o,k){
   return t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&txt.includes(t[0])&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))}
 const hitW = (o,w) => watchMatch(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
 const TOMORROW=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date(Date.now()+864e5));
-const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(o.from) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
-const tagHTML = v => {v=Math.max(v,0);const e=Math.floor(v+1e-9),c=Math.round((v-e)*100);return `<span class="eu">${e||"-"}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
+const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(shopDay(o.from)) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
+const tagHTML = v => {v=Math.round(Math.max(v,0)*100);const e=Math.floor(v/100),c=v%100;return `<span class="eu">${e}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
 const comboLabels = o => steps(o).filter(s=>s.t!=="base"&&s.t!=="of").map(s=>s.l);
 function verdict(o){const h=histOf(o);
   if(h.length<3)return{t:"ok",l:"Preisvergleich startet: SparRadar merkt sich ab jetzt jeden Tag den Preis. Nach ein paar Tagen siehst du hier, ob es ein echter Tiefpreis ist oder ein Schein-Rabatt.",s:"Preis wird beobachtet",fresh:true};
@@ -201,20 +203,67 @@ function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.lengt
 // Aldi in größerer Breite. Gilt auch für schon gespeicherte Angebote.
 const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails)$/,"").replace(/\/scaleWidth\/500\//,"/scaleWidth/1000/");
 const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
-function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off">−${offPct(o)} %</span>`:""}</div>`}
+function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt zweifelhaft – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}</div>`}
 
 // ---------- Daten ----------
+// ---------- Automatische Rabatt-Prüfung ----------
+// Jeder Rabatt wird beim Laden geprüft. Falsche „statt“-Preise fliegen raus; hohe Rabatte (ab 50 %)
+// werden zusätzlich gegengecheckt. Zweifelhafte bekommen ein „?“ und rutschen in Sortierung und Kracher nach hinten.
+function packQty(t){ // Menge aus „6 x 1,5 Liter“, „200-g-Pckg.“, „750 g“ -> {v,u} in kg/l; Spannen/mehrere Größen -> null
+  t=String(t||"");const m=[...t.matchAll(/(?:(\d+)\s*[x×]\s*)?(\d+(?:[.,]\d+)?)\s*-?\s*(kg|g|ml|l|liter)\b/gi)];
+  if(m.length!==1||/\d\s*[\/–-]\s*\d/.test(t))return null;
+  const [,n,v,u0]=m[0],u=u0.toLowerCase(),x=parseFloat(v.replace(",","."))*(+n||1);
+  return u==="g"?{v:x/1000,u:"kg"}:u==="ml"?{v:x/1000,u:"l"}:{v:x,u:u==="kg"?"kg":"l"}}
+function sizes(t){ // alle Größen im Text in kg/l: „250 – 750 ml“ -> [0.25, 0.75]
+  return [...String(t||"").matchAll(/(\d+(?:[.,]\d+)?)\s*(?=(?:(?:-|–|\/|bis)\s*\d+(?:[.,]\d+)?\s*)*(kg|g|ml|l|liter)\b)/gi)].map(m=>{const v=parseFloat(m[1].replace(",","."));return /^(g|ml)$/i.test(m[2])?v/1000:v})}
+function checkDeal(o){
+  if(!o.p||o.manual)return o;
+  const txt=`${o.n} ${o.d||""}`;
+  // 1) „statt“ = Kilo-/Literpreis  2) „statt“ = Preis der ganzen Packung (10 x 0,75 € = 7,50 €)
+  if(o.o){const kilo=o.gp&&Math.abs(o.gp.v-o.o)<.006,pack=[...txt.matchAll(/(\d+)\s*[x×]\s*\d/g)].find(m=>+m[1]>1&&+m[1]<=48&&Math.abs(o.p*m[1]-o.o)<.02);
+    const big=!kilo&&!pack&&o.gp&&sizes(txt).some(v=>v>0&&Math.abs(o.gp.v*v-o.o)<.02)&&sizes(txt).some(v=>v>0&&Math.abs(o.gp.v*v-o.p)<.02);
+    if(big)return {...o,o:null,rk:{t:"fix",l:[`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist aber der Preis der größeren Packung (gleicher Grundpreis ${eur(o.gp.v)}/${o.gp.u}), kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`]}};
+    if(kilo||pack)return {...o,o:null,rk:{t:"fix",l:[kilo?`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist aber der Preis pro ${o.gp.u==="l"?"Liter":"Kilo"}, kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`:`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist der Preis für alle ${pack[1]} Stück zusammen (${pack[1]} × ${eur(o.p)}), kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`]}};}
+  const e=o.ap&&o.ap<o.p?o.ap:o.p,base=o.o||o.p,pct=Math.round((1-e/base)*100);if(pct<50)return o;
+  const ok=[],bad=[],q=packQty(o.d);let real=null;
+  // 3) Passt der Grundpreis zum Preis (Angebot oder App-Preis)?
+  if(o.gp&&q&&q.u===o.gp.u&&q.v>0){const near=v=>Math.abs(v/q.v-o.gp.v)/o.gp.v<.12;
+    if(near(o.p)||near(e))ok.push("Grundpreis passt zum Angebotspreis");
+    else if(o.o&&near(o.o))bad.push("Der Grundpreis gehört zum „statt“-Preis, nicht zum Angebot – die Preisangabe im Prospekt wirkt fehlerhaft");
+    else bad.push("Grundpreis und Preis passen nicht zusammen");}
+  // 4) Gleicher Artikel bei anderen Märkten: wie teuer ist er dort regulär?
+  const k=norm((o.b||"")+o.n),cmp=RAW.filter(x=>x!==o&&x.s!==o.s&&x.p>0&&norm((x.b||"")+x.n)===k);
+  if(cmp.length){const best=cmp.reduce((a,b)=>(a.o||a.p)<=(b.o||b.p)?a:b),n=best.o||best.p;
+    if(n<base*.7){real=Math.max(0,Math.round((1-e/n)*100));bad.push(`„statt“-Preis ${eur(base)} ist zu hoch angesetzt: bei ${sname(best.s)} kostet derselbe Artikel ${eur(n)}. Realistische Ersparnis: ${real} %`)}
+    else ok.push(`Normalpreis passt zu anderen Märkten (${sname(best.s)}: ${eur(n)})`);}
+  // 5) Preisverlauf: war er schon öfter so günstig?
+  const h=histOf(o);if(h.length>=3){const avg=h.reduce((a,b)=>a+b,0)/h.length;
+    if(avg<=e*1.1)bad.push(`Kostete zuletzt meist ${eur(avg)} – der Rabatt besteht nur auf dem Papier`);else ok.push(`Vorher meist ${eur(avg)} – echter Preissturz`)}
+  // 6) „statt“ genau 3-, 4-, 5- … faches des Angebots: meist eine Mehrfachpackung
+  const mult=o.o?Math.round(o.o/o.p):0;if(mult>=3&&Math.abs(o.p*mult-o.o)<.015)bad.push(`„statt“-Preis ist genau ${mult} × der Angebotspreis – vermutlich der Preis einer Mehrfach- oder Großpackung`);
+  // 7) Ungewöhnlich hoch. Lebensmittel haben immer einen Grundpreis; teure Artikel ohne Grundpreis = Non-Food
+  const nonfood=NONFOOD_CATS.includes(o.c)||(!o.gp&&base>=15);
+  if(!nonfood&&pct>=70&&!ok.length)bad.push("Ungewöhnlich hoher Rabatt für ein Lebensmittel – Preis im Laden kurz prüfen");
+  if(nonfood&&o.o&&pct>=60)bad.push("„statt“-Preis ist bei Non-Food meist die Preisempfehlung des Herstellers (UVP) – so teuer war es im Laden oft nie");
+  if(o.ap&&e<o.p)ok.push(`Der stärkste Preis gilt nur mit ${o.s==="lidl"?"Lidl Plus":"der App"} – ohne App ${eur(o.p)}`);
+  return {...o,rk:bad.length?{t:"warn",l:bad,real}:{t:"ok",l:ok.length?ok:["Keine Auffälligkeiten (Packung, Grundpreis und Kilopreis geprüft)"]}}}
+const dealWarn = o => !!(o.rk&&o.rk.t==="warn");
+// Sortierung: zweifelhafte Rabatte zählen nur mit der realistischen Ersparnis (sonst höchstens 45 %)
+const sortPct = o => dealWarn(o)?(o.rk.real!=null?Math.min(o.rk.real,offPct(o)):Math.min(offPct(o),45)):offPct(o);
 const weekOffers = () => OFFERS.filter(o => S.week ? (o.from && o.from>TODAY) : (!o.from || o.from<=TODAY));
 function filtered(){
   let r=weekOffers();
   if(S.stores.size)r=r.filter(o=>S.stores.has(o.s));
-  if(S.cat)r=r.filter(o=>o.c===S.cat);
-  const qt=S.q.trim().split(/\s+/).filter(Boolean);if(qt.length)r=searchOffers(r,S.q);
-  const f0={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
+  const qt=S.q.trim().split(/\s+/).filter(Boolean);S._catOff=false;
+  if(qt.length){r=searchOffers(r,S.q);
+    // Suche findet in der gewählten Kategorie nichts? Dann in allen Kategorien suchen statt „nicht im Angebot“
+    if(S.cat){const rc=r.filter(o=>o.c===S.cat);if(rc.length||!r.length)r=rc;else S._catOff=true}}
+  else if(S.cat)r=r.filter(o=>o.c===S.cat);
+  const f0={off:(a,b)=>sortPct(b)-sortPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
   // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
   const f=qt.length?(a,b)=>f0(a,b)||relevance(a,qt)-relevance(b,qt):f0;
   return r.sort(f)}
-const score = o => {const v=verdict(o).t;return offPct(o)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
+const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
 
@@ -225,7 +274,7 @@ async function load(){
     NAMES=Object.keys(nm||{});
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
-    OFFERS=o.offers.filter(x=>!x.to||x.to>=TODAY).concat(manualOffers());
+    RAW=o.offers.filter(x=>!x.to||x.to>=TODAY);OFFERS=RAW.map(checkDeal).concat(manualOffers());
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
@@ -250,10 +299,10 @@ function flyerInfo(){
   const soon=new Date(Date.now()+8*864e5).toISOString().slice(0,10),week=a=>{const w=a.filter(o=>o.to&&o.to<=soon);return w.length?w:a};
   const auto=OFFERS.filter(o=>!o.manual),now=auto.filter(o=>!o.from||o.from<=TODAY),next=auto.filter(o=>o.from&&o.from>TODAY);
   const to=mode(week(now).map(o=>o.to)),nf=next.map(o=>o.from).sort()[0];
-  const sum=[to?"Prospekte bis "+wd(to):"",nf?"neue ab "+wd(nf):""].filter(Boolean).join(" · ");
+  const sum=[to?"Prospekte bis "+wd(to):"",nf?"neue ab "+wd(shopDay(nf)):""].filter(Boolean).join(" · ");
   const rows=Object.keys(STORES).filter(s=>auto.some(o=>o.s===s)).map(s=>{
     const n=week(now.filter(o=>o.s===s)),f=mode(n.map(o=>o.from)),t=mode(n.map(o=>o.to)),nx=next.filter(o=>o.s===s).map(o=>o.from).sort()[0];
-    return `<span>${sb(s)}${esc(sname(s))}: ${f&&t?d(f)+"–"+d(t):t?"bis "+d(t):"laufend"}${nx?` · neu ab ${d(nx)}`:""}</span>`}).join("");
+    return `<span>${sb(s)}${esc(sname(s))}: ${f&&t?d(shopDay(f))+"–"+d(t):t?"bis "+d(t):"laufend"}${nx?` · neu ab ${d(shopDay(nx))}`:""}</span>`}).join("");
   return {sum,rows}}
 const byId = id => OFFERS.find(o=>o.id===id);
 
@@ -337,6 +386,7 @@ function renderOffers(){
   return `${kracherBtn()}
    ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
+   ${S._catOff?`<p class="catoff">In „${esc(CATS[S.cat])}“ nichts gefunden – hier die Treffer aus allen Kategorien.</p>`:""}
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
    ${S.q.trim()?moreArticles(r):""}
@@ -363,7 +413,7 @@ function renderDetail(){
   const share=`${o.n}${o.b?" ("+o.b+")":""} bei ${sname(o.s)}: ${o.bo?eur(o.bo)+" Bonus":eur(fin(o))}${offPct(o)?` (−${offPct(o)} %)`:""}${validTxt(o)?", "+validTxt(o):""}\n\nGefunden mit SparRadar: ${APP_URL}`;
   return `<div class="sheet detail" role="dialog" aria-modal="true" aria-label="${esc(o.n)}">
    <div class="sheet-h">${sb(o.s,true)}<h2>${esc(sname(o.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
-   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off">−${offPct(o)} %</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span>`:""}</div>
+   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt zweifelhaft – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span>`:""}</div>
    ${ims.length>1?`<div class="dthumbs">${ims.map((u,i)=>`<button data-dimg="${i}" aria-pressed="${u===cur}" aria-label="Bild ${i+1}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb="1"></button>`).join("")}</div>`:""}
    <div class="dinfo">
     ${o.b?`<span class="store">${esc(o.b)}</span>`:""}
@@ -373,8 +423,9 @@ function renderDetail(){
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
      <div>${ref(o)>fin(o)&&!o.bo?`<s>statt ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
+    ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt zweifelhaft":o.rk.t==="fix"?"🔧 Rabatt korrigiert":"✅ Rabatt geprüft"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
     <dl class="dfacts">
-     <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(o.from)+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
+     <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(shopDay(o.from))+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
      <dt>Markt</dt><dd>${esc(sname(o.s))}</dd>
      ${o.pg?`<dt>Prospekt</dt><dd>Seite ${esc(o.pg)}</dd>`:""}
      ${o.cat?.length?`<dt>Kategorie</dt><dd>${o.cat.map(esc).join(" › ")}</dd>`:`<dt>Kategorie</dt><dd>${esc(CATS[o.c]||"")}</dd>`}
@@ -395,6 +446,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  45:["Automatische Rabatt-Prüfung: Jeder hohe Rabatt wird gegengecheckt (Packung, Grundpreis, andere Märkte, Preisverlauf). Zweifelhafte zeigen ein „?“ und stehen nicht mehr ganz oben.","Falsche Riesen-Rabatte aussortiert (z. B. Kilopreis oder Packungspreis als „statt“-Preis).","Suche findet jetzt immer etwas, auch wenn gerade eine andere Kategorie gewählt ist.","Preise unter 1 € stehen jetzt richtig da (z. B. 0.88 statt -.88).","Neue Prospekte zeigen den echten ersten Einkaufstag (Montag statt Sonntag).","App-Preise sauber benannt, z. B. „Netto App-Preis“.","Lange Artikelbeschreibungen machen die Karten nicht mehr riesig – alles Weitere in der Detailansicht."],
   44:["Kein Knopf führt mehr unnötig aus der App heraus – alle Infos stehen direkt in SparRadar."],
   43:["Update-Fenster sieht sauber aus."],
   40:["Alle Produktbilder jetzt in voller Auflösung – scharf statt verpixelt.","Grüne Umrandung der Markt-Kacheln nicht mehr abgeschnitten."],
