@@ -57,7 +57,7 @@ const IC = {
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
-  coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),sheet:null,limit:60};
+  coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),saved:store.get("saved",[]),sheet:null,limit:60};
 let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {};
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
@@ -81,7 +81,7 @@ let tt; function toast(m){const t=document.getElementById("toast");t.textContent
 // Scheck-In/Serpa und „Angebot eintragen“ wurden entfernt: alte Einträge vom Gerät löschen
 try{localStorage.removeItem("sr_manual")}catch(e){}
 S.coupons=S.coupons.filter(c=>c.s==="all"||STORES[c.s]);
-const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);Sync.changed()};
+const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);store.set("saved",S.saved);Sync.changed()};
 
 // ---------- Geräte verbinden (Handy <-> PC) ----------
 // Merkliste, Einkaufszettel und Coupons liegen zusätzlich in einem geheimen Gist im
@@ -89,18 +89,18 @@ const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.s
 const Sync = {
   API:"https://api.github.com", FILE:"sparradar-sync.json", DESC:"SparRadar-Sync (Merkliste, Einkaufszettel, Coupons)",
   cfg(){return store.get("sync",null)}, timer:null, busy:false, status:"",
-  data(){return {watch:S.watch,list:S.list,coupons:S.coupons,extra:S.extra,checked:S.checked}},
+  data(){return {watch:S.watch,list:S.list,coupons:S.coupons,extra:S.extra,checked:S.checked,saved:S.saved}},
   snap(){return JSON.stringify(this.data())},
   async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
     if(r.status===401)throw new Error("Schlüssel ungültig oder abgelaufen");if(!r.ok)throw new Error("GitHub antwortet nicht ("+r.status+")");return r.json()},
-  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.coupons=d.coupons||[];S.extra=d.extra||[];S.checked=d.checked||[];
-    store.set("extra",S.extra);store.set("checked",S.checked);
+  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.coupons=d.coupons||[];S.extra=d.extra||[];S.checked=d.checked||[];S.saved=d.saved||S.saved||[];
+    store.set("extra",S.extra);store.set("checked",S.checked);store.set("saved",S.saved);
     store.set("watch2",S.watch);store.set("list",S.list);store.set("coupons",S.coupons);},
   // beide Seiten geändert: nichts verlieren, alles zusammenführen
   merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
     return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
       coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|")),
-      extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])]}},
+      extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])],saved:u(a.saved||[],b.saved||[],x=>x.id+"|"+x.d)}},
   async connect(token){store.set("sync",{token});
     try{const gs=await this.req("/gists?per_page=100");let g=gs.find(x=>x.description===this.DESC&&x.files[this.FILE]);
       if(!g)g=await this.req("/gists",{method:"POST",body:JSON.stringify({description:this.DESC,public:false,files:{[this.FILE]:{content:JSON.stringify({updatedAt:Date.now(),data:this.data()})}}})});
@@ -216,6 +216,13 @@ function packQty(t){ // Menge aus „6 x 1,5 Liter“, „200-g-Pckg.“, „750
   return u==="g"?{v:x/1000,u:"kg"}:u==="ml"?{v:x/1000,u:"l"}:{v:x,u:u==="kg"?"kg":"l"}}
 function sizes(t){ // alle Größen im Text in kg/l: „250 – 750 ml“ -> [0.25, 0.75]
   return [...String(t||"").matchAll(/(\d+(?:[.,]\d+)?)\s*(?=(?:(?:-|–|\/|bis)\s*\d+(?:[.,]\d+)?\s*)*(kg|g|ml|l|liter)\b)/gi)].map(m=>{const v=parseFloat(m[1].replace(",","."));return /^(g|ml)$/i.test(m[2])?v/1000:v})}
+// Gleicher Artikel bei anderen Märkten. Schlüssel = Wörter aus Marke + Name (Reihenfolge egal),
+// Preis umgerechnet auf dieselbe Menge (über den Grundpreis oder bei gleicher Packungsgröße).
+const tokKey = o => [...new Set(((o.b||"")+" "+o.n).toLowerCase().match(/[a-zäöüß0-9]+/g)||[])].map(norm).filter(Boolean).sort().join(" ");
+function sameElsewhere(o,pool){const k=tokKey(o),uf=x=>x.gp&&x.gp.v>0&&x.p>0?{v:x.gp.v/x.p,u:x.gp.u}:null,mine=uf(o),a=packQty(o.d);
+  return pool.filter(x=>x!==o&&x.id!==o.id&&x.s!==o.s&&x.p>0&&tokKey(x)===k).map(x=>{const u=uf(x);
+    if(mine&&u&&u.u===mine.u)return {x,f:u.v/mine.v};  // Preis von x × f = Preis für die Menge von o
+    const b=packQty(x.d);return a&&b&&a.u===b.u&&Math.abs(a.v-b.v)/a.v<.05?{x,f:1}:null}).filter(Boolean)}
 function checkDeal(o){
   if(!o.p)return o;
   const txt=`${o.n} ${o.d||""}`;
@@ -238,10 +245,7 @@ function checkDeal(o){
     else bad.push("Grundpreis und Preis passen nicht zusammen");}
   // 4) Gleicher Artikel bei anderen Märkten: wie teuer ist er dort regulär? Verglichen wird pro kg/l
   //    (Grundpreis) oder bei gleicher Packungsgröße – nie 100 g gegen 1 kg.
-  const k=norm((o.b||"")+o.n),uOf=x=>x.gp&&x.gp.v>0?{v:x.gp.v/x.p,u:x.gp.u}:null,mine=uOf(o); // Faktor Preis -> Grundpreis
-  const cmp=RAW.filter(x=>x!==o&&x.s!==o.s&&x.p>0&&norm((x.b||"")+x.n)===k).map(x=>{const u=uOf(x);
-    if(mine&&u&&u.u===mine.u)return {s:x.s,n:(x.o||x.p)*u.v/mine.v}; // regulärer Preis, umgerechnet auf unsere Packungsgröße
-    const a=packQty(o.d),b=packQty(x.d);if(a&&b&&a.u===b.u&&Math.abs(a.v-b.v)/a.v<.05)return {s:x.s,n:x.o||x.p};return null}).filter(Boolean);
+  const cmp=sameElsewhere(o,RAW).map(({x,f})=>({s:x.s,n:(x.o||x.p)*f}));
   if(cmp.length){const best=cmp.reduce((a,b)=>a.n<=b.n?a:b),n=Math.round(best.n*100)/100;
     if(n<base*.7&&own)ok.push(`Hinweis: bei ${sname(best.s)} kostet derselbe Artikel (gleiche Menge) regulär nur ${eur(n)}`);
     else if(n<base*.7){real=Math.max(0,Math.round((1-e/n)*100));bad.push(`„statt“-Preis ${eur(base)} ist zu hoch angesetzt: bei ${sname(best.s)} kostet derselbe Artikel (gleiche Menge) regulär ${eur(n)}. Realistische Ersparnis: ${real} %`)}
@@ -415,6 +419,75 @@ function moreArticles(shown){
    <div class="rows">${cand.slice(0,15).map(n=>{const on=S.watch.some(w=>norm(w.k)===norm(n));
     return `<div class="mrow"><span>${esc(n)}</span>${on?`<em>✓ auf der Merkliste</em>`:`<button class="btn ghost sm" data-watchname="${esc(n)}">${IC.star}Merken</button>`}</div>`}).join("")}</div></section>`}
 
+// ---------- Preisvergleich: derselbe Artikel bei anderen Märkten ----------
+function compareHTML(o){
+  const rows=sameElsewhere(o,OFFERS).map(({x,f})=>({x,v:fin(x)*f,same:Math.abs(f-1)<.02}));
+  if(!rows.length)return "";
+  const top=rows.sort((a,b)=>a.v-b.v).slice(0,6),all=[{x:o,v:fin(o),same:true,me:true},...top].sort((a,b)=>a.v-b.v),best=all[0].v;
+  return `<div class="cmp"><h4>Preisvergleich</h4><p class="cmp-sub">Derselbe Artikel bei anderen Märkten, umgerechnet auf die gleiche Menge.</p>
+   ${all.map(r=>`<button class="cmprow${r.me?" me":""}" ${r.me?"disabled":`data-detail="${esc(r.x.id)}"`}>${sb(r.x.s)}<span class="cn">${esc(sname(r.x.s))}${r.me?" <em>(dieses Angebot)</em>":""}<small>${esc(r.x.d||"")}${r.x.from&&r.x.from>TODAY?" · ab "+esc(fmtDate(shopDay(r.x.from))):""}</small></span>
+     <span class="cp"><b>${eur(r.v)}</b>${r.same?"":`<small>${eur(fin(r.x))} pro Packung</small>`}${r.v<=best+.004?'<em class="cbest">günstigster</em>':""}</span></button>`).join("")}</div>`}
+
+// ---------- Barcode-Scanner ----------
+// Kamera -> Strichcode (EAN) -> Artikelname über Open Food Facts / Open Beauty Facts (offene Datenbanken)
+// -> passende Angebote. Erkennung: eingebauter BarcodeDetector (Chrome auf Android), sonst ZXing (docs/vendor).
+const Scan={stream:null,timer:null,busy:false,last:"",res:"",
+  msg(t){const e=document.getElementById("scanMsg");if(e)e.textContent=t},
+  stop(){clearTimeout(this.timer);this.timer=null;if(this.stream){this.stream.getTracks().forEach(t=>t.stop());this.stream=null}},
+  sync(){if(S.sheet!=="scan"){this.stop();return}const v=document.getElementById("scanVideo");if(v&&!this.stream&&!this.busy)this.start(v)},
+  async start(v){
+    if(!navigator.mediaDevices?.getUserMedia){this.msg("Die Kamera ist hier nicht verfügbar. Tippe die Nummer unter dem Strichcode unten ein.");return}
+    this.busy=true;
+    try{this.stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false})}
+    catch(e){this.busy=false;this.msg(/SparRadarAndroid/.test(navigator.userAgent)?"Die alte Android-App darf die Kamera nicht nutzen. Installiere SparRadar über Chrome (Einladungslink) oder tippe die Nummer unten ein.":"Kein Zugriff auf die Kamera. Erlaube den Zugriff oder tippe die Nummer unter dem Strichcode unten ein.");return}
+    this.busy=false;if(S.sheet!=="scan"){this.stop();return}
+    v.srcObject=this.stream;try{await v.play()}catch(e){}
+    this.msg("Strichcode in das Feld halten …");
+    let det=null;
+    if("BarcodeDetector" in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes("ean_13"))det=new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e"]})}catch(e){}}
+    if(!det){try{await loadZXing()}catch(e){this.msg("Scanner konnte nicht geladen werden. Tippe die Nummer unten ein.");return}}
+    const c=document.createElement("canvas"),ctx=c.getContext("2d",{willReadFrequently:true});
+    const zx=det?null:(()=>{const h=new Map();h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E]);h.set(ZXing.DecodeHintType.TRY_HARDER,true);const r=new ZXing.MultiFormatReader();r.setHints(h);return r})();
+    const tick=async()=>{if(!this.stream||S.sheet!=="scan")return;let code="";
+      try{if(det){const r=await det.detect(v);code=r[0]?.rawValue||""}
+        else if(v.videoWidth){c.width=v.videoWidth;c.height=v.videoHeight;ctx.drawImage(v,0,0);
+          code=zx.decodeWithState(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(c)))).getText()}}catch(e){}
+      if(code&&code!==this.last){this.last=code;try{navigator.vibrate?.(80)}catch(e){}this.lookup(code)}
+      this.timer=setTimeout(tick,det?250:400)};
+    tick()},
+  async lookup(code){
+    code=String(code).replace(/\D/g,"");if(code.length<8){this.msg("Bitte die ganze Nummer unter dem Strichcode eingeben (8 oder 13 Ziffern).");return}
+    this.msg(`Strichcode ${code} erkannt – suche Artikel …`);
+    let p=null;
+    for(const host of ["world.openfoodfacts.org","world.openbeautyfacts.org"]){
+      try{const r=await fetch(`https://${host}/api/v2/product/${code}.json?fields=product_name,product_name_de,brands,quantity`);
+        const j=await r.json();if(j.status===1&&j.product){p=j.product;break}}catch(e){}}
+    const box=document.getElementById("scanRes");if(!box)return;
+    if(!p){this.msg(`Strichcode ${code}: Artikel nicht in der offenen Produktdatenbank gefunden.`);box.innerHTML=`<p class="cmp-sub">Tipp: Gib den Namen oben in die Suche ein.</p>`;return}
+    const brand=(p.brands||"").split(",")[0].trim(),name=(p.product_name_de||p.product_name||"").trim(),full=[brand&&!norm(name).includes(norm(brand))?brand:"",name].filter(Boolean).join(" ");
+    this.msg(`Erkannt: ${full}${p.quantity?" ("+p.quantity+")":""}`);
+    box.innerHTML=scanResultHTML(full,brand,name);this.res=box.innerHTML},
+};
+function loadZXing(){return window.ZXing?Promise.resolve():new Promise((ok,err)=>{const s=document.createElement("script");s.src="vendor/zxing.min.js";s.onload=ok;s.onerror=err;document.head.appendChild(s)})}
+function scanResultHTML(full,brand,name){
+  const wo=weekOffers(),words=name.split(/\s+/).filter(w=>w.length>2).slice(0,3).join(" ");
+  let hits=full?searchOffers(wo,full):[],how="Genau dieser Artikel";
+  if(!hits.length&&brand&&words){hits=searchOffers(wo,brand+" "+words);how="Ähnliche Artikel der Marke"}
+  if(!hits.length&&brand){hits=searchOffers(wo,brand);how="Andere Angebote der Marke "+brand}
+  hits=hits.sort((a,b)=>fin(a)-fin(b)).slice(0,12);
+  const on=S.watch.some(w=>norm(w.k)===norm(full));
+  return `${hits.length?`<h4>${esc(how)} im Angebot</h4>${hits.map(o=>`<button class="cmprow" data-detail="${esc(o.id)}">${sb(o.s)}<span class="cn">${esc(o.n)}<small>${esc(sname(o.s))}${o.d?" · "+esc(o.d):""}</small></span><span class="cp"><b>${eur(fin(o))}</b>${offPct(o)?`<small>−${offPct(o)} %</small>`:""}</span></button>`).join("")}`
+    :`<p><b>Gerade nicht im Angebot.</b> Setz ihn auf die Merkliste, dann siehst du es, sobald ein Markt ihn reduziert.</p>`}
+   ${full?(on?`<p class="cmp-sub">✓ „${esc(full)}“ ist auf deiner Merkliste.</p>`:`<button class="btn" data-watchname="${esc(full)}">${IC.star}„${esc(full)}“ merken</button>`):""}`}
+function renderScan(){
+  return `<div class="sheet scan" role="dialog" aria-modal="true" aria-label="Barcode scannen">
+   <div class="sheet-h"><h2>Artikel scannen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <div class="scanbox"><video id="scanVideo" playsinline muted></video><i class="scanframe"></i></div>
+   <p id="scanMsg" class="scanmsg">Kamera wird gestartet …</p>
+   <form class="addrow" id="eanForm"><input id="eanIn" inputmode="numeric" pattern="[0-9 ]*" placeholder="oder Nummer unter dem Strichcode eintippen" autocomplete="off"><button class="btn" type="submit">Suchen</button></form>
+   <div id="scanRes" class="cmp scanres">${Scan.res}</div>
+   <p class="cmp-sub">Artikeldaten: Open Food Facts / Open Beauty Facts (offene Datenbanken). Das Kamerabild bleibt auf deinem Gerät.</p></div>`}
+
 // ---------- Detailansicht eines Artikels ----------
 const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
 function renderDetail(){
@@ -435,6 +508,7 @@ function renderDetail(){
      <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
     ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${compareHTML(o)}
     <dl class="dfacts">
      <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(shopDay(o.from))+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
      <dt>Markt</dt><dd>${esc(sname(o.s))}</dd>
@@ -457,6 +531,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  48:["Neu: Barcode-Scanner. Im Laden auf das Strichcode-Symbol im Suchfeld tippen, Artikel scannen und sehen, ob er gerade irgendwo im Angebot ist.","Neu: Preisvergleich in der Artikelansicht – derselbe Artikel bei den anderen Märkten.","Einkaufszettel: Summe pro Markt und Tipp, wenn es einen Artikel woanders günstiger gibt (mit „Tauschen“).","Neu: Gespart-Zähler. Was du auf dem Zettel abhakst, zählt als gekauft: diese Woche, diesen Monat, insgesamt."],
   47:["Kracher der Woche: zählt jetzt nur belegte Rabatte. Rabatte gegenüber der UVP (Preisempfehlung des Herstellers) stehen in der Liste mit vollem Prozentwert, werden aber nicht mehr zum Kracher.","Bei UVP steht jetzt „UVP“ statt „statt“ am Preis."],
   46:["Scheck-In und Serpa sind entfernt, ebenso „Angebot eintragen“.","Genaue Rabatt-Prüfung: Ab 40 % wird jeder Rabatt geprüft. Echte Rabatte (Händler nennt eigenen 30-Tage-Preis, anderer Markt oder Preisverlauf bestätigt) bleiben oben. Grau wird nur, was nachweislich falsch ist. UVP wird als „UVP“ angezeigt."],
   45:["Automatische Rabatt-Prüfung: Jeder hohe Rabatt wird gegengecheckt (Packung, Grundpreis, andere Märkte, Preisverlauf). Zweifelhafte zeigen ein „?“ und stehen nicht mehr ganz oben.","Falsche Riesen-Rabatte aussortiert (z. B. Kilopreis oder Packungspreis als „statt“-Preis).","Suche findet jetzt immer etwas, auch wenn gerade eine andere Kategorie gewählt ist.","Preise unter 1 € stehen jetzt richtig da (z. B. 0.88 statt -.88).","Neue Prospekte zeigen den echten ersten Einkaufstag (Montag statt Sonntag).","App-Preise sauber benannt, z. B. „Netto App-Preis“.","Lange Artikelbeschreibungen machen die Karten nicht mehr riesig – alles Weitere in der Detailansicht."],
@@ -566,10 +641,22 @@ function renderWatch(){
    <div class="meta"><h2>Deine Treffer</h2><span>${hits.length} Angebote</span></div>
    ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis.</div>'}`}
 
+// Ersparnis-Zähler: was auf dem Zettel abgehakt wird, zählt als gekauft
+function savedHTML(){if(!S.saved.length)return "";
+  const sum=a=>a.reduce((t,x)=>t+x.v,0),mon=TODAY.slice(0,7),wk=new Date(Date.now()-6*864e5).toISOString().slice(0,10);
+  const m=sum(S.saved.filter(x=>x.d.startsWith(mon))),w=sum(S.saved.filter(x=>x.d>=wk)),all=sum(S.saved);
+  return `<div class="savedc"><div><span>Diese Woche</span><b>${eur(w)}</b></div><div><span>Diesen Monat</span><b>${eur(m)}</b></div><div><span>Insgesamt</span><b>${eur(all)}</b></div><p>Gespart mit SparRadar · zählt beim Abhaken auf dem Zettel</p></div>`}
+// Gleicher Artikel woanders günstiger (gleiche Menge)? -> Tausch vorschlagen
+function swapTips(items){
+  const t=items.filter(o=>!S.checked.includes(o.id)).map(o=>{const c=sameElsewhere(o,weekOffers()).filter(r=>Math.abs(r.f-1)<.05&&!S.list.includes(r.x.id)).sort((a,b)=>fin(a.x)-fin(b.x))[0];
+    return c&&fin(c.x)<fin(o)-.04?{o,x:c.x}:null}).filter(Boolean);
+  if(!t.length)return "";
+  return `<section class="panel swaps"><h3>Woanders günstiger</h3><p>Derselbe Artikel in gleicher Menge kostet bei einem anderen Markt weniger.</p>
+   <div class="rows">${t.map(({o,x})=>`<div class="swap"><span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} ${eur(fin(o))} → ${esc(sname(x.s))} ${eur(fin(x))} · ${eur(fin(o)-fin(x))} weniger</small></span><button class="btn ghost sm" data-swap="${esc(o.id)}|${esc(x.id)}">Tauschen</button></div>`).join("")}</div></section>`}
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;
   const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Eigener Eintrag, z. B. Brot, Eier, Spülmittel" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form>`;
-  if(!items.length&&!extra.length)return `${addRow}<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder schreib oben selbst etwas dazu. SparRadar sortiert alles nach Markt.</div>`;
+  if(!items.length&&!extra.length)return `${addRow}${savedHTML()}<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder schreib oben selbst etwas dazu. SparRadar sortiert alles nach Markt.</div>`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const open=items.filter(o=>!S.checked.includes(o.id));
   const sum=items.reduce((a,o)=>a+fin(o),0),reg=items.reduce((a,o)=>a+ref(o),0),rest=open.reduce((a,o)=>a+fin(o),0);
@@ -577,10 +664,11 @@ function renderList(){
   const done=id=>S.checked.includes(id);
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"nicht mehr abhaken":"abhaken"}"><i></i><span>${esc(name)}${label||""}</span></button><span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
-  return `${addRow}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} erledigt`:""}</div>
+  const grpTot=os=>{const t=os.reduce((a,o)=>a+fin(o),0),r=os.reduce((a,o)=>a+ref(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
+  return `${addRow}${savedHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} erledigt`:""}</div>
    <div class="rhint">Tipp: Beim Einkaufen auf einen Artikel tippen, um ihn abzuhaken.</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>
-     ${os.map(o=>line(o.id,o.n,eur(fin(o)),comboLabels(o).length?" *":"")).join("")}</div>`).join("")}
+     ${os.map(o=>line(o.id,o.n,eur(fin(o)),comboLabels(o).length?" *":"")).join("")}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
    ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${extra.map(x=>line(x.id,x.n,"")).join("")}</div>`:""}
    ${items.length?`<div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>`:""}
    ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
@@ -769,10 +857,12 @@ function render(){
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
-  if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,detail:renderDetail}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,detail:renderDetail}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
+  Scan.sync();
   navSync();
 }
 
@@ -792,6 +882,7 @@ document.addEventListener("click",e=>{
   const det=!b&&!e.target.closest("a")&&e.target.closest("[data-detail]");
   if(det){S.detail=det.dataset.detail;S.dImg=0;S.sheet="detail";render();return}
   if(!b)return;
+  if(b.dataset.detail){S.detail=b.dataset.detail;S.dImg=0;S.sheet="detail";S._shown=null;render();return}
   if(b.dataset.sugg==="q"){const v=b.dataset.v;S.q=v;document.getElementById("q").value=v;S.limit=60;hideSugg();S.tab="offers";render();return}
   if(b.dataset.sugg==="kw"){const v=b.dataset.v;document.getElementById("kwIn").value=v;hideSugg();document.getElementById("kwForm").requestSubmit();return}
   if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
@@ -827,7 +918,12 @@ document.addEventListener("click",e=>{
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
   if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
-  if(b.dataset.check){const id=b.dataset.check,i=S.checked.indexOf(id);if(i>=0)S.checked.splice(i,1);else S.checked.push(id);save();render();return}
+  if(b.id==="scanBtn"){Scan.last="";Scan.res="";S.sheet="scan";render();return}
+  if(b.dataset.swap){const [a,c]=b.dataset.swap.split("|"),i=S.list.indexOf(a);if(i>=0)S.list[i]=c;const n=byId(c);save();toast(n?`Getauscht: jetzt bei ${sname(n.s)}`:"Getauscht");render();return}
+  if(b.dataset.check){const id=b.dataset.check,i=S.checked.indexOf(id);
+    if(i>=0){S.checked.splice(i,1);const j=S.saved.map(x=>x.id).lastIndexOf(id);if(j>=0)S.saved.splice(j,1)}
+    else{S.checked.push(id);const o=byId(id);if(o){const v=Math.round((ref(o)-fin(o))*100)/100;if(v>0){S.saved.push({id,n:o.n,s:o.s,v,d:TODAY});toast(`Abgehakt – ${eur(v)} gespart`)}}}
+    save();render();return}
   if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
   if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
@@ -845,6 +941,7 @@ document.addEventListener("submit",e=>{
   if(e.target.id==="syncForm"){e.preventDefault();const t=document.getElementById("syncToken").value.trim();
     if(!/^(ghp_|github_pat_)/.test(t)){toast("Das sieht nicht wie ein GitHub-Schlüssel aus (beginnt mit ghp_).");return}
     toast("Verbinde …");Sync.connect(t).then(()=>{toast("Verbunden! Deine Listen sind jetzt auf allen Geräten gleich.");render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
+  if(e.target.id==="eanForm"){e.preventDefault();const v=document.getElementById("eanIn").value;Scan.last=v;Scan.lookup(v);return}
   if(e.target.id==="cpForm"){e.preventDefault();
     const val=id=>document.getElementById(id).value.trim();
     const v=parseNum(val("cpVal")),k=val("cpKw").replace(/\s+/g," ");

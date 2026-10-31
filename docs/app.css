@@ -206,3 +206,35 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .rk.warn{background:color-mix(in srgb,#F59E0B 16%,transparent)}
 .rk.fix{background:color-mix(in srgb,#3B82F6 12%,transparent)}
 .rk.open{background:color-mix(in srgb,#64748B 12%,transparent)}
+/* Preisvergleich in der Detailansicht */
+.cmp{border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin:2px 0 10px;display:grid;gap:6px}
+.cmp h4{margin:0;font-size:.95rem}
+.cmp-sub{margin:0 0 2px;color:var(--muted);font-size:.8rem}
+.cmprow{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;text-align:left;border:0;border-radius:10px;padding:8px;background:var(--surface2);color:inherit;font:inherit;cursor:pointer}
+.cmprow.me{background:color-mix(in srgb,var(--accent) 12%,transparent);cursor:default}
+.cmprow .cn{min-width:0;font-weight:600}
+.cmprow .cn em{font-style:normal;font-weight:500;color:var(--muted);font-size:.8rem}
+.cmprow small{display:block;color:var(--muted);font-weight:400;font-size:.76rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmprow .cp{text-align:right}
+.cbest{display:block;font-style:normal;font-size:.72rem;font-weight:700;color:var(--save)}
+/* Gespart-Zähler und Tausch-Tipps auf dem Einkaufszettel */
+.savedc{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px;border-radius:16px;background:var(--grad-brand,linear-gradient(135deg,#2B3034,#1E9E5A));color:#fff;margin-bottom:12px}
+.savedc div{display:grid;gap:2px;text-align:center}
+.savedc span{font-size:.74rem;opacity:.85}
+.savedc b{font-size:1.15rem}
+.savedc p{grid-column:1/-1;margin:2px 0 0;font-size:.72rem;opacity:.8;text-align:center}
+.swaps .swap{display:flex;gap:10px;align-items:center;justify-content:space-between}
+.swaps .swap span{min-width:0}
+.swaps .swap small{display:block;color:var(--muted);font-size:.8rem}
+.rsub{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:var(--muted);border-top:1px dashed var(--line);margin-top:4px;padding-top:4px}
+/* Barcode-Scanner */
+.scanbtn{border:0;background:transparent;color:var(--accent);display:grid;place-items:center;width:38px;height:38px;border-radius:12px;cursor:pointer;flex:none}
+.scanbtn:hover{background:var(--surface2)}
+.scanbtn svg{color:currentColor!important}
+.scanbox{position:relative;border-radius:16px;overflow:hidden;background:#000;aspect-ratio:4/3;max-height:46vh;width:100%}
+.scanbox video{width:100%;height:100%;object-fit:cover;display:block}
+.scanframe{position:absolute;background:transparent!important;display:block;pointer-events:none;left:12%;right:12%;top:32%;bottom:32%;border:3px solid #4ADE80;border-radius:12px;box-shadow:0 0 0 2px rgba(0,0,0,.35),inset 0 0 0 2px rgba(0,0,0,.35)}
+.scanmsg{margin:0;font-weight:600;text-align:center}
+.scanres:empty{display:none}
+.scanres h4{margin:0}
+.swaps .swap .btn{flex:none;white-space:nowrap}

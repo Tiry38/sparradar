@@ -73,8 +73,14 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Ab 40 % geprüft** (82 % der Lebensmittel-Rabatte liegen unter 40 %, nur ~1 % ab 60 %): Händlerangabe, Grundpreis, gleicher Artikel bei anderem Markt (pro kg/l oder gleiche Menge), Preisverlauf, „statt“ = genau 3×/4×… Preis.
 - Zustände: `ok` ✅ bestätigt (oben, leichter Bonus beim Kracher) · `open` 🔍 noch nicht bestätigt, aber kein Gegenbeweis (**voller Rang, nicht grau**) · `warn` ⚠️ widerlegt (grau „?“, Sortierung mit realistischer Ersparnis) · `fix` 🔧 falscher statt-Preis entfernt.
 
+## Preisvergleich, Zettel, Gespart, Scanner (31.10.)
+- **Gleicher Artikel woanders:** `tokKey()` (Wörter aus Marke + Name, Reihenfolge egal) + `sameElsewhere()` rechnet Preise über den Grundpreis bzw. gleiche Packungsgröße auf dieselbe Menge um. Genutzt von Rabatt-Prüfung, Detail-„Preisvergleich“ (`compareHTML`) und Zettel-Tipp „Woanders günstiger“ (`swapTips`, Knopf „Tauschen“).
+- **Gespart-Zähler:** Abhaken auf dem Zettel speichert `{id,n,s,v,d}` in `S.saved` (localStorage `sr_saved`, auch im Sync). Ent-Haken nimmt es wieder raus. Anzeige `savedHTML()` oben im Zettel.
+- **Barcode-Scanner:** Knopf im Suchfeld (`#scanBtn`), Fenster `renderScan`/`Scan`. Erkennung per `BarcodeDetector` (Chrome Android), sonst ZXing aus `docs/vendor/zxing.min.js` (MIT, lädt nur bei Bedarf). EAN -> Name über Open Food Facts / Open Beauty Facts API (CORS, ohne Schlüssel). Die alte APK hat keine Kamera-Berechtigung -> Hinweis auf Chrome-Installation; Nummer kann auch eingetippt werden.
+- **Aldi Süd** liefert kein UVP-Merkmal (nur `wasPriceDisplay`, `savingsDisplay`) -> dort nur Marktvergleich/Preisverlauf.
+
 ## App-Funktionen (Überblick)
-Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).
+Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil (Summe pro Markt, Tausch-Tipps) · Gespart-Zähler · Barcode-Scanner · Preisvergleich · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).
 
 ## Testen
 - Abruf lokal: `python fetcher/fetch_offers.py` (dauert ca. 3–5 Minuten). Auf Kevins Windows-PC scheitert Aldi lokal an einem Zertifikatsfehler, auf GitHub funktioniert es.

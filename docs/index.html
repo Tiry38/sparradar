@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600;700&family=Barlow+Condensed:wght@700;800&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <link rel="stylesheet" href="style.css?v=6">
-<link rel="stylesheet" href="app.css?v=37">
+<link rel="stylesheet" href="app.css?v=38">
 <link rel="stylesheet" href="look.css?v=4">
 <script>try{var z=JSON.parse(localStorage.getItem("sr_zoom")||"1");if(z>1)document.documentElement.style.zoom=z}catch(e){}</script>
 </head>
@@ -50,6 +50,7 @@
       <label class="search" for="q">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         <input id="q" type="search" placeholder="Artikel oder Marke suchen, z. B. Butter, Felix, Kaffee …" autocomplete="off">
+        <button class="scanbtn" id="scanBtn" type="button" aria-label="Artikel per Barcode scannen" title="Barcode scannen"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg></button>
         <button class="clear" id="qclear" type="button" aria-label="Suche leeren" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
       </label>
       <div id="qSugg"></div>
@@ -75,7 +76,7 @@
 </div>
 <div class="scrim" id="sheet" hidden></div>
 <div class="toast" id="toast" hidden></div>
-<script src="app.js?v=47"></script>
+<script src="app.js?v=48"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>
