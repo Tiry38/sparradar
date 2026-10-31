@@ -278,6 +278,12 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .qstep{display:inline-flex;align-items:center;gap:2px;flex:none}
 .qstep button{all:unset;cursor:pointer;width:26px;height:26px;border-radius:8px;border:1px solid var(--line);display:grid;place-items:center;font-weight:800}
 .qstep b{min-width:16px;text-align:center;font-size:.85rem}
+.qstep.cq{margin-left:auto;background:var(--surface2);border-radius:10px;padding:2px}
+.qstep.cq button{width:30px;height:30px;border:0;font-size:1.05rem}
+.qstep.cq b small{font-weight:600;opacity:.6;margin-left:1px}
+.qstep.cq.big{margin-left:0}
+.qstep.cq.big button{width:38px;height:38px}
+.card-foot .qstep.cq+.ibtn{margin-left:0}
 .qx{font-style:normal;font-weight:800;color:var(--accent)}
 .trippop{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));z-index:45;width:min(420px,calc(100% - 32px));background:var(--surface);color:var(--fg);border:2px solid var(--save);border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.25);display:grid;gap:6px;animation:tpIn .25s ease-out}
 .trippop[hidden]{display:none}

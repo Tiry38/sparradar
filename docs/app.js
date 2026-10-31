@@ -452,7 +452,7 @@ function card(o,bestIds){
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}">${validTxt(o)}</span>
      <button class="ibtn" data-fav="${esc(o.id)}" aria-pressed="${fav}" aria-label="${fav?"Von Merkliste entfernen":"Auf Merkliste setzen"}" title="Merken">${IC.star}</button>
-     <button class="ibtn add" data-add="${esc(o.id)}" aria-pressed="${inL}" aria-label="${inL?"Vom Einkaufszettel nehmen":"Auf den Einkaufszettel"}" title="Einkaufszettel">${inL?IC.check:IC.plus}</button></div>
+     ${inL?qStep(o.id):""}<button class="ibtn add" data-add="${esc(o.id)}" aria-pressed="${inL}" aria-label="${inL?"Vom Einkaufszettel nehmen":"Auf den Einkaufszettel"}" title="Einkaufszettel">${inL?IC.check:IC.plus}</button></div>
    </div></article>`}
 
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
@@ -604,7 +604,7 @@ function renderDetail(){
     <div class="verdict ${vd.t}">${spark(o,90,24)}<span>${esc(vd.l)}</span></div>
     ${hist.length?`<div class="dtext"><h4>Preisverlauf</h4><ul class="dhist">${hist.map(([d,p])=>`<li><span>${fmtDate(d)}</span><b>${eur(p)}</b></li>`).join("")}</ul></div>`:""}
     <div class="dactions">
-     <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>
+     <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>${inL?qStep(o.id,true):""}
      <button class="btn ghost" data-fav="${esc(o.id)}">${IC.star}${fav?"Gemerkt":"Merken"}</button>
      <a class="btn wa" href="${waLink(share)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a>
     </div>
@@ -615,6 +615,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  60:["Menge gleich beim Hinzufügen: Sobald ein Artikel auf dem Einkaufszettel ist, kannst du direkt auf der Karte (und im Detail) mit − und + die Anzahl einstellen.","Kaffeemaschinen, Pizzaöfen, Fritteusen & Co. stehen jetzt unter Technik."],
   59:["Durchgestrichener Preis „kostet eigentlich“ jetzt auch bei Rewe und Edeka: Nennt der Prospekt keinen „statt“-Preis, zeigt SparRadar die echte UVP desselben Markenartikels (gleiche Menge) von einem anderen Markt – oder den bisherigen Preis im selben Markt.","Kaffeemaschinen, Wasserkocher & Co. stehen jetzt unter Technik statt unter Kaffee & Tee."],
   58:["Kategorien: Du kannst jetzt mehrere gleichzeitig auswählen, z. B. Obst & Gemüse und Fleisch & Fisch. Nochmal antippen nimmt eine Kategorie wieder raus, „Alle Kategorien“ setzt alles zurück.","Prospekte, die erst am Montag erscheinen, werden jetzt auch sofort geholt."],
   57:["Einkaufszettel als Einkaufswagen: Im Laden antippen, was im Wagen liegt. Am Handy schließt der letzte Artikel den Einkauf ab – mit kurzem Bericht und „Zurückholen“.","Neu unter dem Zettel: „Meine Einkäufe“ mit Monatsbericht (ausgegeben, gespart, nach Markt) und allen Einkäufen zum Nachlesen.","Mengen (2×, 3×), eigene Einträge mit Preis („Brot 1,99“), Budget, „Wieder kaufen“ aus deinen letzten Einkäufen. Beim Einkaufen bleibt der Bildschirm an."],
@@ -710,7 +711,7 @@ function renderKracher(){
      <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap"><div class="tag xl">${tagHTML(fin(k))}</div>${ref(k)>fin(k)?`<div class="was" style="text-align:left"><s>${wasLbl(k)} ${eur(ref(k))}</s><b style="color:var(--save);font-size:1rem">Du sparst ${eur(ref(k)-fin(k))} (${offPct(k)} %)</b></div>`:""}</div>
      <div class="stack">${st.map((s,i)=>i===0?`<div><span>${esc(s.l)}</span><span>${eur(s.v)}</span></div>`:`<div class="neg"><span>− ${esc(s.l)}</span><span>${eur(s.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(k))}</span></div></div>
      <div class="verdict ${vd.t}">${spark(k,90,24)}<span>${esc(vd.l)}</span></div>
-     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-add="${esc(k.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button><button class="btn ghost" data-fav="${esc(k.id)}">${IC.star}Merken</button><a class="btn wa" href="${waLink(`🔥 ${k.n}${k.b?" ("+k.b+")":""} bei ${sname(k.s)} für ${eur(fin(k))}${offPct(k)?` (−${offPct(k)} %)`:""}${validTxt(k)?", "+validTxt(k):""}\n\nGefunden mit SparRadar: ${APP_URL}`)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a></div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-add="${esc(k.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>${inL?qStep(k.id,true):""}<button class="btn ghost" data-fav="${esc(k.id)}">${IC.star}Merken</button><a class="btn wa" href="${waLink(`🔥 ${k.n}${k.b?" ("+k.b+")":""} bei ${sname(k.s)} für ${eur(fin(k))}${offPct(k)?` (−${offPct(k)} %)`:""}${validTxt(k)?", "+validTxt(k):""}\n\nGefunden mit SparRadar: ${APP_URL}`)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a></div>
     </div></section>
    ${top.length?`<h3 class="sec-h">Beste Kombi-Deals</h3><p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Angebot + App-Preis, Bonus-Guthaben und deine Coupons zusammengerechnet.</p><div class="rows">${top.map(drow).join("")}</div>`:""}
    <h3 class="sec-h">Weitere Top-Angebote</h3><div class="rows">${rest.map(drow).join("")}</div>
@@ -759,6 +760,8 @@ function goneHTML(){const g=S.list.filter(id=>!byId(id)&&OLD.has(id)).map(id=>OL
 // Antippen = liegt im Wagen. Am Handy schließt der letzte Artikel den Einkauf ab: Zettel leer, Einkauf mit Bericht in „Meine Einkäufe“.
 const TOUCH=()=>matchMedia("(hover:none) and (pointer:coarse)").matches;
 const qty=id=>Math.max(1,S.qty[id]||1);
+// Menge direkt beim Hinzufügen: auf Karte und im Detail erscheint „− 1 +“, sobald der Artikel auf dem Zettel ist
+function qStep(id,big){return `<span class="qstep cq${big?" big":""}" title="Menge auf dem Einkaufszettel"><button data-qm="${esc(id)}" aria-label="weniger">−</button><b>${qty(id)}<small>×</small></b><button data-qp="${esc(id)}" aria-label="mehr">+</button></span>`}
 const r2=v=>Math.round(v*100)/100;
 const lineP=o=>r2(fin(o)*qty(o.id)),lineR=o=>r2(Math.max(ref(o),fin(o))*qty(o.id)),extraP=x=>x.p?r2(x.p*qty(x.id)):0;
 // „3x Joghurt“, „Brot 1,99“, „Kaffee 4,49 €“ -> Menge, Name, Preis
@@ -1119,7 +1122,7 @@ document.addEventListener("click",e=>{
   if(b.id==="appSw"){S.useApp=!S.useApp;save();render();return}
   if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
   if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
-  if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0)S.list.splice(i,1);else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
+  if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);save();render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
