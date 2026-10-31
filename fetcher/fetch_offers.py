@@ -174,13 +174,25 @@ SEEN_NAMES = set()
 def fetch_lidl():
     out = []
     base = "https://www.lidl.de/q/api/search?assortment=DE&locale=de_DE&version=2.1.0&store=1"
+
+    def pages(q):
+        """lidl.de liefert höchstens 60 Artikel pro Abruf -> mit offset weiterblättern bis numFound."""
+        offset = 0
+        while offset < 2000:
+            raw = http(base + q + f"&fetchsize=60&offset={offset}")
+            time.sleep(PAUSE)
+            if not raw:
+                return
+            d = json.loads(raw)
+            got = d.get("items") or []
+            yield from got
+            offset += len(got)
+            if not got or offset >= int(d.get("numFound") or 0):
+                return
+
     for q in ("&category.id=10068374", "&q=katzenfutter", "&q=katzennahrung", "&q=duschgel", "&q=deo",
               "&q=shampoo", "&q=zahncreme", "&q=toilettenpapier", "&q=kosmetik"):
-        raw = http(base + q + "&fetchsize=500&offset=0")
-        time.sleep(PAUSE)
-        if not raw:
-            continue
-        for it in json.loads(raw).get("items", []):
+        for it in pages(q):
             g = (it.get("gridbox") or {}).get("data") or {}
             pr = g.get("price") or {}
             p, old = pr.get("price"), pr.get("oldPrice")
@@ -264,16 +276,40 @@ def fetch_aldi():
 
 
 # ---------- kaufDA (Rewe, Netto, Edeka, dm, Lidl) ----------
-def kd_items(url):
+KD_PER_PAGE = 16   # kaufDA zeigt 16 Angebote pro Seite, weitere über ?page=2, 3, …
+KD_MAX_PAGES = 70  # Sicherheitsgrenze (kaufDA meldet höchstens 1000 Angebote = 63 Seiten)
+
+
+def kd_page(url):
+    """Eine kaufDA-Seite: (Angebote, Gesamtzahl laut kaufDA)."""
     h = http(url)
     time.sleep(PAUSE)
     if not h:
-        return []
+        return [], 0
     m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
     if not m:
-        return []
+        return [], 0
     pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
-    return ((pi.get("offers") or {}).get("main") or {}).get("items") or []
+    main = (pi.get("offers") or {}).get("main") or {}
+    return main.get("items") or [], int(main.get("totalItems") or 0)
+
+
+def kd_items(url, all_pages=True):
+    """Alle Angebote einer kaufDA-Seite, Seite für Seite (vorher fehlte alles ab Angebot 17!)."""
+    items, total = kd_page(url)
+    if not all_pages or total <= len(items):
+        return items
+    seen = {it.get("id") for it in items}
+    pages = min(KD_MAX_PAGES, -(-total // KD_PER_PAGE))
+    for page in range(2, pages + 1):
+        more, _ = kd_page(f"{url}?page={page}")
+        new = [it for it in more if it.get("id") not in seen]
+        if not new:
+            break  # keine neuen Angebote mehr
+        seen.update(it.get("id") for it in new)
+        items += new
+    log(f"  {url.split('/')[-2]}: {len(items)} von {total} Angeboten")
+    return items
 
 
 APP_HINT = re.compile(r"(?:mit\s+(?:der\s+)?app|app[- ]preis|rewe\s+bonus|lidl\s+plus|netto[- ]app)[^0-9]{0,25}(\d+)[,.](\d\d)", re.I)
@@ -317,8 +353,10 @@ def fetch_kaufda():
         for a, b in (("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
             slug = slug.replace(a, b)  # kaufDA schreibt Umlaute aus: Käse -> Kaese
         pages.append(f"https://www.kaufda.de/{KD_CITY}/Angebote/{urllib.parse.quote(slug)}")
+    store_pages = set(KD_STORES.values())
     for n, url in enumerate(pages, 1):
-        items = kd_items(url)
+        # Händlerseiten komplett durchblättern, Stichwortseiten (Karlsruhe) nur die erste Seite
+        items = kd_items(url, all_pages=url in store_pages)
         for it in items:
             o = kd_offer(it)
             if o:
