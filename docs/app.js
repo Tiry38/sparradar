@@ -2,14 +2,14 @@
 // SparRadar – Anzeige der täglich abgerufenen Angebote (docs/data/offers.json)
 
 const STORES = {
-  lidl:   {n:"Lidl",          m:"Li", c:"#2F6FE4", app:"Lidl Plus",  link:"https://www.lidl.de/"},
-  aldi:   {n:"Aldi Süd",      m:"AS", c:"#1590B5",                   link:"https://www.aldi-sued.de/de/angebote.html"},
-  rewe:   {n:"Rewe",          m:"Re", c:"#D9363E", app:"Rewe Bonus", link:"https://www.kaufda.de/Woerth-am-Rhein/REWE/p-r101"},
-  netto:  {n:"Netto",         m:"Ne", c:"#C99400", app:"Netto App",  link:"https://www.kaufda.de/Woerth-am-Rhein/Netto-Marken-Discount/p-r9"},
-  edeka:  {n:"Edeka Jockgrim",m:"Ed", c:"#1F5FAF", app:"Payback",    link:"https://www.kaufda.de/Jockgrim/EDEKA/p-r107"},
-  scheck: {n:"Scheck-In",     m:"SI", c:"#2E9E5B", app:"Payback",    link:"https://www.scheck-in.de/", manual:true},
+  lidl:   {n:"Lidl",          m:"Li", c:"#2F6FE4", app:"Lidl Plus",  link:"https://www.lidl.de/", dom:"lidl.de"},
+  aldi:   {n:"Aldi Süd",      m:"AS", c:"#1590B5",                   link:"https://www.aldi-sued.de/de/angebote.html", dom:"aldi-sued.de"},
+  rewe:   {n:"Rewe",          m:"Re", c:"#D9363E", app:"Rewe Bonus", link:"https://www.kaufda.de/Woerth-am-Rhein/REWE/p-r101", dom:"rewe.de"},
+  netto:  {n:"Netto",         m:"Ne", c:"#C99400", app:"Netto App",  link:"https://www.kaufda.de/Woerth-am-Rhein/Netto-Marken-Discount/p-r9", dom:"netto-online.de"},
+  edeka:  {n:"Edeka Jockgrim",m:"Ed", c:"#1F5FAF", app:"Payback",    link:"https://www.kaufda.de/Jockgrim/EDEKA/p-r107", dom:"edeka.de"},
+  scheck: {n:"Scheck-In",     m:"SI", c:"#2E9E5B", app:"Payback",    link:"https://www.scheck-in.de/", manual:true, dom:"scheck-in.de"},
   serpa:  {n:"Serpa Markt",   m:"Se", c:"#D97A12",                   link:"https://www.google.com/search?q=Serpa+Markt+W%C3%B6rth+am+Rhein+Prospekt", manual:true},
-  dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/"}
+  dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/", dom:"dm.de"}
 };
 const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käse & Eier",brot:"Brot & Backwaren",vorrat:"Vorrat",tk:"Tiefkühl",suess:"Süßes & Snacks",kaffee:"Kaffee & Tee",getraenke:"Getränke",katze:"Katzenfutter",drogerie:"Drogerie & Pflege",
   haushalt:"Haushalt & Putzen",tier:"Tierbedarf",baby:"Baby & Kind",technik:"Technik & Elektro",mode:"Mode & Schuhe",wohnen:"Wohnen & Küche",garten:"Garten & Heimwerken",freizeit:"Freizeit, Spiel & Reisen",sonstiges:"Sonstiges"};
@@ -72,7 +72,10 @@ const safeUrl = u => /^https:\/\//i.test(u||"") ? u : "";
 const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 const parseNum = s => {const v=parseFloat(String(s||"").replace(",","."));return isFinite(v)&&v>0?v:null};
 const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"}) : "";
-const sb = (s,lg) => `<span class="sb${lg?" lg":""}" style="--c:${(STORES[s]||{}).c||"#888"}" aria-hidden="true">${(STORES[s]||{}).m||"?"}</span>`;
+// Markt-Logo: das Website-Symbol des Markts (wird beim Öffnen geladen, liegt nicht im Repo).
+// Lädt es nicht, bleibt das farbige Kürzel darunter sichtbar.
+const logoUrl = s => STORES[s]?.dom ? `https://www.google.com/s2/favicons?domain=${STORES[s].dom}&sz=64` : "";
+const sb = (s,lg) => `<span class="sb${lg?" lg":""}" style="--c:${(STORES[s]||{}).c||"#888"}" aria-hidden="true">${(STORES[s]||{}).m||"?"}${logoUrl(s)?`<img src="${logoUrl(s)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-logo="1">`:""}</span>`;
 const sname = s => (STORES[s]||{}).n || s;
 let tt; function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
 const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("manual",S.manual);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);Sync.changed()};
@@ -552,12 +555,13 @@ function render(){
   const lb=document.getElementById("listBadge");lb.textContent=ln;lb.hidden=!ln;
   const nc=S.coupons.filter(cpActive).length,cb=document.getElementById("cpBadge");cb.textContent=nc;cb.hidden=!nc;
   const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
-  document.getElementById("storeChips").innerHTML=`<button class="chip plain" data-store="" aria-pressed="${!S.stores.size}">Alle Märkte</button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="chip" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k)}${esc(STORES[k].n)}</button>`).join("");
+  // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
+  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mn">Alle</span><em>${OFFERS.length}</em></button>`+Object.keys(STORES).filter(k=>counts[k]||!STORES[k].manual).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cat}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cat===k).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cat===k}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("sort").value=S.sort;
-  const act=[...S.stores].map(sname).concat(S.cat?[CATS[S.cat]]:[],S.sort!=="off"?[SORTS[S.sort]]:[]);
-  document.getElementById("fsum").textContent=act.length?act.join(" · "):"Alle Märkte · Alle Kategorien";
+  const act=[].concat(S.cat?[CATS[S.cat]]:[],S.sort!=="off"?[SORTS[S.sort]]:[]);
+  document.getElementById("fsum").textContent=act.length?act.join(" · "):"Alle Kategorien";
   const fc=document.getElementById("fcount");fc.textContent=act.length;fc.hidden=!act.length;
   document.getElementById("qclear").hidden=!S.q;
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
@@ -567,7 +571,7 @@ function render(){
 }
 
 // kaputte Fotos durch Illustration ersetzen
-document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.dataset.cat){t.outerHTML=ILL[t.dataset.cat]||ILL.sonstiges}},true);
+document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.dataset.logo){t.remove();return}if(t.tagName==="IMG"&&t.dataset.cat){t.outerHTML=ILL[t.dataset.cat]||ILL.sonstiges}},true);
 
 document.addEventListener("click",e=>{
   if(e.target.id==="sheet"){S.sheet=null;render();return}
