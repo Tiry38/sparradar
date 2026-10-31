@@ -355,8 +355,6 @@ function moreArticles(shown){
     return `<div class="mrow"><span>${esc(n)}</span>${on?`<em>✓ auf der Merkliste</em>`:`<button class="btn ghost sm" data-watchname="${esc(n)}">${IC.star}Merken</button>`}</div>`}).join("")}</div></section>`}
 
 // ---------- Detailansicht eines Artikels ----------
-// hochaufgelöste Prospektseite (kaufDA): dort ist auch Kleingedrucktes lesbar
-const pageImg = o => o.bid&&o.pg&&/^[0-9a-f-]{20,}$/i.test(o.bid) ? `https://content-media.bonial.biz/${o.bid}/zoomlarge_page_${+o.pg}.jpg` : "";
 const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
 function renderDetail(){
   const o=byId(S.detail);if(!o)return `<div class="sheet"><div class="sheet-h"><h2>Artikel</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div><div class="empty"><b>Nicht mehr im Angebot</b></div></div>`;
@@ -389,7 +387,6 @@ function renderDetail(){
     <div class="dactions">
      <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>
      <button class="btn ghost" data-fav="${esc(o.id)}">${IC.star}${fav?"Gemerkt":"Merken"}</button>
-     ${pageImg(o)?`<button class="btn ghost" data-zoom="${esc(pageImg(o))}">📄 Prospektseite ${esc(o.pg)} ansehen</button>`:""}
      <a class="btn wa" href="${waLink(share)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a>
      ${link?`<a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">Beim Händler ansehen</a>`:""}
     </div>
@@ -400,8 +397,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  42:["Detailansicht: „Prospektseite ansehen“ zeigt die ganze Prospektseite gestochen scharf – mit zwei Fingern heranzoomen."],
-  41:["Update-Fenster sieht sauber aus, Bilder schärfer."],
+  43:["Update-Fenster sieht sauber aus."],
   40:["Alle Produktbilder jetzt in voller Auflösung – scharf statt verpixelt.","Grüne Umrandung der Markt-Kacheln nicht mehr abgeschnitten."],
   38:["Neues Logo in Anthrazit und Grün – mit Prozentzeichen."],
   37:["Zurück-Taste: geht immer nur einen Schritt zurück, ganz am Ende fragt SparRadar, ob du die App schließen willst."],
