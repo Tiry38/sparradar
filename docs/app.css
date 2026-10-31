@@ -252,3 +252,4 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .simg img{width:100%;height:100%;object-fit:contain}
 .sugg .st{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}
 .sugg em{white-space:nowrap}
+.pvtag{font-style:normal;font-size:.68rem;font-weight:700;color:#fff;background:#2563EB;border-radius:6px;padding:1px 5px;margin-left:4px;letter-spacing:0}

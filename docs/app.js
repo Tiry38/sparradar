@@ -420,7 +420,7 @@ function card(o,bestIds){
   const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} ${cl.length===1?esc(cl[0]):"Mit Kombi"}<b>${eur(fin(o))}</b></div>${cl.length>1?`<div class="src">${cl.map(esc).join(" + ")}</div>`:""}</div>`:"";
   return `<article class="card" data-detail="${esc(o.id)}" tabindex="0" aria-label="${esc(o.n)}: Details anzeigen">${thumb(o)}
    <div class="body">
-   <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}</span>
+   <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}${o.pv?' <em class="pvtag" title="Vorschau aus dem regionalen Prospekt">Vorschau</em>':""}</span>
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
@@ -560,6 +560,7 @@ function renderDetail(){
     <dl class="dfacts">
      <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(shopDay(o.from))+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
      <dt>Markt</dt><dd>${esc(sname(o.s))}</dd>
+     ${o.pv?`<dt>Vorschau</dt><dd>Aus dem ${esc(sname(o.s).split(" ")[0])}-Prospekt der Region für nächste Woche. Der Prospekt deines Markts ist noch nicht online – sobald er da ist, gleicht SparRadar automatisch ab. Einzelne Preise können abweichen.</dd>`:""}
      ${o.pg?`<dt>Prospekt</dt><dd>Seite ${esc(o.pg)}</dd>`:""}
      ${o.cat?.length?`<dt>Kategorie</dt><dd>${o.cat.map(esc).join(" › ")}</dd>`:`<dt>Kategorie</dt><dd>${esc(CATS[o.c]||"")}</dd>`}
      <dt>Quelle</dt><dd>${esc(o.src||"")}</dd>
@@ -579,6 +580,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  51:["Nächste Woche früher: Aldi-Angebote der kommenden Woche kommen jetzt direkt von den Aldi-Tagesseiten, Edeka als „Vorschau“ aus dem regionalen Prospekt, sobald es ihn gibt.","Ein Prospekt-Wächter schaut Do–So alle 2 Stunden nach neuen Prospekten aller Märkte."],
   50:["Vorschläge beim Tippen (Suche und Merkliste) zeigen jetzt kleine Produktbilder."],
   49:["Der Knopf „Demnächst“ heißt jetzt „Nächste Woche“ (bzw. „Ab Donnerstag“, wenn noch diese Woche etwas startet).","Neu: Angebote ohne „statt“-Preis zeigen jetzt ihren Vorteil – blau markiert: günstiger als zuletzt, Großpackung günstiger pro Kilo oder günstigster Markt.","Filter überarbeitet: Kategorien richten sich nur noch nach Artikelname, Marke und Warengruppe, nicht mehr nach der Beschreibung."],
   48:["Neu: Barcode-Scanner. Im Laden auf das Strichcode-Symbol im Suchfeld tippen, Artikel scannen und sehen, ob er gerade irgendwo im Angebot ist.","Neu: Preisvergleich in der Artikelansicht – derselbe Artikel bei den anderen Märkten.","Einkaufszettel: Summe pro Markt und Tipp, wenn es einen Artikel woanders günstiger gibt (mit „Tauschen“).","Neu: Gespart-Zähler. Was du auf dem Zettel abhakst, zählt als gekauft: diese Woche, diesen Monat, insgesamt."],

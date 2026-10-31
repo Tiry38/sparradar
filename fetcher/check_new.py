@@ -43,6 +43,18 @@ def future_marks():
                 pc = (it.get("parentContent") or {}).get("id")
                 if pc:
                     marks[f"{store}:{pc}"] = start
+    # Edeka/Rewe: Vorschau-Prospekte der nächsten Woche erscheinen zuerst auf den Sortiment-Seiten (gleiche Händler-Kennung)
+    for store, slug, pub in (("edeka", "Edeka", "DE-220164"), ("rewe", "REWE", "DE-1062")):
+        h = f.http(f"https://www.kaufda.de/{slug}/Sortiment/Kaffee")
+        time.sleep(f.PAUSE)
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
+        if not m:
+            continue
+        pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+        for it in ((pi.get("offers") or {}).get("main") or {}).get("items") or []:
+            start = str(it.get("validFrom") or "")[:10]
+            if start > today and it.get("publisherId") == pub:
+                marks[f"{store}:{(it.get('parentContent') or {}).get('id')}"] = start
     h = f.http("https://www.aldi-sued.de/de/angebote.html") or ""
     for day, _ in f.aldi_days(h):  # Aldi-Tagesseiten der nächsten Woche (z. B. /angebote/2026-11-02)
         if day > today:

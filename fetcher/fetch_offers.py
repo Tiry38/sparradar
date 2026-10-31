@@ -467,6 +467,9 @@ def kd_page(url):
         "brochures": _ids([br.get("viewer"), br.get("publisher")], set()) | {str((it.get("parentContent") or {}).get("id")) for it in items},
         "links": [l.get("link_href") for l in links if isinstance(l, dict) and l.get("link_href")],
         "known": {(norm(it.get("title")), round(float((it.get("prices") or {}).get("mainPrice") or 0), 2)) for it in items},
+        "pubs": {it.get("publisherId") for it in items if it.get("publisherId")},  # Händler-Kennung, z. B. EDEKA = DE-220164
+        "future": any(str((b or {}).get("validFrom") or "")[:10] > dt.date.today().isoformat()
+                      for key in ("viewer", "publisher") for b in (br.get(key) if isinstance(br.get(key), list) else [])),
     }
     return items, int(main.get("totalItems") or 0)
 
@@ -600,6 +603,7 @@ def fetch_sortiment(regional=None):
     regional = regional or {}
     out, accepted = [], {}
     for store, slugs in KD_SLUGS.items():
+        preview = set()
         local = KD_INFO.get(KD_STORES.get(store), {})
         terms = list(dict.fromkeys(SORTIMENT + [l.rstrip("/").split("/")[-1] for l in local.get("links", [])]))
         slug = None
@@ -618,6 +622,17 @@ def fetch_sortiment(regional=None):
             # regionale Händler: nur Prospekte mit gleichem Inhalt wie die lokale Händlerseite
             base = {b for b in local.get("brochures", set()) if b and b != "None"}
             ok = same_flyer(found, local.get("known", set()), base)
+            # Vorschau auf die nächste Woche: Solange die lokale Händlerseite noch keinen neuen Prospekt zeigt, die
+            # künftigen Prospekte desselben Händlers (gleiche Händler-Kennung) von den Sortiment-Seiten übernehmen.
+            # Sobald der lokale Prospekt online ist, greift wieder der Inhaltsabgleich (same_flyer).
+            preview = set()
+            if not local.get("future") and local.get("pubs"):
+                today = dt.date.today().isoformat()
+                preview = {str((it.get("parentContent") or {}).get("id")) for it in found
+                           if str(it.get("validFrom") or "")[:10] > today and it.get("publisherId") in local["pubs"]}
+                if preview:
+                    log(f"  {store}: Vorschau nächste Woche aus Prospekt(en) {sorted(preview)}")
+            ok = ok | preview
             accepted[store] = ok
             kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in ok]
         else:
@@ -626,6 +641,8 @@ def fetch_sortiment(regional=None):
         for it in kept_items:
             o = kd_offer(it)
             if o:
+                if store in ("rewe", "edeka") and str((it.get("parentContent") or {}).get("id")) in preview:
+                    o["pv"] = 1  # Vorschau aus dem Prospekt der Region, noch nicht vom eigenen Markt bestätigt
                 out.append(o)
         log(f"  Sortiment {store}: {len(out) - n0} Angebote übernommen von {len(found)} gefundenen"
             f" ({'keine Sortiment-Seiten, nur Stichwortseiten' if not slug else str(len(terms)) + ' Begriffe'})")
@@ -660,6 +677,8 @@ def merge(offers):
         # das vollständigere Angebot behalten, fehlende Felder ergänzen
         if cur.get("c") in ("vorrat", "sonstiges") and o.get("c") not in ("vorrat", "sonstiges"):
             cur["c"] = o["c"]  # „Vorrat“/„Sonstiges“ ist nur die Notlösung, wenn nichts passte
+        if cur.get("pv") and not o.get("pv"):
+            cur.pop("pv", None)  # derselbe Artikel steht auch im bestätigten Prospekt
         if "ou" not in cur and "ou" in o and (not cur.get("o") or cur.get("o") == o.get("o")):
             cur["ou"] = o["ou"]  # 0 = eigener früherer Preis (zählt, obwohl „falsch“ im Sinne von Python)
         for f in ("b", "o", "gp", "img", "il", "ims", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url"):
