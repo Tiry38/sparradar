@@ -328,7 +328,8 @@ function moreArticles(shown){
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  29:["Nach jedem Update erscheint dieses Fenster mit den Neuigkeiten.","Oben ein grüner Balken, wenn es eine neue App-Version zum Installieren gibt."],
+  30:["Keine Update-Hinweise für die Android-App mehr: Neuigkeiten kommen ab jetzt immer automatisch, ohne Installieren."],
+  29:["Nach jedem Update erscheint dieses Fenster mit den Neuigkeiten."],
   27:["Die Zurück-Taste bzw. Wischgeste schließt zuerst offene Fenster statt der App."],
   26:["Neue Farben: Anthrazit und Grün."],
   24:["Märkte oben als Kacheln mit Logo und Anzahl der Angebote.","Die Suche ist genauer, beim Tippen gibt es Vorschläge."],
@@ -521,7 +522,9 @@ const UA=navigator.userAgent, AND_V=+(UA.match(/SparRadarAndroid\/(\d+)/)||[])[1
 const IN_ANDROID_APP = !!AND_V || (/Android/.test(UA) && /; wv\)/.test(UA));   // auch alte App-Versionen ohne Versionsnummer
 const verCmp=(a,b)=>{const x=String(a).split(".").map(Number),y=String(b).split(".").map(Number);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)-(y[i]||0)}return 0};
 function appUpdateHTML(){
-  if(IN_ANDROID_APP&&APPV.code&&(!AND_V||AND_V<APPV.code))
+  // Android-App: kein Balken mehr. Updates der App-Hülle sind selten nötig und Android verlangt dafür
+  // jedes Mal Bestätigungen und Warnungen. Wer will, sucht in den Einstellungen selbst nach Updates.
+  if(false&&IN_ANDROID_APP&&APPV.code&&(!AND_V||AND_V<APPV.code))
     return `<div class="appupd">${IC.bell}<span><b>Neue App-Version da.</b> Kurz aktualisieren, dann ist alles auf dem neuesten Stand.</span>${window.SparRadarApp?'<button class="btn sm" id="appUpdNow">Aktualisieren</button>':`<a class="btn sm" href="${APK_URL}">Aktualisieren</a>`}</div>`;
   const w=window.__SR_DESKTOP__;
   if(w&&APPV.desktop&&verCmp(w,APPV.desktop)<0)
