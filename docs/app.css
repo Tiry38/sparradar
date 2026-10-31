@@ -127,3 +127,4 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .appupd .btn{background:#fff;color:#1C2023;box-shadow:none}
 .wn{margin:0;padding-left:20px;display:grid;gap:8px;font-size:.95rem}
 .wn li::marker{color:var(--save)}
+.sugg{max-height:min(60vh,420px);overflow-y:auto;overscroll-behavior:contain}

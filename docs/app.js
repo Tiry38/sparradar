@@ -169,7 +169,20 @@ function searchOffers(list,q){const t=q.trim().split(/\s+/).filter(Boolean);if(!
   let r=list.filter(o=>matchesAll(o,t));
   if(!r.length)r=list.filter(o=>t.every(x=>matches(o,x)||hayD(o).includes(norm(x))));
   return r}
-const hitW = (o,w) => matches(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
+// Merkliste: passt ein Angebot zum gemerkten Artikel?
+// 1) alle wichtigen Wörter kommen im Angebot vor (Name, Marke, Beschreibung), Reihenfolge egal
+// 2) Prospekt bietet „versch. Sorten“ an: dann reicht die Marke/Produktlinie (erstes Wort),
+//    z. B. gemerkt „Tassimo Morning Café XL“, Angebot „Jacobs Tassimo, versch. Sorten“
+const WATCH_FILL=/^(\d.*|g|kg|ml|l|cl|x|xl|xxl|st|stk|stueck|pack|packung|bigpack|big|cups?|portionen|kapseln|und|mit|fuer|der|die|das|von)$/;
+const WATCH_WEAK=new Set(["bio","gut","ja","mini","frisch","frische","original","classic","klassik","deluxe","premium","neu","extra"]);
+const wTokens = k => (k.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(t=>t.length>1&&!WATCH_FILL.test(t));
+function watchMatch(o,k){
+  if(matches(o,k))return true;
+  const t=wTokens(k);if(!t.length)return false;
+  const txt=hay(o)+" "+hayD(o);
+  if(t.every(x=>txt.includes(x)))return true;
+  return t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&txt.includes(t[0])&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))}
+const hitW = (o,w) => watchMatch(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
 const TOMORROW=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date(Date.now()+864e5));
 const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(o.from) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
 const tagHTML = v => {v=Math.max(v,0);const e=Math.floor(v+1e-9),c=Math.round((v-e)*100);return `<span class="eu">${e||"-"}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
@@ -246,23 +259,31 @@ const BASE_WORDS=("Butter,Milch,H-Milch,Hafermilch,Käse,Gouda,Mozzarella,Feta,J
  "Brot,Toastbrot,Brötchen,Croissant,Nudeln,Spaghetti,Reis,Mehl,Zucker,Olivenöl,Sonnenblumenöl,Haferflocken,Müsli,Cornflakes,Marmelade,Honig,Nutella,Ketchup,Mayonnaise,Senf,Tomatensoße,"+
  "Tomaten,Kartoffeln,Äpfel,Bananen,Gurken,Paprika,Zwiebeln,Knoblauch,Salat,Möhren,Brokkoli,Erdbeeren,Trauben,Mandarinen,Avocado,Zitronen,Pilze,"+
  "Pizza,Tiefkühlpizza,Pommes,Eis,Tiefkühlgemüse,Schokolade,Chips,Kekse,Gummibärchen,Pralinen,Nüsse,"+
- "Kaffee,Kaffeebohnen,Kaffeepads,Kaffeekapseln,Tassimo,Dolce Gusto,Senseo,Nespresso,Jacobs,Tchibo,Dallmayr,Lavazza,Melitta,Eduscho,Tee,Kakao,"+
+ "Kaffee,Kaffeebohnen,Kaffeepads,Kaffeekapseln,Tassimo,Tassimo Morning Café Strong & Intense XL,Dolce Gusto,Senseo,Nespresso,Jacobs,Tchibo,Dallmayr,Lavazza,Melitta,Eduscho,Tee,Kakao,"+
  "Coca-Cola,Pepsi,Fanta,Sprite,Spezi,Red Bull,Monster,Energy Drink,Mineralwasser,Apfelsaft,Orangensaft,Eistee,Bier,Pils,Radler,Weißwein,Rotwein,Sekt,Prosecco,"+
  "Milka,Lindt,Ritter Sport,Kinder,Ferrero,Haribo,Lorenz,Pringles,Leibniz,Oreo,Bahlsen,Dr. Oetker,Wagner,Iglo,Frosta,Barilla,Knorr,Maggi,Ehrmann,Müller,Weihenstephan,Landliebe,Kerrygold,Philadelphia,Bärenmarke,Alpro,"+
  "Katzenfutter,Nassfutter,Trockenfutter,Felix,Sheba,Whiskas,Gourmet,Kitekat,Animonda,Katzensnacks,Katzenstreu,Hundefutter,"+
  "Duschgel,Shampoo,Spülung,Deo,Zahnpasta,Zahnbürste,Rasierer,Rasierklingen,Gillette,Nivea,Dove,Balea,Toilettenpapier,Küchenrolle,Taschentücher,Feuchttücher,Windeln,Pampers,"+
  "Waschmittel,Persil,Ariel,Weichspüler,Spülmittel,Spülmaschinentabs,Finish,Putzmittel,Müllbeutel,Batterien").split(",");
+// Großer Artikelstamm (Open Food Facts / Open Beauty Facts), wird erst beim ersten Tippen geladen
+let CATALOG=null,CATALOG_N=null,catLoading=false;
+function loadCatalog(then){if(CATALOG||catLoading)return;catLoading=true;
+  fetch("data/catalog.json").then(r=>r.json()).then(a=>{CATALOG=Array.isArray(a)?a:[];CATALOG_N=CATALOG.map(norm);then&&then()}).catch(()=>{CATALOG=[];CATALOG_N=[]})}
 function suggest(q){
-  const k=norm(q);if(k.length<2)return [];
+  const k=norm(q),tk=(q.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(Boolean);if(k.length<2)return [];
   const out=[],seen=new Set(),add=t=>{const n=norm(t);if(!n||seen.has(n))return;seen.add(n);out.push(t)};
-  const starts=a=>a.filter(t=>norm(t).startsWith(k)),inside=a=>a.filter(t=>!norm(t).startsWith(k)&&norm(t).includes(k));
+  const hasAll=n=>tk.every(x=>n.includes(x));
+  const starts=a=>a.filter(t=>norm(t).startsWith(k)),inside=a=>a.filter(t=>{const n=norm(t);return !n.startsWith(k)&&hasAll(n)});
   const live=weekOffers().map(o=>o.b&&!norm(o.n).includes(norm(o.b))?o.b+" "+o.n:o.n);
   const brands=[...new Set(OFFERS.map(o=>o.b).filter(Boolean))];
   [starts(BASE_WORDS),starts(brands),starts(live),inside(BASE_WORDS),inside(live),starts(NAMES),inside(NAMES)].forEach(a=>a.forEach(add));
-  const wo=weekOffers();return out.slice(0,8).map(t=>({t,n:searchOffers(wo,t).length}))}
+  if(CATALOG_N){const a=[],b=[];for(let i=0;i<CATALOG_N.length&&a.length+b.length<400;i++){const n=CATALOG_N[i];if(n.startsWith(k))a.push(CATALOG[i]);else if(hasAll(n))b.push(CATALOG[i])}
+    a.sort((x,y)=>x.length-y.length);b.sort((x,y)=>x.length-y.length);[...a,...b].forEach(add)}
+  const wo=weekOffers();return out.slice(0,30).map(t=>({t,n:wo.filter(o=>watchMatch(o,t)).length}))}
 function suggHTML(q,kind){const list=suggest(q);if(!list.length)return "";
   return `<div class="sugg" role="listbox" aria-label="Vorschläge">${list.map(x=>`<button type="button" role="option" data-sugg="${kind}" data-v="${esc(x.t)}"><span>${esc(x.t)}</span>${x.n?`<em class="on">${x.n} im Angebot</em>`:`<em>nicht im Angebot</em>`}</button>`).join("")}</div>`}
-function showSugg(id,q,kind){const el=document.getElementById(id);if(el)el.innerHTML=suggHTML(q,kind)}
+function showSugg(id,q,kind){const el=document.getElementById(id);if(!el)return;el.innerHTML=suggHTML(q,kind);
+  if(!CATALOG)loadCatalog(()=>{const inp=document.getElementById(kind==="q"?"q":"kwIn");if(inp&&document.activeElement===inp)showSugg(id,inp.value,kind)})}
 const hideSugg=()=>["qSugg","kwSugg"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=""});
 
 // ---------- Teilen ----------
@@ -318,8 +339,9 @@ function renderOffers(){
 function moreArticles(shown){
   const t=S.q.trim().split(/\s+/).map(norm).filter(Boolean);if(!t.length)return "";
   const have=new Set(shown.map(o=>norm(o.n)));
-  const cand=[...new Set([...BASE_WORDS,...NAMES])].filter(n=>{const k=norm(n);return t.every(x=>k.includes(x))&&![...have].some(h=>k.includes(h)||h.includes(k))});
+  const cand=[...new Set([...BASE_WORDS,...NAMES,...(CATALOG||[])])].filter(n=>{const k=norm(n);return t.every(x=>k.includes(x))&&![...have].some(h=>k.includes(h)||h.includes(k))});
   cand.sort((a,b)=>(norm(b).startsWith(t[0])-norm(a).startsWith(t[0]))||a.length-b.length);
+  if(!CATALOG)loadCatalog(()=>{if(S.tab==="offers"&&S.q.trim())render()});
   if(!cand.length)return "";
   return `<section class="panel"><h3>Gerade nicht im Angebot</h3><p>Auf die Merkliste setzen: Sobald einer dieser Artikel im Angebot ist, zeigt SparRadar es dir beim Öffnen.</p>
    <div class="rows">${cand.slice(0,15).map(n=>{const on=S.watch.some(w=>norm(w.k)===norm(n));
@@ -328,6 +350,7 @@ function moreArticles(shown){
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  31:["Suche und Merkliste kennen jetzt zehntausende Artikel (z. B. alle Tassimo-Sorten) zum gezielten Merken.","Merkliste erkennt auch Prospekt-Angebote wie „Tassimo, versch. Sorten“."],
   30:["Keine Update-Hinweise für die Android-App mehr: Neuigkeiten kommen ab jetzt immer automatisch, ohne Installieren."],
   29:["Nach jedem Update erscheint dieses Fenster mit den Neuigkeiten."],
   27:["Die Zurück-Taste bzw. Wischgeste schließt zuerst offene Fenster statt der App."],
