@@ -23,9 +23,21 @@ def size(url):
     return f"OK {len(data) // 1024} KB, {w}x{h}"
 
 
-for store in ("netto", "lidl", "rewe"):
-    items, _ = f.kd_page(f.KD_STORES[store])
-    for it in items[:2]:
-        pc = it.get("parentContent") or {}
-        u = f"https://content-media.bonial.biz/{pc.get('id')}/zoomlarge_page_{(pc.get('page') or {}).get('number')}.jpg"
-        print(store, it.get("title"), "->", u, "->", size(u))
+import json
+import re
+h = f.http(f.KD_STORES["netto"])
+d = json.loads(re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h, re.S).group(1))
+pi = d["props"]["pageProps"]["pageInformation"]
+for key in ("viewer", "publisher"):
+    for b in (pi.get("brochures") or {}).get(key) or []:
+        print("PROSPEKT", key, json.dumps({k: v for k, v in b.items() if k != "pages"}, ensure_ascii=False)[:500])
+        for pg in (b.get("pages") or [])[:2]:
+            print("   SEITE", json.dumps(pg, ensure_ascii=False)[:400])
+        print("   Seiten in Liste:", len(b.get("pages") or []), "von", b.get("pageCount"))
+it = pi["offers"]["main"]["items"][0]
+pc = it["parentContent"]
+print("ANGEBOT parentContent:", pc)
+for q in ("?impolicy=SEO-BROCHURE-BOX-VIEWER", ""):
+    for name in ("zoomlarge_page_%d.jpg", "page_%d.jpg"):
+        u = f"https://content-media.bonial.biz/{pc['id']}/" + name % pc["page"]["number"] + q
+        print(u, "->", size(u))
