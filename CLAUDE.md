@@ -66,11 +66,12 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Sperren nicht umgehen:** rewe.de und netto-online.de blocken automatische Abrufe (403). Diese Sperren nicht umgehen, keine API-Schlüssel aus Websites auslesen (z. B. bei Marktguru). Nur öffentliche Seiten, die robots.txt erlaubt, mit ehrlichem User-Agent, höchstens einmal pro Tag und mit Pausen (`PAUSE`).
 - Das Repository ist öffentlich (nötig für kostenloses GitHub Pages). Keine Passwörter, Tokens oder persönlichen Daten hineinschreiben.
 
-## Automatische Rabatt-Prüfung (Kevins Wunsch: hohe Rabatte genau prüfen)
+## Automatische Rabatt-Prüfung (Kevins Wunsch: hohe Rabatte genauestens prüfen, echte dürfen NICHT abgewertet werden)
 - `checkDeal()` in `docs/app.js` läuft bei jedem Laden über alle Angebote, `fake_old()` in `fetcher/fetch_offers.py` schon beim Abruf.
-- **Entfernt** (`rk.t="fix"`): „statt“-Preis = Kilo-/Literpreis, = Preis der ganzen Packung (`6 x … ` × Preis) oder = Preis der größeren Packung bei gleichem Grundpreis („250 – 750 ml“).
-- **Ab 40 % gegengecheckt** (Daten 31.10.: 82 % der Lebensmittel-Rabatte liegen unter 40 %, nur ~1 % ab 60 %): Grundpreis passt zum Preis? Gleicher Artikel bei anderem Markt regulär günstiger (-> realistische Ersparnis)? Preisverlauf? „statt“ genau 3×/4×… der Preis? Non-Food ab 60 % = meist UVP. Lebensmittel ab 60 % = kritisch: zählt nur mit Bestätigung von außen (anderer Markt oder Preisverlauf).
-- Zweifelhafte (`rk.t="warn"`): graues „−xx % ?“, in Sortierung/Kracher nur mit realistischer Ersparnis (sonst max. 45 %). Detailansicht zeigt das Prüfergebnis.
+- **Feld `ou`** (vom Abruf): 0 = „statt“ ist eigener früherer Preis des Markts (kaufDA `secondaryPriceIsUVP=false`, Lidl `discount.fromRecommendedPrice=false`) -> laut PAngV § 11 niedrigster Preis der letzten 30 Tage = **bestätigt**. 1 = UVP -> Karte zeigt „UVP“ statt „statt“.
+- **Entfernt** (`rk.t="fix"`): „statt“ = Kilo-/Literpreis, = Preis der ganzen Packung, = Preis der größeren Packung bei gleichem Grundpreis.
+- **Ab 40 % geprüft** (82 % der Lebensmittel-Rabatte liegen unter 40 %, nur ~1 % ab 60 %): Händlerangabe, Grundpreis, gleicher Artikel bei anderem Markt (pro kg/l oder gleiche Menge), Preisverlauf, „statt“ = genau 3×/4×… Preis.
+- Zustände: `ok` ✅ bestätigt (oben, leichter Bonus beim Kracher) · `open` 🔍 noch nicht bestätigt, aber kein Gegenbeweis (**voller Rang, nicht grau**) · `warn` ⚠️ widerlegt (grau „?“, Sortierung mit realistischer Ersparnis) · `fix` 🔧 falscher statt-Preis entfernt.
 
 ## App-Funktionen (Überblick)
 Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).

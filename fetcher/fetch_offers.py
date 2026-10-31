@@ -168,7 +168,7 @@ def fake_old(price, old, up, text):
 
 
 def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=None, start=None, end=None,
-          app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None, img_large=None, info=None, cats=None, page=None, images=None, brochure=None):
+          app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None, img_large=None, info=None, cats=None, page=None, images=None, brochure=None, uvp=None):
     title = re.sub(r"\s+", " ", (title or "").strip())
     if not title or ((not price or price <= 0) and not bonus_only):
         return None
@@ -208,6 +208,10 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         o["pg"] = page            # Seite im Prospekt
     if brochure:
         o["bid"] = brochure       # Prospekt-ID -> hochaufgelöste Prospektseite in der Detailansicht
+    if o["o"] and uvp is not None:
+        # „statt“-Preis = UVP des Herstellers (1) oder eigener früherer Preis des Markts (0).
+        # Eigener Preis: laut Preisangabenverordnung § 11 der niedrigste Preis der letzten 30 Tage.
+        o["ou"] = 1 if uvp else 0
     if app_only:
         o["ao"] = app_only        # Preis gilt nur mit dieser App/Karte
     if bonus_only:
@@ -245,8 +249,12 @@ def fetch_lidl():
         for it in pages(q):
             g = (it.get("gridbox") or {}).get("data") or {}
             pr = g.get("price") or {}
-            p, old = pr.get("price"), pr.get("oldPrice")
-            disc = (pr.get("discount") or {}).get("showDiscount")
+            dd = pr.get("discount") or {}
+            # „statt“-Preis: oldPrice, sonst deletedPrice (z. B. bei UVP-Angeboten fehlt oldPrice)
+            p, old = pr.get("price"), pr.get("oldPrice") or dd.get("deletedPrice")
+            disc = dd.get("showDiscount")
+            # fromRecommendedPrice: True = „statt“ ist die UVP, False = eigener früherer Lidl-Preis
+            uvp = dd.get("fromRecommendedPrice") if isinstance(dd.get("fromRecommendedPrice"), bool) else None
             plus = None
             for lp in g.get("lidlPlus") or []:
                 v = (lp.get("price") or {}).get("price") if isinstance(lp.get("price"), dict) else lp.get("price")
@@ -265,7 +273,7 @@ def fetch_lidl():
                       src="lidl.de", url="https://www.lidl.de" + (g.get("canonicalUrl") or ""), cat_text=text,
                       info=" ".join(v for v in (kf.values() if isinstance(kf, dict) else []) if isinstance(v, str)),
                       cats=[g.get("category")] if g.get("category") else None,
-                      food=q == "&category.id=10068374")
+                      food=q == "&category.id=10068374", uvp=uvp)
             if o:
                 # weitere Produktbilder (Lidl liefert oft mehrere Ansichten)
                 more = []
@@ -437,7 +445,8 @@ def kd_offer(it):
                  app_only=app_only, bonus_only=bonus_only, info=it.get("description"),
                  cats=[n.get("name") for p in paths for n in p if isinstance(n, dict)][-3:] + list(it.get("categories") or []),
                  page=((it.get("parentContent") or {}).get("page") or {}).get("number"),
-                 brochure=(it.get("parentContent") or {}).get("id"))
+                 brochure=(it.get("parentContent") or {}).get("id"),
+                 uvp=pr.get("secondaryPriceIsUVP") if isinstance(pr.get("secondaryPriceIsUVP"), bool) else None)
 
 
 def fetch_kaufda():
@@ -567,6 +576,8 @@ def merge(offers):
             by[k] = o
             continue
         # das vollständigere Angebot behalten, fehlende Felder ergänzen
+        if "ou" not in cur and "ou" in o and (not cur.get("o") or cur.get("o") == o.get("o")):
+            cur["ou"] = o["ou"]  # 0 = eigener früherer Preis (zählt, obwohl „falsch“ im Sinne von Python)
         for f in ("b", "o", "gp", "img", "il", "ims", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url"):
             if not cur.get(f) and o.get(f):
                 cur[f] = o[f]

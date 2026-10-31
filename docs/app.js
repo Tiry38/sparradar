@@ -203,7 +203,7 @@ function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.lengt
 // Aldi in größerer Breite. Gilt auch für schon gespeicherte Angebote.
 const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails)$/,"").replace(/\/scaleWidth\/500\//,"/scaleWidth/1000/");
 const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
-function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt zweifelhaft – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}</div>`}
+function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}</div>`}
 
 // ---------- Daten ----------
 // ---------- Automatische Rabatt-Prüfung ----------
@@ -225,7 +225,12 @@ function checkDeal(o){
     if(big)return {...o,o:null,rk:{t:"fix",l:[`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist aber der Preis der größeren Packung (gleicher Grundpreis ${eur(o.gp.v)}/${o.gp.u}), kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`]}};
     if(kilo||pack)return {...o,o:null,rk:{t:"fix",l:[kilo?`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist aber der Preis pro ${o.gp.u==="l"?"Liter":"Kilo"}, kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`:`Der Prospekt nannte „statt ${eur(o.o)}“ – das ist der Preis für alle ${pack[1]} Stück zusammen (${pack[1]} × ${eur(o.p)}), kein früherer Preis. Kein echter Rabatt, SparRadar hat ihn entfernt.`]}};}
   const e=o.ap&&o.ap<o.p?o.ap:o.p,base=o.o||o.p,pct=Math.round((1-e/base)*100);if(pct<40)return o;
-  const ok=[],bad=[],q=packQty(o.d);let real=null,ext=0; // ext = Bestätigungen von außen (anderer Markt, Preisverlauf)
+  const ok=[],bad=[],q=packQty(o.d);let real=null,ext=0; // ext = Bestätigungen von außen (Händlerangabe, anderer Markt, Preisverlauf)
+  // 0) Händlerangabe: „statt“ = eigener früherer Preis -> laut Preisangabenverordnung (§ 11) der niedrigste Preis
+  //    der letzten 30 Tage in diesem Markt. Das ist der stärkste Beleg. „statt“ = UVP -> nur Preisempfehlung.
+  const own=o.o&&o.ou===0,uvp=o.o&&o.ou===1;
+  if(own){ok.push(`${sname(o.s)} gibt ${eur(o.o)} als eigenen früheren Preis an. Das muss laut Preisangabenverordnung der niedrigste Preis der letzten 30 Tage sein – der Rabatt ist echt.`);ext+=2}
+  if(uvp)ok.push(`„statt“-Preis ${eur(o.o)} ist die unverbindliche Preisempfehlung (UVP) des Herstellers, nicht der bisherige Preis im Laden.`);
   // 3) Passt der Grundpreis zum Preis (Angebot oder App-Preis)?
   if(o.gp&&q&&q.u===o.gp.u&&q.v>0){const near=v=>Math.abs(v/q.v-o.gp.v)/o.gp.v<.12;
     if(near(o.p)||near(e))ok.push("Grundpreis passt zum Angebotspreis");
@@ -238,7 +243,8 @@ function checkDeal(o){
     if(mine&&u&&u.u===mine.u)return {s:x.s,n:(x.o||x.p)*u.v/mine.v}; // regulärer Preis, umgerechnet auf unsere Packungsgröße
     const a=packQty(o.d),b=packQty(x.d);if(a&&b&&a.u===b.u&&Math.abs(a.v-b.v)/a.v<.05)return {s:x.s,n:x.o||x.p};return null}).filter(Boolean);
   if(cmp.length){const best=cmp.reduce((a,b)=>a.n<=b.n?a:b),n=Math.round(best.n*100)/100;
-    if(n<base*.7){real=Math.max(0,Math.round((1-e/n)*100));bad.push(`„statt“-Preis ${eur(base)} ist zu hoch angesetzt: bei ${sname(best.s)} kostet derselbe Artikel (gleiche Menge) regulär ${eur(n)}. Realistische Ersparnis: ${real} %`)}
+    if(n<base*.7&&own)ok.push(`Hinweis: bei ${sname(best.s)} kostet derselbe Artikel (gleiche Menge) regulär nur ${eur(n)}`);
+    else if(n<base*.7){real=Math.max(0,Math.round((1-e/n)*100));bad.push(`„statt“-Preis ${eur(base)} ist zu hoch angesetzt: bei ${sname(best.s)} kostet derselbe Artikel (gleiche Menge) regulär ${eur(n)}. Realistische Ersparnis: ${real} %`)}
     else {ok.push(`Normalpreis passt zu anderen Märkten (${sname(best.s)}: ${eur(n)})`);ext++}}
   // 5) Preisverlauf: war er schon öfter so günstig?
   const h=histOf(o);if(h.length>=3){const avg=h.reduce((a,b)=>a+b,0)/h.length;
@@ -248,10 +254,12 @@ function checkDeal(o){
   // 7) Ungewöhnlich hoch. Lebensmittel haben immer einen Grundpreis; teure Artikel ohne Grundpreis = Non-Food
   const nonfood=NONFOOD_CATS.includes(o.c)||(!o.gp&&base>=15);
   // Lebensmittel: 82 % aller Rabatte liegen unter 40 %, nur gut 1 % bei 60 % und mehr -> ab 60 % nur mit Bestätigung von außen
-  if(!nonfood&&pct>=60&&!ext)bad.push(`Kritisch hoher Rabatt (${pct} %): bei Lebensmitteln sehr selten und weder durch einen anderen Markt noch durch den Preisverlauf bestätigt – Preis im Laden prüfen`);
-  if(nonfood&&o.o&&pct>=60&&!ext)bad.push("„statt“-Preis ist bei Non-Food meist die Preisempfehlung des Herstellers (UVP) – so teuer war es im Laden oft nie");
+  const open=[]; // nichts spricht dagegen, aber auch noch keine Bestätigung von außen
+  if(pct>=60&&!ext&&(!nonfood||uvp))open.push(`Sehr hoher Rabatt (${pct} %) – kein Gegenbeweis gefunden, aber noch nicht durch Händlerangabe, anderen Markt oder Preisverlauf bestätigt. Der Preisverlauf bestätigt ihn automatisch in den nächsten Tagen.`);
+  if(nonfood&&o.o&&pct>=60&&!ext&&!uvp)open.push("„statt“-Preis ist bei Non-Food meist die Preisempfehlung des Herstellers (UVP) – so teuer war es im Laden oft nie");
   if(o.ap&&e<o.p)ok.push(`Der stärkste Preis gilt nur mit ${o.s==="lidl"?"Lidl Plus":"der App"} – ohne App ${eur(o.p)}`);
-  return {...o,rk:bad.length?{t:"warn",l:bad,real}:{t:"ok",l:ok.length?ok:["Keine Auffälligkeiten (Packung, Grundpreis und Kilopreis geprüft)"]}}}
+  return {...o,rk:bad.length?{t:"warn",l:bad,real}:open.length?{t:"open",l:[...open,...ok]}:{t:"ok",l:ok.length?ok:["Keine Auffälligkeiten (Packung, Grundpreis und Kilopreis geprüft)"]}}}
+const wasLbl = o => o.o&&o.ou===1&&ref(o)===o.o?"UVP":"statt";
 const dealWarn = o => !!(o.rk&&o.rk.t==="warn");
 // Sortierung: zweifelhafte Rabatte zählen nur mit der realistischen Ersparnis (sonst höchstens 45 %)
 const sortPct = o => dealWarn(o)?(o.rk.real!=null?Math.min(o.rk.real,offPct(o)):Math.min(offPct(o),45)):offPct(o);
@@ -268,7 +276,7 @@ function filtered(){
   // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
   const f=qt.length?(a,b)=>f0(a,b)||relevance(a,qt)-relevance(b,qt):f0;
   return r.sort(f)}
-const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
+const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o.rk&&o.rk.t==="ok"?3:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
 
@@ -365,7 +373,7 @@ function card(o,bestIds){
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
-     <div class="was">${o.o?`<s>statt ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
+     <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}">${validTxt(o)}</span>
@@ -416,7 +424,7 @@ function renderDetail(){
   const share=`${o.n}${o.b?" ("+o.b+")":""} bei ${sname(o.s)}: ${o.bo?eur(o.bo)+" Bonus":eur(fin(o))}${offPct(o)?` (−${offPct(o)} %)`:""}${validTxt(o)?", "+validTxt(o):""}\n\nGefunden mit SparRadar: ${APP_URL}`;
   return `<div class="sheet detail" role="dialog" aria-modal="true" aria-label="${esc(o.n)}">
    <div class="sheet-h">${sb(o.s,true)}<h2>${esc(sname(o.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
-   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt zweifelhaft – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span>`:""}</div>
+   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span>`:""}</div>
    ${ims.length>1?`<div class="dthumbs">${ims.map((u,i)=>`<button data-dimg="${i}" aria-pressed="${u===cur}" aria-label="Bild ${i+1}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb="1"></button>`).join("")}</div>`:""}
    <div class="dinfo">
     ${o.b?`<span class="store">${esc(o.b)}</span>`:""}
@@ -424,9 +432,9 @@ function renderDetail(){
     ${o.d?`<p class="dsub">${esc(o.d)}</p>`:""}
     ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
-     <div>${ref(o)>fin(o)&&!o.bo?`<s>statt ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
+     <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
-    ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt zweifelhaft":o.rk.t==="fix"?"🔧 Rabatt korrigiert":"✅ Rabatt geprüft"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
+    ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
     <dl class="dfacts">
      <dt>Gültig</dt><dd>${o.from&&o.to?fmtDate(shopDay(o.from))+" – "+fmtDate(o.to):validTxt(o)||"laufend"}${o.to===TODAY?' <b class="last">nur noch heute</b>':""}</dd>
      <dt>Markt</dt><dd>${esc(sname(o.s))}</dd>
@@ -449,7 +457,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  46:["Scheck-In und Serpa sind entfernt, ebenso „Angebot eintragen“.","Rabatt-Prüfung strenger: Ab 40 % wird jeder Rabatt geprüft, ab 60 % zählt er nur, wenn ein anderer Markt oder der Preisverlauf ihn bestätigt."],
+  46:["Scheck-In und Serpa sind entfernt, ebenso „Angebot eintragen“.","Genaue Rabatt-Prüfung: Ab 40 % wird jeder Rabatt geprüft. Echte Rabatte (Händler nennt eigenen 30-Tage-Preis, anderer Markt oder Preisverlauf bestätigt) bleiben oben. Grau wird nur, was nachweislich falsch ist. UVP wird als „UVP“ angezeigt."],
   45:["Automatische Rabatt-Prüfung: Jeder hohe Rabatt wird gegengecheckt (Packung, Grundpreis, andere Märkte, Preisverlauf). Zweifelhafte zeigen ein „?“ und stehen nicht mehr ganz oben.","Falsche Riesen-Rabatte aussortiert (z. B. Kilopreis oder Packungspreis als „statt“-Preis).","Suche findet jetzt immer etwas, auch wenn gerade eine andere Kategorie gewählt ist.","Preise unter 1 € stehen jetzt richtig da (z. B. 0.88 statt -.88).","Neue Prospekte zeigen den echten ersten Einkaufstag (Montag statt Sonntag).","App-Preise sauber benannt, z. B. „Netto App-Preis“.","Lange Artikelbeschreibungen machen die Karten nicht mehr riesig – alles Weitere in der Detailansicht."],
   44:["Kein Knopf führt mehr unnötig aus der App heraus – alle Infos stehen direkt in SparRadar."],
   43:["Update-Fenster sieht sauber aus."],
@@ -528,7 +536,7 @@ function renderKracher(){
     <div class="info">
      <div class="store" style="gap:9px">${sb(k.s,true)}${esc(sname(k.s))} · ${validTxt(k)}</div>
      <h3>${esc(k.n)}<small>${esc([k.b,k.d,unitTxt(k)].filter(Boolean).join(" · "))}</small></h3>
-     <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap"><div class="tag xl">${tagHTML(fin(k))}</div>${ref(k)>fin(k)?`<div class="was" style="text-align:left"><s>statt ${eur(ref(k))}</s><b style="color:var(--save);font-size:1rem">Du sparst ${eur(ref(k)-fin(k))} (${offPct(k)} %)</b></div>`:""}</div>
+     <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap"><div class="tag xl">${tagHTML(fin(k))}</div>${ref(k)>fin(k)?`<div class="was" style="text-align:left"><s>${wasLbl(k)} ${eur(ref(k))}</s><b style="color:var(--save);font-size:1rem">Du sparst ${eur(ref(k)-fin(k))} (${offPct(k)} %)</b></div>`:""}</div>
      <div class="stack">${st.map((s,i)=>i===0?`<div><span>${esc(s.l)}</span><span>${eur(s.v)}</span></div>`:`<div class="neg"><span>− ${esc(s.l)}</span><span>${eur(s.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(k))}</span></div></div>
      <div class="verdict ${vd.t}">${spark(k,90,24)}<span>${esc(vd.l)}</span></div>
      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-add="${esc(k.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button><button class="btn ghost" data-fav="${esc(k.id)}">${IC.star}Merken</button><a class="btn wa" href="${waLink(`🔥 ${k.n}${k.b?" ("+k.b+")":""} bei ${sname(k.s)} für ${eur(fin(k))}${offPct(k)?` (−${offPct(k)} %)`:""}${validTxt(k)?", "+validTxt(k):""}\n\nGefunden mit SparRadar: ${APP_URL}`)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a></div>
