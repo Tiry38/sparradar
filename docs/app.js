@@ -353,6 +353,7 @@ function moreArticles(shown){
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  33:["Die Einstellungen findest du jetzt ganz unten im Tab „Coupons“."],
   32:["Viel mehr Angebote: Vorher fehlten bei jedem Markt viele Angebote (z. B. bei Lidl), jetzt kommen alle aus den Prospekten.","Lidl-Plus-Preise, App-Preise und Rewe-Bonus stehen direkt beim Angebot."],
   31:["Suche und Merkliste kennen jetzt zehntausende Artikel (z. B. alle Tassimo-Sorten) zum gezielten Merken.","Merkliste erkennt auch Prospekt-Angebote wie „Tassimo, versch. Sorten“."],
   30:["Keine Update-Hinweise für die Android-App mehr: Neuigkeiten kommen ab jetzt immer automatisch, ohne Installieren."],
@@ -593,7 +594,8 @@ function renderTips(){
    <h3 class="sec-h">Apps und Programme deiner Märkte</h3>
    <div class="tips">${T.map(([s,prog,txt])=>`<div class="tip"><h4>${sb(s,true)}${esc(sname(s))}</h4><span class="prog">${prog}</span><p>${txt}</p><a href="${STORES[s].link}" target="_blank" rel="noopener" style="font-size:.84rem">Angebote ansehen</a></div>`).join("")}
    <div class="tip"><h4><span class="ico">${IC.layers}</span>Cashback-Apps</h4><span class="prog">Marktguru · Scondoo · Coupies</span><p>Geld zurück auf bestimmte Markenprodukte, egal in welchem Markt gekauft. Kassenbon fotografieren, das Geld kommt aufs Konto oder per PayPal.</p></div>
-   <div class="tip"><h4><span class="ico">${IC.bag}</span>Too Good To Go</h4><span class="prog">Abends Essen retten</span><p>Standort Wörth am Rhein wählen und Bäcker und Märkte in der Nähe als Favoriten speichern.</p><a href="https://www.toogoodtogo.com/de" target="_blank" rel="noopener" style="font-size:.84rem">toogoodtogo.com</a></div></div>`}
+   <div class="tip"><h4><span class="ico">${IC.bag}</span>Too Good To Go</h4><span class="prog">Abends Essen retten</span><p>Standort Wörth am Rhein wählen und Bäcker und Märkte in der Nähe als Favoriten speichern.</p><a href="https://www.toogoodtogo.com/de" target="_blank" rel="noopener" style="font-size:.84rem">toogoodtogo.com</a></div></div>
+   <div class="setlink"><button class="btn ghost" id="openSettings">${IC.gear}Einstellungen</button></div>`}
 
 // Handy: Märkte, Kategorien und Sortierung aufgeräumt in einem Fenster statt drei langer Leisten
 const SORTS={off:"Höchste Ersparnis",gp:"Bester Grundpreis",p:"Niedrigster Preis"};
@@ -670,6 +672,7 @@ document.addEventListener("click",e=>{
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openAdd"||b.dataset.openadd){S.sheet="add";render();return}
   if(b.id==="openFilter"){S.sheet="filter";render();return}
+  if(b.id==="openSettings"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="settingsBtn"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="reloadApp"){location.reload();return}
   if(b.id==="appUpdNow"){try{window.SparRadarApp.checkUpdate()}catch(e){location.href=APK_URL}return}
