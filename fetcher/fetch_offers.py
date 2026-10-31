@@ -281,12 +281,25 @@ def fetch_aldi():
 
 
 # ---------- kaufDA (Rewe, Netto, Edeka, dm, Lidl) ----------
-KD_PER_PAGE = 16   # kaufDA zeigt 16 Angebote pro Seite, weitere über ?page=2, 3, …
-KD_MAX_PAGES = 70  # Sicherheitsgrenze (kaufDA meldet höchstens 1000 Angebote = 63 Seiten)
+KD_INFO = {}  # je Händlerseite: gültige Prospekt-IDs und Themen-Links (für die Sortiment-Seiten)
+
+
+def _ids(o, out):
+    """alle 'id'-Werte (Prospekt-IDs) in den Prospekt-Listen einsammeln"""
+    if isinstance(o, dict):
+        for k, v in o.items():
+            if k in ("id", "contentId", "legacyId") and isinstance(v, (str, int)):
+                out.add(str(v))
+            elif isinstance(v, (dict, list)) and k != "pages":
+                _ids(v, out)
+    elif isinstance(o, list):
+        for v in o:
+            _ids(v, out)
+    return out
 
 
 def kd_page(url):
-    """Eine kaufDA-Seite: (Angebote, Gesamtzahl laut kaufDA)."""
+    """Eine kaufDA-Seite: (Angebote, Gesamtzahl laut kaufDA). Merkt sich Prospekt-IDs und Themen-Links."""
     h = http(url)
     time.sleep(PAUSE)
     if not h:
@@ -296,24 +309,22 @@ def kd_page(url):
         return [], 0
     pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
     main = (pi.get("offers") or {}).get("main") or {}
-    return main.get("items") or [], int(main.get("totalItems") or 0)
+    items = main.get("items") or []
+    br = pi.get("brochures") or {}
+    links = ((((pi.get("template") or {}).get("content") or {}).get("OfferLinkbox") or {}).get("PublisherOfferLinkbox") or {}).get("links") or []
+    KD_INFO[url] = {
+        "brochures": _ids([br.get("viewer"), br.get("publisher")], set()) | {str((it.get("parentContent") or {}).get("id")) for it in items},
+        "links": [l.get("link_href") for l in links if isinstance(l, dict) and l.get("link_href")],
+    }
+    return items, int(main.get("totalItems") or 0)
 
 
-def kd_items(url, all_pages=True):
-    """Alle Angebote einer kaufDA-Seite, Seite für Seite (vorher fehlte alles ab Angebot 17!)."""
+def kd_items(url):
+    """Angebote einer kaufDA-Seite. Weiterblättern gibt es nicht (?page= liefert dieselben 16),
+    deshalb kommen die übrigen Angebote über die Sortiment-Seiten (fetch_sortiment)."""
     items, total = kd_page(url)
-    if not all_pages or total <= len(items):
-        return items
-    seen = {it.get("id") for it in items}
-    pages = min(KD_MAX_PAGES, -(-total // KD_PER_PAGE))
-    for page in range(2, pages + 1):
-        more, _ = kd_page(f"{url}?page={page}")
-        new = [it for it in more if it.get("id") not in seen]
-        if not new:
-            break  # keine neuen Angebote mehr
-        seen.update(it.get("id") for it in new)
-        items += new
-    log(f"  {url.split('/')[-2]}: {len(items)} von {total} Angeboten")
+    if total > len(items) and url in KD_STORES.values():
+        log(f"  {url.split('/')[-2]}: {len(items)} von {total} Angeboten auf der Händlerseite")
     return items
 
 
@@ -378,17 +389,70 @@ def fetch_kaufda():
         for a, b in (("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
             slug = slug.replace(a, b)  # kaufDA schreibt Umlaute aus: Käse -> Kaese
         pages.append(f"https://www.kaufda.de/{KD_CITY}/Angebote/{urllib.parse.quote(slug)}")
-    store_pages = set(KD_STORES.values())
     for n, url in enumerate(pages, 1):
         # Händlerseiten komplett durchblättern, Stichwortseiten (Karlsruhe) nur die erste Seite
-        items = kd_items(url, all_pages=url in store_pages)
+        items = kd_items(url)
         for it in items:
             o = kd_offer(it)
             if o:
                 out.append(o)
         if n % 20 == 0:
             log(f"  kaufDA: {n}/{len(pages)} Seiten")
+    out += fetch_sortiment()
     log("kaufDA:", len(out), "(vor Duplikat-Bereinigung)")
+    return out
+
+
+# kaufDA zeigt auf der Händlerseite nur 16 Angebote. Die öffentlichen Sortiment-Seiten
+# (kaufda.de/<Händler>/Sortiment/<Begriff>) zeigen je Begriff alle passenden Angebote des Händlers.
+# Sie sind bundesweit -> nur Angebote aus Prospekten behalten, die auch für Wörth/Jockgrim gelten.
+KD_SLUGS = {"lidl": ["Lidl"], "netto": ["Netto-Marken-Discount"], "rewe": ["REWE"], "edeka": ["Edeka", "EDEKA-Center"],
+            "dm": ["dm", "dm-drogerie"]}
+SORTIMENT = """Butter Milch Kaese Joghurt Quark Sahne Eier Mozzarella Margarine Pudding Skyr Frischkaese Gouda
+Hackfleisch Haehnchen Putenbrust Schweinefleisch Rindfleisch Steak Schnitzel Bratwurst Wuerstchen Salami Schinken Wurst Lachs Fisch Garnelen Thunfisch
+Obst Gemuese Tomaten Aepfel Bananen Kartoffeln Paprika Zwiebeln Salat Trauben Mandarinen Beeren Pilze
+Brot Broetchen Kuchen Toast Nudeln Reis Mehl Zucker Oel Konserven Suppe Muesli Cornflakes Marmelade Honig Nutella Ketchup Gewuerze
+Pizza Eis Pommes Tiefkuehlkost Schokolade Chips Kekse Pralinen Suessigkeiten Gummibaerchen Nuesse
+Kaffee Kaffeekapseln Kaffeepads Espresso Tee Kakao Tassimo Senseo Jacobs Tchibo Dallmayr Lavazza
+Cola Coca-Cola Pepsi Fanta Limonade Mineralwasser Wasser Saft Bier Wein Sekt Prosecco Spirituosen Whisky Wodka Energy-Drink Red-Bull Monster-Energy
+Katzenfutter Hundefutter Katzenstreu Tierfutter
+Shampoo Duschgel Deo Zahnpasta Zahnbuerste Rasierer Toilettenpapier Kuechenrolle Taschentuecher Windeln Kosmetik Creme
+Waschmittel Persil Ariel Weichspueler Spuelmittel Reiniger Muellbeutel Batterien
+Kleidung Schuhe Jacke Socken Unterwaesche Bettwaesche Handtuch Kissen Decke Pfanne Topf Geschirr Lampe Kerzen
+Werkzeug Akkuschrauber Garten Pflanzen Blumen Grill Fahrrad Spielzeug Lego Fernseher Kopfhoerer Staubsauger Kaffeemaschine Kuechengeraete""".split()
+
+
+def fetch_sortiment():
+    out = []
+    for store, slugs in KD_SLUGS.items():
+        local = KD_INFO.get(KD_STORES.get(store), {})
+        # Rewe und Edeka haben regionale Prospekte -> nur die für Wörth/Jockgrim; Lidl, Netto, dm sind bundesweit gleich
+        allowed = {b for b in local.get("brochures", set()) if b and b != "None"} if store in ("rewe", "edeka") else set()
+        terms = list(dict.fromkeys(SORTIMENT + [l.rstrip("/").split("/")[-1] for l in local.get("links", [])]))
+        slug = None
+        for sl in slugs:  # gibt es für diesen Händler Sortiment-Seiten?
+            items, total = kd_page(f"https://www.kaufda.de/{sl}/Sortiment/Butter" if store != "dm" else f"https://www.kaufda.de/{sl}/Sortiment/Shampoo")
+            if items or total:
+                slug = sl
+                break
+        if not slug:
+            log(f"  Sortiment {store}: keine Seiten")
+            continue
+        seen, kept, other = set(), 0, 0
+        for t in terms:
+            items, _ = kd_page(f"https://www.kaufda.de/{slug}/Sortiment/{urllib.parse.quote(t)}")
+            for it in items:
+                if it.get("id") in seen:
+                    continue
+                seen.add(it.get("id"))
+                if allowed and str((it.get("parentContent") or {}).get("id")) not in allowed:
+                    other += 1  # Prospekt aus einer anderen Region
+                    continue
+                o = kd_offer(it)
+                if o:
+                    out.append(o)
+                    kept += 1
+        log(f"  Sortiment {store}: {kept} Angebote ({other} aus anderen Regionen ausgelassen, {len(terms)} Begriffe)")
     return out
 
 

@@ -37,6 +37,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 | Scheck-In (Wörth, Maximiliancenter) | nicht automatisch – Nutzer trägt Angebote in der App selbst ein |
 | Serpa Markt (Wörth) | nicht automatisch – Nutzer trägt Angebote in der App selbst ein |
 
+**Wichtig:** kaufDA-Händlerseiten zeigen nur 16 Angebote, `?page=` blättert nicht (kaufDA mischt nur die Reihenfolge). Die übrigen Angebote kommen über die öffentlichen **Sortiment-Seiten** `kaufda.de/<Händler>/Sortiment/<Begriff>` (Lidl, Netto, REWE; `fetch_sortiment()`), bei Rewe/Edeka gefiltert auf die Prospekte der lokalen Händlerseite. Die interne kaufDA-Schnittstelle wird bewusst nicht genutzt.
 Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruhe/Angebote/<Begriff>`, Umlaute ausgeschrieben: Käse → Kaese). Für Wörth gibt es keine Stichwortseiten.
 
 ## Was in die App gehört
