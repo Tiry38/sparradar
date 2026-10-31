@@ -43,10 +43,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(Color.parseColor("#0C0F1D"));
+        getWindow().setStatusBarColor(Color.parseColor("#16191C"));
 
         web = new WebView(this);
-        web.setBackgroundColor(Color.parseColor("#0C0F1D"));
+        web.setBackgroundColor(Color.parseColor("#16191C"));
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true); // Merkliste, Einkaufszettel und Coupons bleiben gespeichert

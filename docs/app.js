@@ -15,7 +15,7 @@ const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käs
   haushalt:"Haushalt & Putzen",tier:"Tierbedarf",baby:"Baby & Kind",technik:"Technik & Elektro",mode:"Mode & Schuhe",wohnen:"Wohnen & Küche",garten:"Garten & Heimwerken",freizeit:"Freizeit, Spiel & Reisen",sonstiges:"Sonstiges"};
 const NONFOOD_CATS = ["haushalt","tier","baby","technik","mode","wohnen","garten","freizeit","sonstiges"];
 const CC = {obst:"#E5484D",fleisch:"#C2453A",kuehl:"#F2B705",brot:"#C98A4B",vorrat:"#3B6FD9",tk:"#3BA5DC",suess:"#8B4A2B",kaffee:"#7A4A2A",getraenke:"#2E9E5B",katze:"#E8893A",drogerie:"#B8327F",
-  haushalt:"#14A3A3",tier:"#9A6B3F",baby:"#E77FB0",technik:"#4B5563",mode:"#7A3CF0",wohnen:"#D97A12",garten:"#3F8F3A",freizeit:"#E5484D",sonstiges:"#6B7280"};
+  haushalt:"#14A3A3",tier:"#9A6B3F",baby:"#E77FB0",technik:"#4B5563",mode:"#2B3034",wohnen:"#D97A12",garten:"#3F8F3A",freizeit:"#E5484D",sonstiges:"#6B7280"};
 // Ersatzbilder, falls ein Angebot kein Foto hat oder das Foto nicht lädt
 const ILL = {
 obst:'<svg class="ill" viewBox="0 0 120 90"><circle cx="74" cy="58" r="20" fill="#F59E0B"/><circle cx="50" cy="52" r="27" fill="#E5484D"/><path d="M50 26l5 7 8-3-5 7 7 4-9 1-1 8-5-7-5 7-1-8-9-1 7-4-5-7 8 3z" fill="#2E9E5B"/></svg>',
@@ -33,7 +33,7 @@ haushalt:'<svg class="ill" viewBox="0 0 120 90"><path d="M44 30h28v8l8 6v36c0 3-
 tier:'<svg class="ill" viewBox="0 0 120 90"><ellipse cx="60" cy="58" rx="18" ry="15" fill="#9A6B3F"/><ellipse cx="38" cy="38" rx="7" ry="9" fill="#9A6B3F"/><ellipse cx="52" cy="26" rx="7" ry="9" fill="#9A6B3F"/><ellipse cx="68" cy="26" rx="7" ry="9" fill="#9A6B3F"/><ellipse cx="82" cy="38" rx="7" ry="9" fill="#9A6B3F"/></svg>',
 baby:'<svg class="ill" viewBox="0 0 120 90"><rect x="46" y="10" width="28" height="10" rx="5" fill="#E77FB0"/><path d="M50 20h20l4 10v44c0 4-3 7-7 7H53c-4 0-7-3-7-7V30z" fill="#fff"/><path d="M46 46h28v28c0 4-3 7-7 7H53c-4 0-7-3-7-7z" fill="#F7C6DD"/><path d="M52 36h8M52 46h8M52 56h8" stroke="#E77FB0" stroke-width="2.5" stroke-linecap="round"/></svg>',
 technik:'<svg class="ill" viewBox="0 0 120 90"><rect x="20" y="16" width="80" height="50" rx="6" fill="#4B5563"/><rect x="26" y="22" width="68" height="38" rx="3" fill="#7DD3FC"/><path d="M50 66h20l4 10H46z" fill="#4B5563"/><path d="M34 52l14-14 10 10 18-18" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-mode:'<svg class="ill" viewBox="0 0 120 90"><path d="M44 14l-24 14 8 16 10-5v41h44V39l10 5 8-16-24-14c-2 6-8 10-16 10s-14-4-16-10z" fill="#7A3CF0"/><path d="M44 14c2 6 8 10 16 10s14-4 16-10" stroke="#fff" stroke-width="3" fill="none" opacity=".7"/></svg>',
+mode:'<svg class="ill" viewBox="0 0 120 90"><path d="M44 14l-24 14 8 16 10-5v41h44V39l10 5 8-16-24-14c-2 6-8 10-16 10s-14-4-16-10z" fill="#2B3034"/><path d="M44 14c2 6 8 10 16 10s14-4 16-10" stroke="#fff" stroke-width="3" fill="none" opacity=".7"/></svg>',
 wohnen:'<svg class="ill" viewBox="0 0 120 90"><path d="M20 44 60 14l40 30v36H20z" fill="#D97A12"/><rect x="50" y="54" width="20" height="26" rx="2" fill="#fff"/><rect x="28" y="50" width="14" height="12" rx="2" fill="#FFE7C2"/><rect x="78" y="50" width="14" height="12" rx="2" fill="#FFE7C2"/></svg>',
 garten:'<svg class="ill" viewBox="0 0 120 90"><path d="M40 56h40l-6 26H46z" fill="#C2410C"/><rect x="36" y="50" width="48" height="8" rx="3" fill="#9A3412"/><path d="M60 50V26" stroke="#3F8F3A" stroke-width="4" stroke-linecap="round"/><path d="M60 34c-14 0-20-10-20-18 12 0 20 6 20 18zM60 30c0-12 8-20 22-20 0 10-8 20-22 20z" fill="#3F8F3A"/></svg>',
 freizeit:'<svg class="ill" viewBox="0 0 120 90"><circle cx="60" cy="46" r="30" fill="#E5484D"/><path d="M30 46h60M60 16c-12 10-12 50 0 60M60 16c12 10 12 50 0 60" stroke="#fff" stroke-width="3.5" fill="none"/></svg>',
@@ -445,7 +445,7 @@ function renderCoupons(){
      <div class="row"><label>Gültig bis<input id="cpTo" type="date" value="${d}"></label><label style="align-self:end"><button class="btn" type="submit">${IC.plus}Coupon speichern</button></label></div>
     </form>
     ${act.length?`<div class="rows">${act.map(({c,i})=>{const n=wo.filter(o=>couponsFor(o).includes(c)).length;
-      return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#7A3CF0"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#7A3CF0">%</span>`:sb(c.s,true)}</div>
+      return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#2B3034"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#2B3034">%</span>`:sb(c.s,true)}</div>
        <div class="t">${esc(c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?"bis "+fmtDate(c.to):"ohne Ende"}</small>
         <div class="pills"><span class="pill ${n?"cb":""}">${n?`passt zu ${n} Angebot${n===1?"":"en"}`:"gerade kein passendes Angebot"}</span></div></div>
        <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`

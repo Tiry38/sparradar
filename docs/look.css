@@ -1,21 +1,24 @@
 /* SparRadar-Look: Farbverläufe und mehr Tiefe. Liegt über style.css/app.css, ändert nur das Aussehen. */
 :root{
-  --grad-brand:linear-gradient(135deg,#3552F5 0%,#7A3CF0 55%,#C2378F 100%);
+  --grad-brand:linear-gradient(135deg,#2B3034 0%,#2B3034 18%,#1E7A47 62%,#22C55E 100%);
   --grad-sun:linear-gradient(135deg,#FFE45C 0%,#FFC21A 45%,#FF8A1F 100%);
   --grad-hot:linear-gradient(135deg,#FF5A5F 0%,#E5332A 50%,#C2185B 100%);
   --grad-save:linear-gradient(135deg,#19C27E 0%,#0B8F62 100%);
-  --glow-a:rgba(53,82,245,.13); --glow-b:rgba(255,194,26,.18); --glow-c:rgba(194,55,143,.10);
+  --glow-a:rgba(34,197,94,.14); --glow-b:rgba(255,194,26,.16); --glow-c:rgba(43,48,52,.10);
   --card-hi:rgba(255,255,255,.7);
+  --grad-title:linear-gradient(135deg,#2B3034 0%,#2B3034 30%,#16A34A 100%);
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --grad-brand:linear-gradient(135deg,#5B73FF 0%,#9A6BFF 55%,#E05AAE 100%);
-  --glow-a:rgba(91,115,255,.20); --glow-b:rgba(255,194,26,.08); --glow-c:rgba(224,90,174,.14);
+  --grad-brand:linear-gradient(135deg,#3A4147 0%,#3A4147 15%,#1E9E5A 60%,#4ADE80 100%);
+  --glow-a:rgba(74,222,128,.12); --glow-b:rgba(255,194,26,.06); --glow-c:rgba(0,0,0,.25);
   --card-hi:rgba(255,255,255,.04);
+  --grad-title:linear-gradient(135deg,#ECEFED 0%,#ECEFED 25%,#4ADE80 100%);
 }}
 :root[data-theme="dark"]{
-  --grad-brand:linear-gradient(135deg,#5B73FF 0%,#9A6BFF 55%,#E05AAE 100%);
-  --glow-a:rgba(91,115,255,.20); --glow-b:rgba(255,194,26,.08); --glow-c:rgba(224,90,174,.14);
+  --grad-brand:linear-gradient(135deg,#3A4147 0%,#3A4147 15%,#1E9E5A 60%,#4ADE80 100%);
+  --glow-a:rgba(74,222,128,.12); --glow-b:rgba(255,194,26,.06); --glow-c:rgba(0,0,0,.25);
   --card-hi:rgba(255,255,255,.04);
+  --grad-title:linear-gradient(135deg,#ECEFED 0%,#ECEFED 25%,#4ADE80 100%);
 }
 
 /* Hintergrund: sanfte Farbwolken */
@@ -29,26 +32,26 @@ header.top{background:transparent}
 
 /* Logo und Titel */
 .logo-mark{background:var(--grad-sun);box-shadow:0 4px 14px rgba(255,138,31,.35)}
-.logo h1{background:var(--grad-brand);-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo h1{background:var(--grad-title);-webkit-background-clip:text;background-clip:text;color:transparent}
 
 /* A+ Knopf */
 .zoombtn{background:var(--grad-sun);border:0;box-shadow:0 4px 14px rgba(255,138,31,.35)}
-.zoombtn[aria-pressed="true"]{background:var(--grad-brand);color:#fff;box-shadow:0 4px 14px rgba(122,60,240,.35)}
+.zoombtn[aria-pressed="true"]{background:var(--grad-brand);color:#fff;box-shadow:0 4px 14px rgba(30,122,71,.35)}
 
 /* Umschalter, Tabs, Chips: aktiv = Farbverlauf */
 .seg button[aria-pressed="true"],
 nav.tabs button[aria-selected="true"],
-.chip[aria-pressed="true"]{background:var(--grad-brand);color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(122,60,240,.28)}
+.chip[aria-pressed="true"]{background:var(--grad-brand);color:#fff;border-color:transparent;box-shadow:0 4px 14px rgba(30,122,71,.28)}
 nav.tabs{box-shadow:var(--shadow)}
 .chip{transition:transform .12s,box-shadow .12s}
 .chip:hover{transform:translateY(-1px)}
 
 /* Suche */
-.search{border-color:transparent;box-shadow:0 0 0 1px var(--line),0 8px 24px rgba(53,82,245,.08)}
-.search:focus-within{box-shadow:0 0 0 2px #7A3CF0,0 8px 24px rgba(122,60,240,.18)}
+.search{border-color:transparent;box-shadow:0 0 0 1px var(--line),0 8px 24px rgba(30,122,71,.08)}
+.search:focus-within{box-shadow:0 0 0 2px #1E9E5A,0 8px 24px rgba(30,122,71,.18)}
 
 /* Knöpfe */
-.btn{background:var(--grad-brand);color:#fff;box-shadow:0 4px 14px rgba(122,60,240,.25)}
+.btn{background:var(--grad-brand);color:#fff;box-shadow:0 4px 14px rgba(30,122,71,.25)}
 .btn.ghost{background:var(--surface);color:var(--fg);box-shadow:none}
 .switch[aria-checked="true"]{background:var(--grad-brand)}
 .badge{background:var(--grad-hot)}
@@ -70,6 +73,6 @@ nav.tabs{box-shadow:var(--shadow)}
 .ibtn.add[aria-pressed="true"]{background:var(--grad-brand);color:#fff;border-color:transparent}
 
 /* Fenster (Kracher, Filter, Eintragen) */
-.sheet{background:linear-gradient(180deg,color-mix(in oklab,var(--bg) 85%,#7A3CF0 15%) 0,var(--bg) 160px)}
+.sheet{background:linear-gradient(180deg,color-mix(in oklab,var(--bg) 85%,#1E9E5A 15%) 0,var(--bg) 160px)}
 .sheet-h{background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(8px)}
 .panel,.tip,.hero{box-shadow:var(--shadow)}

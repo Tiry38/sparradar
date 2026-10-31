@@ -1,9 +1,9 @@
 /* Layout: one column app. Sticky header with search + filters, Kracher banner, offer grid with product image tiles and shelf-tag prices, receipt-style shopping list, bottom sheet for the Kracher overview. */
 :root{
-  --bg:#EEF1F7; --surface:#FFFFFF; --surface2:#F5F7FC; --line:#DCE1EE;
-  --fg:#141726; --muted:#5D6482; --accent:#3552F5; --accent-ink:#FFFFFF;
+  --bg:#EFF2F0; --surface:#FFFFFF; --surface2:#F4F6F5; --line:#DCE2DE;
+  --fg:#1C2023; --muted:#5E6A64; --accent:#15803D; --accent-ink:#FFFFFF;
   --tag:#FFD60A; --tag-ink:#141726; --save:#0B8F62; --save-bg:#DDF5EA; --alert:#D93A40; --alert-bg:#FCE4E5;
-  --app:#7A3CF0; --app-bg:#EEE6FE; --receipt:#FFFFFF; --scrim:rgba(14,17,32,.45);
+  --app:#1F7A4A; --app-bg:#E2F3E8; --receipt:#FFFFFF; --scrim:rgba(14,17,32,.45);
   --shadow:0 1px 2px rgba(20,23,38,.06),0 6px 20px rgba(20,23,38,.06);
   --f-display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif;
   --f-body:"Figtree",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -11,17 +11,17 @@
   --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0C0F1D; --surface:#151A2D; --surface2:#1B2138; --line:#283052;
-  --fg:#ECEEF8; --muted:#8F97B8; --accent:#7D93FF; --accent-ink:#0C0F1D;
+  --bg:#16191C; --surface:#1F2327; --surface2:#262B30; --line:#343B41;
+  --fg:#ECEFED; --muted:#98A39D; --accent:#4ADE80; --accent-ink:#0F1A13;
   --tag:#FFD60A; --tag-ink:#141726; --save:#3DDC97; --save-bg:#0F3328; --alert:#FF6B70; --alert-bg:#3A1A22;
-  --app:#B595FF; --app-bg:#2A2150; --receipt:#1B2138; --scrim:rgba(0,0,0,.6);
+  --app:#4ADE80; --app-bg:#15281C; --receipt:#262B30; --scrim:rgba(0,0,0,.6);
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
   color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0C0F1D; --surface:#151A2D; --surface2:#1B2138; --line:#283052;
-  --fg:#ECEEF8; --muted:#8F97B8; --accent:#7D93FF; --accent-ink:#0C0F1D;
+  --bg:#16191C; --surface:#1F2327; --surface2:#262B30; --line:#343B41;
+  --fg:#ECEFED; --muted:#98A39D; --accent:#4ADE80; --accent-ink:#0F1A13;
   --tag:#FFD60A; --tag-ink:#141726; --save:#3DDC97; --save-bg:#0F3328; --alert:#FF6B70; --alert-bg:#3A1A22;
-  --app:#B595FF; --app-bg:#2A2150; --receipt:#1B2138; --scrim:rgba(0,0,0,.6);
+  --app:#4ADE80; --app-bg:#15281C; --receipt:#262B30; --scrim:rgba(0,0,0,.6);
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25);
   color-scheme:dark}
 
