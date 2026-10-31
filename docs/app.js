@@ -355,6 +355,8 @@ function moreArticles(shown){
     return `<div class="mrow"><span>${esc(n)}</span>${on?`<em>✓ auf der Merkliste</em>`:`<button class="btn ghost sm" data-watchname="${esc(n)}">${IC.star}Merken</button>`}</div>`}).join("")}</div></section>`}
 
 // ---------- Detailansicht eines Artikels ----------
+// hochaufgelöste Prospektseite (kaufDA): dort ist auch Kleingedrucktes lesbar
+const pageImg = o => o.bid&&o.pg&&/^[0-9a-f-]{20,}$/i.test(o.bid) ? `https://content-media.bonial.biz/${o.bid}/zoomlarge_page_${+o.pg}.jpg` : "";
 const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
 function renderDetail(){
   const o=byId(S.detail);if(!o)return `<div class="sheet"><div class="sheet-h"><h2>Artikel</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div><div class="empty"><b>Nicht mehr im Angebot</b></div></div>`;
@@ -387,16 +389,18 @@ function renderDetail(){
     <div class="dactions">
      <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>
      <button class="btn ghost" data-fav="${esc(o.id)}">${IC.star}${fav?"Gemerkt":"Merken"}</button>
+     ${pageImg(o)?`<button class="btn ghost" data-zoom="${esc(pageImg(o))}">📄 Prospektseite ${esc(o.pg)} ansehen</button>`:""}
      <a class="btn wa" href="${waLink(share)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a>
      ${link?`<a class="btn ghost" href="${esc(link)}" target="_blank" rel="noopener">Beim Händler ansehen</a>`:""}
     </div>
    </div>
   </div>`}
-function renderLightbox(){const u=S.lightbox;return u?`<div class="lightbox" id="lightbox" role="dialog" aria-label="Bild groß"><img src="${esc(u)}" alt="" referrerpolicy="no-referrer"><button class="ibtn lbclose" id="lbClose" aria-label="Schließen">${IC.x}</button></div>`:""}
+function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");return u?`<div class="lightbox${pg?" pg":""}" id="lightbox" role="dialog" aria-label="Bild groß"><img src="${esc(u)}" alt="" referrerpolicy="no-referrer"${pg?' class="page"':""}><button class="ibtn lbclose" id="lbClose" aria-label="Schließen">${IC.x}</button></div>`:""}
 
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  42:["Detailansicht: „Prospektseite ansehen“ zeigt die ganze Prospektseite gestochen scharf – mit zwei Fingern heranzoomen."],
   41:["Update-Fenster sieht sauber aus, Bilder schärfer."],
   40:["Alle Produktbilder jetzt in voller Auflösung – scharf statt verpixelt.","Grüne Umrandung der Markt-Kacheln nicht mehr abgeschnitten."],
   38:["Neues Logo in Anthrazit und Grün – mit Prozentzeichen."],
@@ -742,7 +746,8 @@ document.addEventListener("click",e=>{
   if(e.target.id==="sheet"){S.sheet=null;render();return}
   if(e.target.id==="exitNo"||e.target.id==="exitAsk"){closeExit(true);return}
   if(e.target.id==="exitYes"){closeExit(false);return}
-  if(e.target.closest("#lightbox")){S.lightbox=null;render();return}
+  // Vollbild: Produktbild schließt bei Tipp, Prospektseite nur über ✕ (dort wird gescrollt und gezoomt)
+  if(e.target.closest("#lbClose")||(e.target.closest("#lightbox")&&!e.target.closest("#lightbox.pg"))){S.lightbox=null;render();return}
   const b=e.target.closest("button");
   if(!e.target.closest(".sugg,#q,#kwIn"))hideSugg();
   // Artikel antippen (nicht auf Knöpfe/Links) = Detailansicht

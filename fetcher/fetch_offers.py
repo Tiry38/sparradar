@@ -148,7 +148,7 @@ def unit_price(text):
 
 
 def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=None, start=None, end=None,
-          app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None, img_large=None, info=None, cats=None, page=None, images=None):
+          app=None, extra=None, src="", url=None, cat_text="", food=True, app_only=None, bonus_only=None, img_large=None, info=None, cats=None, page=None, images=None, brochure=None):
     title = re.sub(r"\s+", " ", (title or "").strip())
     if not title or ((not price or price <= 0) and not bonus_only):
         return None
@@ -184,6 +184,8 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         o["cat"] = cl[:6]         # Kategorien laut Quelle
     if page:
         o["pg"] = page            # Seite im Prospekt
+    if brochure:
+        o["bid"] = brochure       # Prospekt-ID -> hochaufgelöste Prospektseite in der Detailansicht
     if app_only:
         o["ao"] = app_only        # Preis gilt nur mit dieser App/Karte
     if bonus_only:
@@ -412,7 +414,8 @@ def kd_offer(it):
                  src="kaufda.de", cat_text=cat_names + " " + " ".join(it.get("categories") or []), food=food_hint,
                  app_only=app_only, bonus_only=bonus_only, info=it.get("description"),
                  cats=[n.get("name") for p in paths for n in p if isinstance(n, dict)][-3:] + list(it.get("categories") or []),
-                 page=((it.get("parentContent") or {}).get("page") or {}).get("number"))
+                 page=((it.get("parentContent") or {}).get("page") or {}).get("number"),
+                 brochure=(it.get("parentContent") or {}).get("id"))
 
 
 def fetch_kaufda():
@@ -542,7 +545,7 @@ def merge(offers):
             by[k] = o
             continue
         # das vollständigere Angebot behalten, fehlende Felder ergänzen
-        for f in ("b", "o", "gp", "img", "il", "ims", "inf", "cat", "pg", "from", "to", "ap", "ao", "url"):
+        for f in ("b", "o", "gp", "img", "il", "ims", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url"):
             if not cur.get(f) and o.get(f):
                 cur[f] = o[f]
         if o.get("x") and not cur.get("x"):

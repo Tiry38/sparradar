@@ -192,3 +192,6 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 /* Fenster-Kopfzeile: volle Breite, gleiche Farbe wie der Fensterhintergrund (kein abgesetzter Kasten) */
 .sheet-h{margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px));
   background:color-mix(in oklab,var(--bg) 85%,#1E9E5A 15%)!important;backdrop-filter:none!important}
+/* Vollbild: scrollbar und mit zwei Fingern zoombar (für Prospektseiten) */
+.lightbox.pg{overflow:auto;touch-action:pan-x pan-y pinch-zoom;place-items:start center;cursor:default}
+.lightbox img.page{max-height:none;max-width:min(100vw,1100px);width:100%}
