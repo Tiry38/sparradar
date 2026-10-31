@@ -380,7 +380,8 @@ def fetch_kaufda():
     out = []
     pages = list(KD_STORES.values())
     seen_kw = set()
-    for kw in KEYWORDS:
+    # Stichwortseiten (Karlsruhe): wichtig vor allem für Edeka und dm, für die es keine Sortiment-Seiten gibt
+    for kw in KEYWORDS + SORTIMENT:
         k = kw.strip()
         if not k or norm(k) in seen_kw:
             continue
@@ -389,10 +390,16 @@ def fetch_kaufda():
         for a, b in (("Ä", "Ae"), ("Ö", "Oe"), ("Ü", "Ue"), ("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
             slug = slug.replace(a, b)  # kaufDA schreibt Umlaute aus: Käse -> Kaese
         pages.append(f"https://www.kaufda.de/{KD_CITY}/Angebote/{urllib.parse.quote(slug)}")
+    edeka_br = None
     for n, url in enumerate(pages, 1):
-        # Händlerseiten komplett durchblättern, Stichwortseiten (Karlsruhe) nur die erste Seite
         items = kd_items(url)
+        if url not in KD_STORES.values() and edeka_br is None:
+            # Prospekte von Edeka Jockgrim (Edeka Südwest) – nur diese Edeka-Angebote aus Karlsruhe übernehmen
+            edeka_br = {b for b in KD_INFO.get(KD_STORES["edeka"], {}).get("brochures", set()) if b and b != "None"}
         for it in items:
+            if (edeka_br and KD_PUBLISHER.get(it.get("publisherName")) == "edeka"
+                    and str((it.get("parentContent") or {}).get("id")) not in edeka_br):
+                continue  # Edeka-Angebot aus einem anderen Regional-Prospekt
             o = kd_offer(it)
             if o:
                 out.append(o)
