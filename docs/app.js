@@ -59,7 +59,7 @@ const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   manual:store.get("manual",[]),coupons:store.get("coupons",[]),sheet:null,limit:60};
-let OFFERS = [], HIST = {}, META = {};
+let OFFERS = [], HIST = {}, META = {}, NAMES = [];
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
 
@@ -149,8 +149,20 @@ const fin = o => Math.round(steps(o).reduce((a,s)=>a+s.v,0)*100)/100;
 const offPct = o => {const r=ref(o);return r>0?Math.max(0,Math.round((1-fin(o)/r)*100)):0};
 const unit = o => o.gp ? o.gp.v*(fin(o)/o.p) : null;
 const unitTxt = o => o.gp ? `1 ${o.gp.u} = ${eur(unit(o))}` : "";
-const hay = o => norm([o.n,o.b,o.d,CATS[o.c],sname(o.s)].join(" "));
-const matches = (o,k) => hay(o).includes(norm(k));
+// Suche: Artikelname, Marke und Markt. Die Beschreibung nur als Notlösung, der Kategoriename nie
+// (sonst findet „Milch“ alles aus „Milch, Käse & Eier“).
+const hay = o => o._hay ??= norm([o.n,o.b,sname(o.s)].join(" "));
+const hayD = o => o._hayD ??= norm(o.d);
+// genauer Kategoriename (z. B. „Katzenfutter“, „Getränke“) findet die ganze Kategorie
+const matches = (o,k) => hay(o).includes(norm(k)) || norm(CATS[o.c]||"")===norm(k);
+const matchesAll = (o,t) => t.every(x=>matches(o,x));
+// Treffer im Namen als ganzes Wort zuerst, dann im Namen, dann Marke/Markt
+const relevance = (o,t) => {const n=(o.n||"").toLowerCase();return t.reduce((a,x)=>{const w=x.toLowerCase();
+  return a+(new RegExp("(^|[^a-zäöüß])"+w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"([^a-zäöüß]|$)").test(n)?0:norm(o.n).includes(norm(x))?1:2)},0)};
+function searchOffers(list,q){const t=q.trim().split(/\s+/).filter(Boolean);if(!t.length)return list;
+  let r=list.filter(o=>matchesAll(o,t));
+  if(!r.length)r=list.filter(o=>t.every(x=>matches(o,x)||hayD(o).includes(norm(x))));
+  return r}
 const hitW = (o,w) => matches(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
 const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(o.from) : o.to ? "bis "+fmtDate(o.to) : "";
 const tagHTML = v => {v=Math.max(v,0);const e=Math.floor(v+1e-9),c=Math.round((v-e)*100);return `<span class="eu">${e||"-"}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
@@ -173,8 +185,9 @@ function filtered(){
   let r=weekOffers();
   if(S.stores.size)r=r.filter(o=>S.stores.has(o.s));
   if(S.cat)r=r.filter(o=>o.c===S.cat);
-  if(S.q.trim()){const t=S.q.trim().split(/\s+/);r=r.filter(o=>t.every(x=>matches(o,x)))}
-  const f={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>fin(a)-fin(b)}[S.sort];
+  const qt=S.q.trim().split(/\s+/).filter(Boolean);if(qt.length)r=searchOffers(r,S.q);
+  const f0={off:(a,b)=>offPct(b)-offPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>fin(a)-fin(b)}[S.sort];
+  const f=qt.length?(a,b)=>relevance(a,qt)-relevance(b,qt)||f0(a,b):f0;
   return r.sort(f)}
 const score = o => {const v=verdict(o).t;return offPct(o)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().slice().sort((a,b)=>score(b)-score(a));
@@ -183,7 +196,8 @@ const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?
 function manualOffers(){return S.manual.filter(m=>!m.to||m.to>=TODAY).map(m=>({...m,src:"selbst eingetragen",manual:true}))}
 async function load(){
   try{
-    const [o,h]=await Promise.all([fetch("data/offers.json",{cache:"no-store"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({}))]);
+    const [o,h,nm]=await Promise.all([fetch("data/offers.json",{cache:"no-store"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({})),fetch("data/names.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({}))]);
+    NAMES=Object.keys(nm||{});
     META=o;HIST=h;
     OFFERS=o.offers.filter(x=>!x.to||x.to>=TODAY).concat(manualOffers());
     const g=new Date(o.generated);
@@ -214,6 +228,32 @@ function flyerInfo(){
     return `<span>${sb(s)}${esc(sname(s))}: ${f&&t?d(f)+"–"+d(t):t?"bis "+d(t):"laufend"}${nx?` · neu ab ${d(nx)}`:""}</span>`}).join("");
   return {sum,rows}}
 const byId = id => OFFERS.find(o=>o.id===id);
+
+// ---------- Vorschläge beim Tippen (Suche und Merkliste) ----------
+// Gängige Artikel und Marken, damit es auch Vorschläge gibt, wenn gerade nichts davon im Angebot ist
+const BASE_WORDS=("Butter,Milch,H-Milch,Hafermilch,Käse,Gouda,Mozzarella,Feta,Joghurt,Skyr,Quark,Sahne,Schmand,Eier,Margarine,"+
+ "Hackfleisch,Hähnchenbrust,Hähnchenschenkel,Putenbrust,Schweinefilet,Schnitzel,Rindersteak,Bratwurst,Wiener Würstchen,Salami,Schinken,Aufschnitt,Lachs,Thunfisch,Garnelen,Fischstäbchen,"+
+ "Brot,Toastbrot,Brötchen,Croissant,Nudeln,Spaghetti,Reis,Mehl,Zucker,Olivenöl,Sonnenblumenöl,Haferflocken,Müsli,Cornflakes,Marmelade,Honig,Nutella,Ketchup,Mayonnaise,Senf,Tomatensoße,"+
+ "Tomaten,Kartoffeln,Äpfel,Bananen,Gurken,Paprika,Zwiebeln,Knoblauch,Salat,Möhren,Brokkoli,Erdbeeren,Trauben,Mandarinen,Avocado,Zitronen,Pilze,"+
+ "Pizza,Tiefkühlpizza,Pommes,Eis,Tiefkühlgemüse,Schokolade,Chips,Kekse,Gummibärchen,Pralinen,Nüsse,"+
+ "Kaffee,Kaffeebohnen,Kaffeepads,Kaffeekapseln,Tassimo,Dolce Gusto,Senseo,Nespresso,Jacobs,Tchibo,Dallmayr,Lavazza,Melitta,Eduscho,Tee,Kakao,"+
+ "Coca-Cola,Pepsi,Fanta,Sprite,Spezi,Red Bull,Monster,Energy Drink,Mineralwasser,Apfelsaft,Orangensaft,Eistee,Bier,Pils,Radler,Weißwein,Rotwein,Sekt,Prosecco,"+
+ "Milka,Lindt,Ritter Sport,Kinder,Ferrero,Haribo,Lorenz,Pringles,Leibniz,Oreo,Bahlsen,Dr. Oetker,Wagner,Iglo,Frosta,Barilla,Knorr,Maggi,Ehrmann,Müller,Weihenstephan,Landliebe,Kerrygold,Philadelphia,Bärenmarke,Alpro,"+
+ "Katzenfutter,Nassfutter,Trockenfutter,Felix,Sheba,Whiskas,Gourmet,Kitekat,Animonda,Katzensnacks,Katzenstreu,Hundefutter,"+
+ "Duschgel,Shampoo,Spülung,Deo,Zahnpasta,Zahnbürste,Rasierer,Rasierklingen,Gillette,Nivea,Dove,Balea,Toilettenpapier,Küchenrolle,Taschentücher,Feuchttücher,Windeln,Pampers,"+
+ "Waschmittel,Persil,Ariel,Weichspüler,Spülmittel,Spülmaschinentabs,Finish,Putzmittel,Müllbeutel,Batterien").split(",");
+function suggest(q){
+  const k=norm(q);if(k.length<2)return [];
+  const out=[],seen=new Set(),add=t=>{const n=norm(t);if(!n||seen.has(n))return;seen.add(n);out.push(t)};
+  const starts=a=>a.filter(t=>norm(t).startsWith(k)),inside=a=>a.filter(t=>!norm(t).startsWith(k)&&norm(t).includes(k));
+  const live=weekOffers().map(o=>o.b&&!norm(o.n).includes(norm(o.b))?o.b+" "+o.n:o.n);
+  const brands=[...new Set(OFFERS.map(o=>o.b).filter(Boolean))];
+  [starts(BASE_WORDS),starts(brands),starts(live),inside(BASE_WORDS),inside(live),starts(NAMES),inside(NAMES)].forEach(a=>a.forEach(add));
+  const wo=weekOffers();return out.slice(0,8).map(t=>({t,n:searchOffers(wo,t).length}))}
+function suggHTML(q,kind){const list=suggest(q);if(!list.length)return "";
+  return `<div class="sugg" role="listbox" aria-label="Vorschläge">${list.map(x=>`<button type="button" role="option" data-sugg="${kind}" data-v="${esc(x.t)}"><span>${esc(x.t)}</span>${x.n?`<em class="on">${x.n} im Angebot</em>`:`<em>nicht im Angebot</em>`}</button>`).join("")}</div>`}
+function showSugg(id,q,kind){const el=document.getElementById(id);if(el)el.innerHTML=suggHTML(q,kind)}
+const hideSugg=()=>["qSugg","kwSugg"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=""});
 
 // ---------- Ansichten ----------
 function card(o,bestIds){
@@ -313,6 +353,7 @@ function renderWatch(){
   return `<section class="panel"><h3>Was soll ich für dich beobachten?</h3>
     <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt. Die Zahl am Tab „Merkliste“ zeigt dir beim Öffnen, wie viele Treffer gerade im Angebot sind.</p>
     <form class="addrow" id="kwForm"><input id="kwIn" placeholder="z. B. Mozzarella, Felix, Cola" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg (optional)" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
+    <div id="kwSugg"></div>
     <div class="kw">${S.watch.map((w,i)=>{const n=wh[i].hits.length;return `<span class="kwchip">${esc(w.k)}${w.max?`<em>≤ ${eur(w.max)}/kg</em>`:""}<span class="n ${n?"":"zero"}">${n}</span><button data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></span>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
    </section>
    <div class="meta"><h2>Deine Treffer</h2><span>${hits.length} Angebote</span></div>
@@ -447,7 +488,11 @@ document.addEventListener("error",e=>{const t=e.target;if(t.tagName==="IMG"&&t.d
 
 document.addEventListener("click",e=>{
   if(e.target.id==="sheet"){S.sheet=null;render();return}
-  const b=e.target.closest("button");if(!b)return;
+  const b=e.target.closest("button");
+  if(!e.target.closest(".sugg,#q,#kwIn"))hideSugg();
+  if(!b)return;
+  if(b.dataset.sugg==="q"){const v=b.dataset.v;S.q=v;document.getElementById("q").value=v;S.limit=60;hideSugg();S.tab="offers";render();return}
+  if(b.dataset.sugg==="kw"){const v=b.dataset.v;document.getElementById("kwIn").value=v;hideSugg();document.getElementById("kwForm").requestSubmit();return}
   if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
   if(b.id==="wk0"||b.id==="wk1"){S.week=+b.id[2];S.limit=60;render();return}
   if(b.id==="openK"){S.sheet="k";render();return}
@@ -507,7 +552,10 @@ document.addEventListener("submit",e=>{
 });
 // Programm passend zum gewählten Markt vorschlagen
 document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
-document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render()});
+document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render();showSugg("qSugg",S.q,"q")});
+document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.target.value,"q"));
+document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw")});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key==="Enter"&&e.target.id==="q"){hideSugg();e.target.blur()}});
 // Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
 const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];
 function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));document.documentElement.style.zoom=ZOOM[i]>1?ZOOM[i]:"";

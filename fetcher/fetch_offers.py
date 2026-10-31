@@ -371,6 +371,19 @@ def update_history(offers, today):
     save("history.json", hist)
 
 
+def update_names(offers, today):
+    """Artikelnamen für die Vorschläge beim Tippen sammeln (auch wenn sie später nicht mehr im Angebot sind)."""
+    names = load("names.json", {})
+    for o in offers:
+        n, b = o["n"], (o.get("b") or "").strip()
+        text = n if not b or norm(b) in norm(n) else f"{b} {n}"
+        names[text[:80]] = today
+    cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=400)).isoformat()
+    names = {k: v for k, v in names.items() if v >= cutoff}
+    names = dict(sorted(names.items(), key=lambda kv: kv[1], reverse=True)[:6000])
+    save("names.json", names)
+
+
 def main():
     today = dt.date.today().isoformat()
     offers = []
@@ -393,6 +406,7 @@ def main():
     save("offers.json", {"generated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
                          "region": "Wörth am Rhein", "counts": counts, "offers": offers})
     update_history(offers, today)
+    update_names(offers, today)
 
 
 if __name__ == "__main__":

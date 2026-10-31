@@ -72,3 +72,13 @@ header.top,#filters,main{grid-template-columns:minmax(0,1fr)}
 #syncPanel code{font-family:var(--f-mono);font-size:.85em}
 .steps-d summary{cursor:pointer;font-weight:700;color:var(--accent)}
 .steps-d .steps{margin-top:8px}
+/* Vorschläge beim Tippen */
+#qSugg:empty,#kwSugg:empty{display:none}
+.sugg{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+.sugg button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-top:1px solid var(--line);min-width:0}
+.sugg button:first-child{border-top:0}
+.sugg button:hover,.sugg button:focus-visible{background:var(--surface2)}
+.sugg span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.sugg em{flex:none;font-style:normal;font-size:.75rem;color:var(--muted)}
+.sugg em.on{color:#fff;background:var(--grad-save,#0B8F62);border-radius:999px;padding:2px 8px;font-weight:700}
+input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display:none}
