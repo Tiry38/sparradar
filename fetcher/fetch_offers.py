@@ -73,9 +73,9 @@ NF_CATS = [
     ("tier", r"\bhund|katzenstreu|streu\b|vogel|nager|aquarium|tierbedarf|kratzbaum|halsband|\bleine\b"),
     ("baby", r"baby|windel|kinderwagen|schnuller|feuchtt[üu]cher"),
     ("haushalt", r"waschmittel|weichsp[üu]l|reiniger|sp[üu]lmittel|geschirrsp[üu]l|putz|m[üu]llbeutel|frischhaltefolie|alufolie|backpapier|schw[äa]mm|wischmop|batterie|gl[üu]hbirne|leuchtmittel|haushalt"),
+    ("garten", r"garten|pflanze|blume|\berde\b|d[üu]nger|rasen|\bgrill\b|werkzeug|bohr|schrauber|s[äa]ge\b|schrauben|heimwerk|leiter\b|\bauto\b|kfz|fahrrad|e-bike"),
     ("technik", r"elektr|\btv\b|fernseher|laptop|notebook|tablet\b|smartphone|handy|kopfh[öo]rer|lautsprecher|kabel|ladeger|\bakku|powerbank|kamera|drucker|monitor|konsole|playstation|gaming|haartrockner|f[öo]hn\b|mixer|k[üu]chenmaschine|kaffeemaschine|wasserkocher|toaster|fritteuse|hei[ßs]luft|staubsauger|lampe|leuchte|\bled\b"),
     ("mode", r"kleid|hose\b|jacke|mantel|pullover|pulli|shirt|bluse|socke|strumpf|unterw[äa]sche|\bslip|schuh|stiefel|sneaker|m[üu]tze|\bschal\b|handschuh|pyjama|schlafanzug|bekleidung|jeans|leggings|weste\b"),
-    ("garten", r"garten|pflanze|blume|\berde\b|d[üu]nger|rasen|\bgrill\b|werkzeug|bohr|schrauber|s[äa]ge\b|schrauben|heimwerk|leiter\b|\bauto\b|kfz|fahrrad|e-bike"),
     ("wohnen", r"m[öo]bel|glas\b|regal|tisch\b|stuhl|sofa|\bbett|kissen|decke\b|matratze|teppich|handtuch|gardine|vorhang|deko|weihnachtsbaum|kerze|vase|pfanne|\btopf|geschirr|besteck|gl[äa]ser\b|aufbewahrung|adventskalender"),
     ("freizeit", r"spielzeug|spiel\b|spiele\b|lego|puppe|pl[üu]sch|puzzle|sport|fitness|yoga|camping|zelt|koffer|rucksack|\breisen?\b|rundreise|kreuzfahrt|urlaub|\bhotel|netto-reisen|\bbuch\b|b[üu]cher|basteln"),
 ]
