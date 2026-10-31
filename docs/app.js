@@ -61,6 +61,13 @@ const S = {tab:"offers",week:0,q:"",stores:new Set(),cat:null,sort:"off",useApp:
 let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {};
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
+// Einkaufstag: Samstag ab 22 Uhr und sonntags hat kein Markt mehr offen -> die Hauptseite zeigt schon die
+// Angebote ab Montag (Kevins Wunsch). Alles, was Samstag endet, fällt dann weg.
+const shopFrom = (now=new Date()) => {const d=new Date(now);const wd=d.getDay();
+  if(wd===0||(wd===6&&d.getHours()>=22)){d.setDate(d.getDate()+(wd===0?1:2))}
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`};
+const SHOP = shopFrom();
+const WEEKEND = SHOP>TODAY;
 
 // ---------- Helfer ----------
 const eur = v => (v<0?"−":"")+Math.abs(v).toFixed(2).replace(".",",")+" €";
@@ -187,7 +194,7 @@ function watchMatch(o,k){
   return t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&txt.includes(t[0])&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))}
 const hitW = (o,w) => watchMatch(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
 const TOMORROW=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date(Date.now()+864e5));
-const validTxt = o => o.from && o.from>TODAY ? "ab "+fmtDate(shopDay(o.from)) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
+const validTxt = o => o.from && o.from>SHOP ? "ab "+fmtDate(shopDay(o.from)) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
 const tagHTML = v => {v=Math.round(Math.max(v,0)*100);const e=Math.floor(v/100),c=v%100;return `<span class="eu">${e}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
 const comboLabels = o => steps(o).filter(s=>s.t!=="base"&&s.t!=="of").map(s=>s.l);
 function verdict(o){const h=histOf(o);
@@ -204,9 +211,9 @@ function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.lengt
 const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails)$/,"").replace(/\/scaleWidth\/500\//,"/scaleWidth/1000/");
 const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
 // Beschriftung für kommende Angebote: „Nächste Woche“, oder „Ab Donnerstag“, wenn etwas noch diese Woche startet
-function nextLabel(){const nx=OFFERS.filter(o=>o.from&&o.from>TODAY).map(o=>shopDay(o.from)).sort()[0];
+function nextLabel(){const nx=OFFERS.filter(o=>o.from&&o.from>SHOP).map(o=>shopDay(o.from)).sort()[0];
   if(!nx)return "Nächste Woche";
-  const d=new Date(TODAY+"T12:00:00"),mon=new Date(d);mon.setDate(d.getDate()+((8-d.getDay())%7||7));
+  const d=new Date(SHOP+"T12:00:00"),mon=new Date(d);mon.setDate(d.getDate()+((8-d.getDay())%7||7));
   const nextMon=`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,"0")}-${String(mon.getDate()).padStart(2,"0")}`;
   return nx>=nextMon?"Nächste Woche":"Ab "+new Date(nx+"T12:00:00").toLocaleDateString("de-DE",{weekday:"long"})}
 const nextShort = () => {const l=nextLabel();return l==="Nächste Woche"?"nächste Woche":l.replace("Ab","ab")};
@@ -300,7 +307,7 @@ const wasLbl = o => o.o&&o.ou===1&&ref(o)===o.o?"UVP":"statt";
 const dealWarn = o => !!(o.rk&&o.rk.t==="warn");
 // Sortierung: zweifelhafte Rabatte zählen nur mit der realistischen Ersparnis (sonst höchstens 45 %)
 const sortPct = o => dealWarn(o)?(o.rk.real!=null?Math.min(o.rk.real,offPct(o)):Math.min(offPct(o),45)):offPct(o);
-const weekOffers = () => OFFERS.filter(o => S.week ? (o.from && o.from>TODAY) : (!o.from || o.from<=TODAY));
+const weekOffers = () => OFFERS.filter(o => S.week ? (o.from && o.from>SHOP) : (!o.from || o.from<=SHOP));
 function filtered(){
   let r=weekOffers();
   if(S.stores.size)r=r.filter(o=>S.stores.has(o.s));
@@ -315,7 +322,7 @@ function filtered(){
   return r.sort(f)}
 const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o.rk&&o.rk.t==="ok"?3:0)-(o.rk&&o.rk.t==="open"&&o.ou===1?20:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
-const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>TODAY:!o.from||o.from<=TODAY))&&hitW(o,w))}));
+const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>SHOP:!o.from||o.from<=SHOP))&&hitW(o,w))}));
 
 async function load(){
   try{
@@ -323,7 +330,7 @@ async function load(){
     NAMES=Object.keys(nm||{});
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
-    RAW=o.offers.filter(x=>!x.to||x.to>=TODAY);OFFERS=RAW.map(checkDeal);PERK.clear();
+    RAW=o.offers.filter(x=>!x.to||x.to>=SHOP);OFFERS=RAW.map(checkDeal);PERK.clear();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
@@ -346,7 +353,7 @@ function flyerInfo(){
   const wd=x=>new Date(x+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short"}).replace(".","")+" "+d(x);
   // Wochenprospekt = Enddatum in den nächsten 8 Tagen (Dauerangebote bis Jahresende zählen nicht)
   const soon=new Date(Date.now()+8*864e5).toISOString().slice(0,10),week=a=>{const w=a.filter(o=>o.to&&o.to<=soon);return w.length?w:a};
-  const auto=OFFERS,now=auto.filter(o=>!o.from||o.from<=TODAY),next=auto.filter(o=>o.from&&o.from>TODAY);
+  const auto=OFFERS,now=auto.filter(o=>!o.from||o.from<=SHOP),next=auto.filter(o=>o.from&&o.from>SHOP);
   const to=mode(week(now).map(o=>o.to)),nf=next.map(o=>o.from).sort()[0];
   const sum=[to?"Prospekte bis "+wd(to):"",nf?"neue ab "+wd(shopDay(nf)):""].filter(Boolean).join(" · ");
   const rows=Object.keys(STORES).filter(s=>auto.some(o=>o.s===s)).map(s=>{
@@ -443,7 +450,7 @@ function renderOffers(){
   const r=filtered(),bestIds=new Set();
   if((S.q.trim()||S.cat)&&r.length>1){const by={};r.forEach(o=>{if(unit(o)==null)return;const k=o.gp.u;if(!by[k]||unit(o)<unit(by[k]))by[k]=o});Object.values(by).forEach(o=>bestIds.add(o.id))}
   const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
-  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cat?CATS[S.cat]:(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):"Angebote, die jetzt gelten");
+  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cat?CATS[S.cat]:(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):WEEKEND?"Angebote ab Montag":"Angebote, die jetzt gelten");
   const shown=r.slice(0,S.limit);
   return `${kracherBtn()}
    ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
@@ -580,6 +587,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  52:["Samstag ab 22 Uhr und sonntags zeigt die Startseite automatisch schon die Angebote ab Montag – dann hat eh kein Markt mehr offen."],
   51:["Nächste Woche früher: Aldi-Angebote der kommenden Woche kommen jetzt direkt von den Aldi-Tagesseiten, Edeka als „Vorschau“ aus dem regionalen Prospekt, sobald es ihn gibt.","Ein Prospekt-Wächter schaut Do–So alle 2 Stunden nach neuen Prospekten aller Märkte."],
   50:["Vorschläge beim Tippen (Suche und Merkliste) zeigen jetzt kleine Produktbilder."],
   49:["Der Knopf „Demnächst“ heißt jetzt „Nächste Woche“ (bzw. „Ab Donnerstag“, wenn noch diese Woche etwas startet).","Neu: Angebote ohne „statt“-Preis zeigen jetzt ihren Vorteil – blau markiert: günstiger als zuletzt, Großpackung günstiger pro Kilo oder günstigster Markt.","Filter überarbeitet: Kategorien richten sich nur noch nach Artikelname, Marke und Warengruppe, nicht mehr nach der Beschreibung."],
@@ -890,7 +898,7 @@ function closeExit(stay){const el=document.getElementById("exitAsk");if(el)el.hi
 function render(){
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
-  document.getElementById("wk1").textContent=nextLabel();
+  document.getElementById("wk1").textContent=nextLabel();document.getElementById("wk0").textContent=WEEKEND?"Ab Montag":"Jetzt gültig";
   document.getElementById("wk0").setAttribute("aria-pressed",S.week===0);document.getElementById("wk1").setAttribute("aria-pressed",S.week===1);
   const hits=new Set(watchHits(null).flatMap(x=>x.hits.map(o=>o.id))).size;
   const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;
@@ -1049,5 +1057,7 @@ async function freshen(){
   }catch(e){}
 }
 setInterval(freshen,30*60*1000);
+// Samstag 22 Uhr: offene App wechselt von selbst auf die Angebote ab Montag
+setInterval(()=>{if(shopFrom()!==SHOP)location.reload()},60*1000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(freshen.last||0)>5*60*1000){freshen.last=Date.now();freshen()}});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)Sync.pull()});
