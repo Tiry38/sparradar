@@ -12,7 +12,9 @@ import datetime as dt
 import json
 import os
 import re
+import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -559,6 +561,9 @@ def fetch_kaufda():
             o = kd_offer(it)
             if o:
                 out.append(o)
+                collect([o])
+        if n == len(KD_STORES):
+            early_save("kaufDA-Händlerseiten")
         if n % 20 == 0:
             log(f"  kaufDA: {n}/{len(pages)} Seiten")
     more, accepted = fetch_sortiment(regional)
@@ -602,7 +607,11 @@ def same_flyer(items, known, base_ids):
 def fetch_sortiment(regional=None):
     regional = regional or {}
     out, accepted = [], {}
-    for store, slugs in KD_SLUGS.items():
+    # Märkte mit neuem Prospekt (noch nicht in der App) zuerst, damit sie früh gespeichert werden (early_save)
+    have = {o["s"] for o in OLD_OFFERS if (o.get("from") or "") > dt.date.today().isoformat()}
+    order = sorted(KD_SLUGS, key=lambda st: not (KD_INFO.get(KD_STORES.get(st), {}).get("future") and st not in have))
+    for store in order:
+        slugs = KD_SLUGS[store]
         preview = set()
         local = KD_INFO.get(KD_STORES.get(store), {})
         terms = list(dict.fromkeys(SORTIMENT + [l.rstrip("/").split("/")[-1] for l in local.get("links", [])]))
@@ -644,6 +653,8 @@ def fetch_sortiment(regional=None):
                 if store in ("rewe", "edeka") and str((it.get("parentContent") or {}).get("id")) in preview:
                     o["pv"] = 1  # Vorschau aus dem Prospekt der Region, noch nicht vom eigenen Markt bestätigt
                 out.append(o)
+        collect(out[n0:])
+        early_save(f"Sortiment {store}")
         log(f"  Sortiment {store}: {len(out) - n0} Angebote übernommen von {len(found)} gefundenen"
             f" ({'keine Sortiment-Seiten, nur Stichwortseiten' if not slug else str(len(terms)) + ' Begriffe'})")
     return out, accepted
@@ -807,27 +818,99 @@ def update_names(offers, today):
     save("names-img.json", {k: v for k, v in imgs.items() if k in names and isinstance(v, str) and v.startswith("https://")})
 
 
-def main():
+# ---------- Schnell in die App (Kevins Wunsch: neue Angebote so früh wie möglich, nicht erst nach 40 Minuten) ----------
+# Lidl, Aldi und prospektewoche laufen parallel zu kaufDA (andere Server, je Server weiter mit PAUSE).
+# Sobald ein Markt mind. 10 neue künftige Angebote hat, die noch nicht in der App sind, wird ein Zwischenstand
+# (neue + bisherige Angebote) gespeichert und auf GitHub hochgeladen (nur mit SR_EARLY_PUSH=1, also im Workflow).
+OLD_OFFERS = []
+COLLECTED = []
+LOCK = threading.Lock()
+LAST_FUT = {}
+
+
+def collect(items):
+    with LOCK:
+        COLLECTED.extend(items)
+
+
+def finalize(offers):
     today = dt.date.today().isoformat()
-    offers = []
-    for name, fn in (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("kaufDA", fetch_kaufda), ("Rewe-Vorschau", fetch_prospektewoche)):
-        try:
-            offers += fn()
-        except Exception as e:  # eine kaputte Quelle soll die anderen nicht stoppen
-            log(f"  ! {name} fehlgeschlagen: {e!r}")
     offers = drop_previews(merge(offers))
-    # abgelaufene Angebote raus
-    offers = [o for o in offers if not o.get("to") or o["to"] >= today]
+    offers = [o for o in offers if not o.get("to") or o["to"] >= today]  # abgelaufene raus
     offers.sort(key=lambda o: (o["s"], o["c"], o["n"]))
+    return offers
+
+
+def future_counts(offers):
+    today = dt.date.today().isoformat()
+    c = {}
+    for o in offers:
+        if (o.get("from") or "") > today:
+            c[o["s"]] = c.get(o["s"], 0) + 1
+    return c
+
+
+def write_offers(offers):
     counts = {}
     for o in offers:
         counts[o["s"]] = counts.get(o["s"], 0) + 1
-    log("Gesamt:", len(offers), counts)
+    gen = dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes")
+    save("offers.json", {"generated": gen, "region": "Wörth am Rhein", "counts": counts, "offers": offers})
+    save("stand.json", {"generated": gen})  # winzige Datei: daran erkennt die App neue Daten, ohne alles zu laden
+    return counts
+
+
+def early_save(why):
+    if os.environ.get("SR_EARLY_PUSH") != "1" or not OLD_OFFERS:
+        return
+    with LOCK:
+        offers = finalize([dict(o) for o in COLLECTED] + [dict(o) for o in OLD_OFFERS])
+        fut = future_counts(offers)
+        gained = {s: n - LAST_FUT.get(s, 0) for s, n in fut.items() if n - LAST_FUT.get(s, 0) >= 10}
+        if not gained:
+            return
+        write_offers(offers)
+        LAST_FUT.update(fut)
+        log(f"  Zwischenstand nach {why}: neue künftige Angebote {gained} -> sofort in die App")
+        try:
+            for cmd in (["git", "add", "docs/data/offers.json", "docs/data/stand.json"],
+                        ["git", "commit", "-q", "-m", f"Angebote {dt.date.today()} (Zwischenstand: {', '.join(gained)})"],
+                        ["git", "pull", "-q", "--rebase", "--autostash"], ["git", "push", "-q"]):
+                subprocess.run(cmd, cwd=ROOT, check=True, timeout=120)
+        except Exception as e:
+            log("  ! Zwischenstand nicht hochgeladen:", e)
+
+
+def main():
+    today = dt.date.today().isoformat()
+    OLD_OFFERS.extend(load("offers.json", {}).get("offers") or [])
+    LAST_FUT.update(future_counts(OLD_OFFERS))
+    results = {}
+
+    def run(name, fn):
+        try:
+            results[name] = fn()
+        except Exception as e:  # eine kaputte Quelle soll die anderen nicht stoppen
+            log(f"  ! {name} fehlgeschlagen: {e!r}")
+            results[name] = []
+            return
+        if name != "kaufDA":
+            collect(results[name])
+            early_save(name)
+
+    threads = [threading.Thread(target=run, args=a) for a in
+               (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("Rewe-Vorschau", fetch_prospektewoche))]
+    for t in threads:
+        t.start()
+    run("kaufDA", fetch_kaufda)
+    for t in threads:
+        t.join()
+    offers = finalize([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau") for o in results.get(name, [])])
     if len(offers) < 30:
         log("! Zu wenige Angebote, alte Daten bleiben stehen.")
         sys.exit(1)
-    save("offers.json", {"generated": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
-                         "region": "Wörth am Rhein", "counts": counts, "offers": offers})
+    counts = write_offers(offers)
+    log("Gesamt:", len(offers), counts)
     update_history(offers, today)
     update_names(offers, today)
 

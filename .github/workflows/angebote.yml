@@ -25,7 +25,13 @@ jobs:
           python-version: "3.12"
 
       - name: Angebote holen
-        run: python fetcher/fetch_offers.py
+        # SR_EARLY_PUSH: neue Angebote eines Markts sofort als Zwischenstand hochladen, nicht erst am Ende (ca. 40 min)
+        env:
+          SR_EARLY_PUSH: "1"
+        run: |
+          git config user.name "SparRadar Bot"
+          git config user.email "actions@users.noreply.github.com"
+          python fetcher/fetch_offers.py
 
       - name: Sichtbare Prospekte merken (für den Prospekt-Wächter)
         working-directory: fetcher

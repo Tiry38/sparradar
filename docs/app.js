@@ -594,6 +594,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  55:["Neue Angebote kommen jetzt viel schneller in die App: Sobald ein Markt seinen neuen Prospekt veröffentlicht, ist er nach wenigen Minuten drin, statt erst nach dem kompletten Abruf. Die App schaut alle 5 Minuten nach neuen Daten."],
   54:["dm: Fehlt der neue dm-Prospekt, sagt die App das jetzt klar dazu. dm veröffentlicht nichts vorab, dafür schaut der Prospekt-Wächter jetzt jeden Tag nach, damit die neuen dm-Aktionen sofort drin sind."],
   53:["Rewe: Angebote der nächsten Woche als „Vorschau“ aus dem Rewe-Prospekt, sobald er veröffentlicht ist. Kommt der Prospekt deines Markts, ersetzt er die Vorschau sofort.","Einkaufszettel: abgelaufene Angebote verschwinden nicht mehr still, sondern stehen unter „Abgelaufen“ – mit Tausch-Knopf, wenn es den Artikel wieder gibt.","Fehlt ein Markt in der nächsten Woche, steht oben, dass sein Prospekt noch nicht online ist."],
   52:["Samstag ab 22 Uhr und sonntags zeigt die ganze App automatisch schon die Angebote ab Montag – dann hat eh kein Markt mehr offen."],
@@ -1069,12 +1070,12 @@ async function freshen(){
   try{
     const v=(await (await fetch("index.html",{cache:"no-store"})).text()).match(/app\.js\?v=(\d+)/)?.[1];
     if(v&&MYV&&v!==MYV){location.reload();return}
-    const o=await (await fetch("data/offers.json",{cache:"no-store"})).json();
-    if(o.generated!==META.generated)load();
+    const o=await (await fetch("data/stand.json",{cache:"no-store"})).json();  // winzig, statt jedes Mal alle Angebote zu laden
+    if(o.generated&&o.generated!==META.generated)load();
   }catch(e){}
 }
-setInterval(freshen,30*60*1000);
+setInterval(freshen,5*60*1000);
 // Samstag 22 Uhr: offene App wechselt von selbst auf die Angebote ab Montag
 setInterval(()=>{if(shopFrom()!==SHOP)location.reload()},60*1000);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(freshen.last||0)>5*60*1000){freshen.last=Date.now();freshen()}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(freshen.last||0)>60*1000){freshen.last=Date.now();freshen()}});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)Sync.pull()});
