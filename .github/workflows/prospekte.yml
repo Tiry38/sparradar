@@ -1,0 +1,39 @@
+name: Prospekt-Wächter
+
+# Kevins Wunsch: Die Angebote der nächsten Woche sollen so früh wie möglich in der App stehen.
+# Do–So alle 2 Stunden nur kurz auf die Marktseiten schauen (6 Seitenaufrufe). Taucht ein neuer
+# Prospekt mit Startdatum in der Zukunft auf, wird sofort der komplette Abruf „Angebote abrufen“ gestartet.
+on:
+  schedule:
+    - cron: "40 5-21/2 * * 4,5,6,0"   # Do, Fr, Sa, So ca. 6:40–22:40 Uhr (Sommerzeit 7:40–23:40), alle 2 Stunden
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: write   # um „Angebote abrufen“ zu starten
+
+concurrency:
+  group: prospekte
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Neue Prospekte?
+        id: check
+        working-directory: fetcher
+        run: python check_new.py
+
+      - name: Kompletten Abruf starten
+        if: steps.check.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run angebote.yml --ref main

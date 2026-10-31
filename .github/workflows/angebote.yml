@@ -27,6 +27,10 @@ jobs:
       - name: Angebote holen
         run: python fetcher/fetch_offers.py
 
+      - name: Sichtbare Prospekte merken (für den Prospekt-Wächter)
+        working-directory: fetcher
+        run: python check_new.py --save
+
       - name: Daten speichern
         run: |
           git config user.name "SparRadar Bot"
