@@ -298,8 +298,9 @@ const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails
 const LOWPX=320;
 const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}${o.iw&&Math.max(...o.iw)<LOWPX?" lowres":""}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
 // Beschriftung für kommende Angebote: „Nächste Woche“, oder „Ab Donnerstag“, wenn etwas noch diese Woche startet
-function nextLabel(){return "Nächste Woche"}
-const nextShort = () => {const l=nextLabel();return l==="Nächste Woche"?"nächste Woche":l.replace("Ab","ab")};
+// Kevin 01.11.: konkretes Datum statt „Nächste Woche“ (sonntags sonst mit „Ab Montag“ zu verwechseln)
+function nextLabel(){return "Ab "+NEXTMON.slice(8,10)+"."+NEXTMON.slice(5,7)+"."}
+const nextShort = () => nextLabel().replace("Ab","ab");
 // ---------- Vorteil ohne „statt“-Preis ----------
 // Steht im Prospekt kein „statt“-Preis, zeigt SparRadar den Vorteil aus eigenen Daten – klar gekennzeichnet (blau):
 // 1) günstiger als zuletzt im selben Markt  2) Großpackung günstiger pro kg/l  3) günstigster aller Märkte
@@ -616,7 +617,7 @@ function renderOffers(){
   const r=filtered(),bestIds=new Set();
   if((S.q.trim()||S.cats.size)&&r.length>1){const by={};r.forEach(o=>{if(unit(o)==null)return;const k=o.gp.u;if(!by[k]||unit(o)<unit(by[k]))by[k]=o});Object.values(by).forEach(o=>bestIds.add(o.id))}
   const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
-  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):WEEKEND?"Angebote ab Montag":"Angebote dieser Woche");
+  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+nextShort():WEEKEND?"Angebote ab Montag":"Angebote dieser Woche");
   const shown=r.slice(0,S.limit);
   return `${kracherBtn()}
    ${S.q.trim()||S.cats.size?(hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""):weekHTML(hitCount)}
@@ -758,6 +759,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  112:["Der Knopf für die Woche danach zeigt jetzt das Datum, z. B. „Ab 09.11.“ – so ist klar, ab wann diese Angebote gelten."],
   111:["Die Zahlen an den Märkten oben gelten jetzt für die gewählte Woche. Hat ein Markt für nächste Woche noch keinen Prospekt, steht dort „noch nichts“."],
   110:["„Diese Woche“ zeigt jetzt alle Angebote bis Samstag – auch die, die erst ab Donnerstag gelten (mit „ab Do“ auf der Karte). So planst du deinen Einkauf ohne Umschalten. „Nächste Woche“ zeigt alles ab Montag."],
   109:["Oben neben „Stand“ siehst du jetzt, wann SparRadar zuletzt nach neuen Prospekten gesucht hat. „Stand“ ist der letzte komplette Abruf aller Angebote."],
