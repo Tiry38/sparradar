@@ -33,6 +33,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 
 ## Design und Bedienung (Stand 31.10.)
 - **Logo:** weißes Preisschild mit Prozentzeichen auf Farbverlauf Anthrazit -> Grün (`docs/icon.svg`, `icon-maskable.svg`, `logo-tag.svg` für die Logo-Kacheln, PNGs, `og.png`, `og-einladung.png`, Android `ic_launcher_*.xml`). Bei Logo-Änderung alle diese Dateien neu erzeugen und die Windows-Version (Commit in `desktop/`) hochzählen.
+- **PC-Version per E-Mail** (Kevins Wunsch 01.11., Einstellungen → Teilen-Kasten, Abschnitt „💻 Für den PC“): `pcMailLink()` = `mailto:` mit fertigem Text (Einladungslink für Chrome/Edge-Installation + Windows-Setup `EXE_URL` als Alternative), „Link kopieren“ (`pcCopy`). Name aus `inviteName` aktualisiert auch den Mail-Link.
 - **Einladung:** `docs/einladung.html?von=<Name>` (Name nur im Link, nicht im Repo), installiert die Web-App über Chrome (keine APK, keine Warnung). Empfohlener Weg für alle Nutzer.
 - **Detailansicht:** Artikel antippen -> großes Bild, weitere Bilder (`il`, `ims`), Beschreibung (`inf`), Kategorien (`cat`), Prospektseite (`pg`), Preisrechnung, Preisverlauf; Bild antippen = Vollbild.
 - **Zurück-Taste:** History-Einträge (`navSync`) + Schutz-Eintrag; ganz am Ende Frage „wirklich schließen?“ (Android: `SparRadarApp.exitApp()`).

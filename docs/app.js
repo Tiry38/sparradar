@@ -697,6 +697,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  94:["Einstellungen → Teilen: SparRadar für den PC per E-Mail schicken. Am PC die E-Mail öffnen, Link anklicken, installieren – fertig."],
   93:["Geld holen: Feld für die PayPal-E-Mail (manche Aktionen zahlen per PayPal) und Hinweis, wie ausgezahlt wird. Aktionen mit zusätzlichem Gewinnspiel sind mit 🎲 markiert – Mitmachen ist freiwillig."],
   92:["Geld zurück siehst du jetzt überall: 💸-Abzeichen am Angebot, „Mitnehmen“ in der Detailansicht und auf dem Einkaufszettel – ohne extra suchen.","Im Tab „Coupons“ siehst du, wie viel du mit Geld zurück schon geholt hast."],
   91:["Geld zurück jetzt mit „💸 Jetzt Geld holen“: SparRadar führt dich Schritt für Schritt – Bon bereitlegen, Aktionsseite öffnen, Name, E-Mail und IBAN mit einem Tipp kopieren, fertig."],
@@ -1241,6 +1242,11 @@ function renderSync(){
 const inviteUrl = () => { const n=(store.get("inviteName","")||"").trim(); return APP_URL+"einladung.html"+(n?"?von="+encodeURIComponent(n):""); };
 const inviteText = () => { const n=(store.get("inviteName","")||"").trim();
   return `🎁 Persönliche Einladung${n?" von "+n:""}\n\nIch habe dich für SparRadar ausgewählt – meine Spar-App mit allen Angeboten von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth.\n\n👉 So einfach geht's:\n1. Link antippen\n2. „SparRadar installieren“ drücken\n3. Mit „Installieren“ bestätigen – fertig!\n\nKeine Warnung, nichts zu deaktivieren.\n${inviteUrl()}`; };
+// PC-Version per E-Mail: Mail-Programm öffnet sich mit fertigem Text, nur noch Empfänger eintragen
+const EXE_URL="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe";
+const pcMailText=()=>{const n=(store.get("inviteName","")||"").trim();
+  return `Hallo,\n\nhier ist SparRadar für deinen PC – alle Angebote von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth, mit Einkaufszettel und Geld-zurück-Aktionen.\n\nSo geht's am PC:\n1. Diesen Link in Google Chrome oder Microsoft Edge öffnen:\n${inviteUrl()}\n2. Auf „SparRadar installieren“ klicken und bestätigen – fertig.\nSparRadar liegt dann im Startmenü und aktualisiert sich von selbst.\n\nOder als Windows-Programm herunterladen:\n${EXE_URL}\n(Windows zeigt dabei eventuell eine Warnung, weil das Programm neu ist: „Weitere Informationen“ → „Trotzdem ausführen“.)\n\nViele Grüße${n?"\n"+n:""}`};
+const pcMailLink=()=>"mailto:?subject="+encodeURIComponent("SparRadar für deinen PC")+"&body="+encodeURIComponent(pcMailText());
 function renderShare(){
   const n=store.get("inviteName","");
   return `<section class="panel invite" id="sharePanel">
@@ -1249,6 +1255,8 @@ function renderShare(){
    <p>Lade Freunde, Familie oder Bekannte ein. Sie bekommen eine Einladung mit Logo, tippen auf <b>„SparRadar installieren“</b> und haben die App auf dem Startbildschirm – ohne Warnungen, mit automatischen Updates.</p>
    <label class="inv-name">Dein Name auf der Einladung<input id="inviteName" value="${esc(n)}" placeholder="z. B. dein Vorname" maxlength="30" autocomplete="off"></label>
    <div class="links"><a class="btn wa inv-btn" id="inviteWa" href="${waLink(inviteText())}" target="_blank" rel="noopener">${WA_ICON}Einladung per WhatsApp senden</a>${navigator.share?'<button class="btn ghost" id="shareOther">Anders teilen …</button>':""}</div>
+   <div class="pcshare"><h4>💻 Für den PC</h4><p>Schick dir oder anderen SparRadar per E-Mail. Am PC die E-Mail öffnen, auf den Link klicken, „SparRadar installieren“ – fertig.</p>
+    <div class="links"><a class="btn" id="pcMail" href="${pcMailLink()}">✉️ PC-Version per E-Mail senden</a><button class="btn ghost" id="pcCopy">Link kopieren</button></div></div>
   </section>`}
 
 function renderSettings(){
@@ -1257,7 +1265,7 @@ function renderSettings(){
    <div class="sheet-h"><span class="newsico">${IC.gear}</span><h2>Einstellungen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    ${renderShare()}
    ${renderSync()}
-   ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hakst du am Handy den letzten Artikel ab, gilt der Einkauf als erledigt. Hast du für den Markt Coupons fotografiert, kommen sie zuerst groß nacheinander zum Scannen. Danach öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA, ALDI SÜD, Netto, Mein dm), damit du an der Kasse gleich deine Kundenkarte zeigen kannst.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
+   ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hakst du am Handy den letzten Artikel ab, gilt der Einkauf als erledigt. Danach öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA, ALDI SÜD, Netto, Mein dm), damit du an der Kasse gleich deine Kundenkarte zeigen kannst.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
    <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
    <section class="panel"><h3>SparRadar als App</h3><p><b>Am einfachsten:</b> SparRadar in Chrome öffnen → Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. Ohne Warnungen, aktualisiert sich selbst.</p><p>Alternativ als Datei: Android-App (APK, Android fragt dabei nach Erlaubnis) oder Windows-Setup. Beide aktualisieren sich danach ebenfalls selbst.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
@@ -1510,6 +1518,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
   if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
+  if(b.id==="pcCopy"){copy(inviteUrl(),"Link kopiert – am PC in Chrome oder Edge öffnen");return}
   if(b.id==="shareOther"){navigator.share({title:"Persönliche Einladung zu SparRadar",text:inviteText()}).catch(()=>{});return}
   if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){S.watch.push({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
   if(b.dataset.showwelcome){S.sheet="welcome";S._shown=null;render();return}
@@ -1547,7 +1556,7 @@ document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.targ
 document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");
   if(e.target.id==="syncToken"){const cp=codeParse(e.target.value);if(cp.p){store.set("syncPick",cp.p);
     document.querySelectorAll("[data-pick]").forEach(c=>{const on=cp.p[c.dataset.pick];c.classList.toggle("on",on);c.setAttribute("aria-pressed",on);c.textContent=(on?"✓ ":"")+Sync.PARTS[c.dataset.pick].n})}}
-  if(e.target.id==="inviteName"){store.set("inviteName",e.target.value.trim());const a=document.getElementById("inviteWa");if(a)a.href=waLink(inviteText())}});
+  if(e.target.id==="inviteName"){store.set("inviteName",e.target.value.trim());const a=document.getElementById("inviteWa");if(a)a.href=waLink(inviteText());const m=document.getElementById("pcMail");if(m)m.href=pcMailLink()}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key==="Enter"&&e.target.id==="q"){hideSugg();e.target.blur()}});
 // Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
 const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];

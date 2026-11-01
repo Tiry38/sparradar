@@ -465,3 +465,6 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .cbearned{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:linear-gradient(90deg,#2B3034,#1f9d55);color:#fff}
 .cbearned b{font-size:1.1em}
 .cbgw{font-size:.9em;color:var(--muted)}
+.pcshare{margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#e3e6e8)}
+.pcshare h4{margin:0 0 4px}
+.pcshare p{margin:0 0 8px}
