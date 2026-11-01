@@ -485,3 +485,58 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
   #storeChips .mtile em{font-size:.78rem}
   #storeChips .mtile .mtx{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
 }
+/* ---------- Deine Woche (01.11.) ---------- */
+.wkbox{margin:4px 0 14px}
+.wkbox h3{font-family:var(--f-display);font-size:1.05rem;margin:0 0 8px}
+.wkrow{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 2px 6px;margin:0 -2px}
+.wkrow::-webkit-scrollbar{display:none}
+.wk{flex:0 0 auto;width:min(66vw,230px);display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:10px;row-gap:2px;align-items:center;text-align:left;
+  padding:11px 13px;border-radius:16px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer;font:inherit;transition:transform .12s}
+.wk i{grid-row:1/3;font-style:normal;font-size:1.35rem;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--wkc,var(--surface2))}
+.wk b{font-size:.88rem;line-height:1.2}
+.wk small{font-size:.74rem;color:var(--muted);line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;min-width:0}
+.wk i{align-self:start}
+.wk-w{--wkc:color-mix(in oklab,#F2B705 22%,transparent)}
+.wk-c{--wkc:color-mix(in oklab,#F08A24 24%,transparent)}
+.wk-l{--wkc:color-mix(in oklab,#1E9E5A 20%,transparent)}
+.wk-p{--wkc:color-mix(in oklab,#3B6FD9 20%,transparent)}
+@media (hover:hover) and (pointer:fine){.wkrow{flex-wrap:wrap;overflow:visible}.wk{flex:1 1 220px;width:auto;max-width:340px}.wk:hover{transform:translateY(-2px)}}
+/* Preis-Alarm */
+.alarm{display:flex;align-items:center;gap:6px;font-size:.76rem;font-weight:800;color:#2459C7;background:color-mix(in oklab,#3B6FD9 13%,transparent);border-radius:9px;padding:5px 8px;width:fit-content;max-width:100%}
+.alarm.big{font-size:.86rem;font-weight:600;padding:10px 12px;border-radius:12px;margin:0 0 8px;width:auto}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .alarm{color:#9DBBFF}}
+:root[data-theme="dark"] .alarm{color:#9DBBFF}
+/* Markt-Farbe als feiner Streifen oben an jeder Karte */
+.grid>.card .thumb{border-top:3px solid var(--sc,transparent)}
+/* Zettel: Laufweg + Günstiger einkaufen */
+.raisle{font-size:.66rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:10px 0 2px;font-family:var(--f-body)}
+.rgroup .rs+.raisle{margin-top:4px}
+.plan h4{margin:12px 0 2px;font-size:.92rem}
+.plan .ph{margin:0 0 6px;font-size:.8rem;color:var(--muted)}
+.plan .btn.sm{margin-top:8px}
+/* Handy: 2 Karten nebeneinander, größere Bilder (bei großer Schrift wieder 1 Spalte) */
+@media (max-width:559px){
+  html:not(.zoomed) .grid{grid-template-columns:1fr 1fr;gap:9px}
+  html:not(.zoomed) .grid>.card{border-radius:15px}
+  html:not(.zoomed) .grid>.card .thumb{aspect-ratio:1/1}
+  html:not(.zoomed) .grid>.card .body{padding:9px 10px 10px;gap:6px}
+  html:not(.zoomed) .grid>.card .store{font-size:.6rem;letter-spacing:.04em;gap:3px 4px;flex-wrap:wrap;overflow-wrap:anywhere}
+  html:not(.zoomed) .grid>.card .pvtag{font-size:.58rem}
+  html:not(.zoomed) .grid>.card .name{font-size:.88rem}
+  html:not(.zoomed) .grid>.card .name small{font-size:.72rem;-webkit-line-clamp:2;line-clamp:2}
+  html:not(.zoomed) .grid>.card .tag .eu{font-size:1.85rem}
+  html:not(.zoomed) .grid>.card .pricerow{gap:4px 8px}
+  html:not(.zoomed) .grid>.card .was{text-align:left;font-size:.72rem}
+  html:not(.zoomed) .grid>.card .hist{font-size:.68rem;gap:4px}
+  html:not(.zoomed) .grid>.card .hist svg{display:none}
+  html:not(.zoomed) .grid>.card .alarm{font-size:.66rem;padding:4px 6px}
+  html:not(.zoomed) .grid>.card .combo{font-size:.7rem;padding:6px 8px}
+  html:not(.zoomed) .grid>.card .card-foot{flex-wrap:wrap;gap:6px;padding-top:8px}
+  html:not(.zoomed) .grid>.card .valid{flex:1 0 100%;font-size:.68rem}
+  html:not(.zoomed) .grid>.card .ibtn{width:34px;height:34px}
+  html:not(.zoomed) .grid>.card .qstep.cq button{width:26px;height:30px}
+  html:not(.zoomed) .grid>.card .card-foot{column-gap:5px}
+  html:not(.zoomed) .grid>.card .thumb .apptag,html:not(.zoomed) .grid>.card .thumb .cbtag{font-size:.62rem;padding:3px 6px}
+  html:not(.zoomed) .grid>.card .thumb .off{font-size:.78rem}
+  html:not(.zoomed) .grid>.card .aonly{font-size:.68rem}
+}

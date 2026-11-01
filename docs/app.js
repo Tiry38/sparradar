@@ -191,6 +191,17 @@ const Sync = {
 
 function histOf(o){const rows=HIST[o.s+"|"+norm(o.n).slice(0,40)]||[];return rows.filter(r=>r[0]<(o.from||TODAY)).map(r=>r[1])}
 // Referenzpreis für "Ersparnis": statt-Preis, sonst Durchschnitt aus dem Verlauf, sonst Angebotspreis
+// Preis-Alarm: so günstig wie seit Wochen nicht (aus dem SparRadar-Preisverlauf desselben Markts).
+// Zählt erst, wenn der Verlauf mind. 3 Wochen zurückreicht – sonst wäre „Tiefstpreis“ nach 2 Tagen Beobachtung wertlos.
+function lowSince(o){if(!o.p||o.bo)return null;const k=o.s+"|"+norm(o.n).slice(0,40),from=o.from||TODAY;
+  const rows=(HIST[k]||[]).filter(r=>r[0]<from);if(rows.length<3)return null;
+  const cheaper=rows.filter(r=>r[1]<=o.p+.004).map(r=>r[0]).sort().pop();
+  const start=cheaper?rows.filter(r=>r[0]>cheaper).map(r=>r[0]).sort()[0]:rows.map(r=>r[0]).sort()[0];
+  if(!start)return null;const days=Math.round((new Date(from+"T12:00:00")-new Date(start+"T12:00:00"))/864e5);
+  if(days<21)return null;
+  const txt=days>=60?`seit ${Math.floor(days/30)} Monaten`:`seit ${Math.floor(days/7)} Wochen`;
+  return {days,never:!cheaper,s:(cheaper?"So günstig wie zuletzt vor ":"Tiefstpreis ")+(cheaper?txt.replace("seit ",""):txt),
+    l:cheaper?`So günstig gab es diesen Artikel bei ${sname(o.s)} ${txt} nicht mehr.`:`Bei ${sname(o.s)} so günstig wie noch nie, ${txt} beobachtet.`}}
 function ref(o){if(o.o)return o.o;const h=histOf(o);return h.length>=3?Math.max(o.p,h.reduce((a,b)=>a+b,0)/h.length):o.p}
 function steps(o){if(!o.p)return [{l:"Bonus-Aktion",v:0,t:"base"}]; // Rewe-Bonus ohne Preis im Prospekt
   const st=[{l:o.o?"Normalpreis":"Angebotspreis",v:o.o||o.p,t:"base"}];
@@ -241,16 +252,22 @@ function searchOffers(list,q){const t=q.trim().split(/\s+/).filter(Boolean);if(!
 // 2) Prospekt bietet „versch. Sorten“ an: dann reicht die Marke/Produktlinie (erstes Wort),
 //    z. B. gemerkt „Tassimo Morning Café XL“, Angebot „Jacobs Tassimo, versch. Sorten“
 const WATCH_FILL=/^(\d.*|g|kg|ml|l|cl|x|xl|xxl|st|stk|stueck|pack|packung|bigpack|big|cups?|portionen|kapseln|und|mit|fuer|der|die|das|von)$/;
+const WATCH_FORM=/^(bohnen|bohne|pads|pad|kapseln|kapsel|pulver|sticks|tabs|beutel|packung|flasche|flaschen|dose|dosen|becher|glas|riegel|tafel|tafeln|scheiben|stuecke|stueck|filet|filets|brust|keule|keulen|aufschnitt|portionen|mix|sorten|spezialitaet|klassiker|block|wuerfel|fl|pack)$/;
 const WATCH_WEAK=new Set(["bio","gut","ja","mini","frisch","frische","original","classic","klassik","deluxe","premium","neu","extra"]);
 const wTokens = k => (k.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(t=>t.length>1&&!WATCH_FILL.test(t));
 // Wörter einzeln vergleichen (nie über Wortgrenzen hinweg: „Prodomo Rewe“ enthält sonst „more“)
 const toks = t => [...new Set(t.toLowerCase().match(/[a-zäöüß0-9]+/g)||[])].map(norm).filter(Boolean);
-const oWords = o => o._ow ??= toks(`${o.b||""} ${o.n} ${sname(o.s)}`);
+// Bindestrich-Wörter: nur der letzte Teil sagt, was es ist („Butter-Spekulatius“ = Spekulatius, „H-Milch“ = Milch) + das ganze Wort zusammen
+const hyph = t => t.replace(/[a-zäöüß0-9]+(?:-[a-zäöüß0-9]+)+/gi,m=>{const p=m.split("-");return p.at(-1)+" "+p.join("")});
+const oWords = o => o._ow ??= toks(`${o.b||""} ${hyph(o.n)} ${sname(o.s)}`);
 const oWordsD = o => o._owd ??= toks(dClean(o));
 function watchMatch(o,k){
   if(norm(CATS[o.c]||"")===norm(k))return true;
   const t=wTokens(k);if(!t.length)return false;
-  const w=oWords(o),wd=oWordsD(o),inW=x=>w.some(v=>{const i=v.indexOf(x);if(i<0)return false;const r=v.slice(i+x.length);return /^(|e|n|en|s|es|er|ern|ns)$/.test(r)||r.length>=4}) // zusammengesetzte Wörter und Mehrzahl zählen (Bohnenkaffee, Kaffeebohnen, Weißbiere), Milkana ist aber nicht Milka
+  const w=oWords(o),wd=oWordsD(o),inW=x=>w.some(v=>{const i=v.indexOf(x);if(i<0)return false;const r=v.slice(i+x.length);
+    if(/^(|e|n|en|s|es|er|ern|ns)$/.test(r))return !(i>0&&/(leber|fleisch)kaese/.test(v)); // Leberkäse ist kein Käse // Mehrzahl und hinten im Wort (Weißbiere, Bohnenkaffee): der letzte Wortteil sagt, was es ist
+    // vorne im Wort nur mit „Form“-Endung (Kaffeebohnen, Kaffeepads) – Buttermilch ist keine Butter, Kaffeevollautomat kein Kaffee
+    return r.length>=3&&WATCH_FORM.test(r)&&!NONFOOD_CATS.includes(o.c)}) // Milkana ist auch nicht Milka
     ||wd.some(v=>v.startsWith(x)&&/^(|e|n|en|s|es|er|ern|ns)$/.test(v.slice(x.length))); // Beschreibung: nur ganzes Wort/Mehrzahl, keine Wortteile
   if(t.every(inW))return true;
   // „versch. Sorten“: Marke/Produktlinie reicht – aber nur als ganzes Wort oder Wortanfang, mind. 4 Buchstaben
@@ -401,7 +418,7 @@ const fltOk=o=>{const F=S.flt;
   if(F.real&&(!(o.o>0)||dealWarn(o)||offPct(o)<=0))return false;
   if(F.noapp&&(o.ap||o.ao||(o.x||[]).length))return false;
   if(F.app&&!appName(o))return false;
-  if(F.low&&verdict(o).t!=="low")return false;
+  if(F.low&&verdict(o).t!=="low"&&!lowSince(o))return false;
   return true};
 const fltCount=()=>Object.values(S.flt).filter(Boolean).length;
 const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis"};
@@ -529,20 +546,36 @@ function card(o,bestIds){
   const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o);
   // App-Preis direkt beim Preis: „Lidl Plus App-Preis 1,49 €“; mehrere Vorteile zusammen = „Mit Kombi“
   const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} ${cl.length===1?esc(cl[0]):"Mit Kombi"}<b>${eur(fin(o))}</b></div>${cl.length>1?`<div class="src">${cl.map(esc).join(" + ")}</div>`:""}</div>`:"";
-  return `<article class="card" data-detail="${esc(o.id)}" tabindex="0" aria-label="${esc(o.n)}: Details anzeigen">${thumb(o)}
+  const ls=lowSince(o);
+  return `<article class="card" data-detail="${esc(o.id)}" tabindex="0" aria-label="${esc(o.n)}: Details anzeigen" style="--sc:${(STORES[o.s]||{}).c||"#6B7280"}">${thumb(o)}
    <div class="body">
    <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}${o.pv?' <em class="pvtag" title="Vorschau – der Prospekt deines Markts ist noch nicht online">Vorschau</em>':""}</span>
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
      <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
-   <div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>
+   ${ls?`<div class="alarm" title="${esc(ls.l)}">📉 ${esc(ls.s)}</div>`:`<div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>`}
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}">${validTxt(o)}</span>
      <button class="ibtn" data-fav="${esc(o.id)}" aria-pressed="${fav}" aria-label="${fav?"Von Merkliste entfernen":"Auf Merkliste setzen"}" title="Merken">${IC.star}</button>
      ${inL?qStep(o.id):""}<button class="ibtn add" data-add="${esc(o.id)}" aria-pressed="${inL}" aria-label="${inL?"Vom Einkaufszettel nehmen":"Auf den Einkaufszettel"}" title="Einkaufszettel">${inL?IC.check:IC.plus}</button></div>
    </div></article>`}
 
+// „Deine Woche“: alles Wichtige auf einen Blick, jede Kachel führt direkt hin. Nur Kacheln mit Inhalt.
+function weekHTML(hitCount){const t=[];
+  if(hitCount){const ks=watchHits(S.week).filter(x=>x.hits.length).map(x=>x.w.k).slice(0,2);
+    t.push(`<button class="wk wk-w" id="goWatch"><i>⭐</i><b>${hitCount} Merklisten-Treffer</b><small>${esc(ks.join(", "))}${ks.length<watchHits(S.week).filter(x=>x.hits.length).length?" …":""}</small></button>`)}
+  const due=cbDue().length;
+  if(due)t.push(`<button class="wk wk-c" data-go="tips"><i>💸</i><b>${due} ${due===1?"Bon":"Bons"} einreichen</b><small>Geld zurück vom Hersteller holen</small></button>`);
+  const items=S.list.map(byId).filter(Boolean).filter(o=>!S.checked.includes(o.id)),nx=S.extra.filter(x=>!S.checked.includes(x.id)).length;
+  if(items.length+nx){const pl=planOf(items),sv=pl?pl.save:0;
+    t.push(`<button class="wk wk-l" data-go="list"><i>🛒</i><b>${items.length+nx} Artikel auf dem Zettel</b><small>${eur(items.reduce((a,o)=>a+lineP(o),0))}${sv>=.5?` · ${eur(sv)} günstiger möglich`:""}</small></button>`)}
+  const low=weekOffers().filter(o=>lowSince(o)).length;
+  if(low)t.push(`<button class="wk wk-p" data-golow="1"><i>📉</i><b>${low} ${low===1?"Preis-Alarm":"Preis-Alarme"}</b><small>so günstig wie seit Wochen nicht</small></button>`);
+  const cbn=weekOffers().filter(o=>cbFor(o)).length;
+  if(cbn&&!due)t.push(`<button class="wk wk-c" data-go="tips"><i>💸</i><b>${cbn} mit Geld zurück</b><small>Hersteller zahlt dir etwas zurück</small></button>`);
+  if(!t.length)return "";
+  return `<section class="wkbox" aria-label="Deine Woche"><h3>Deine Woche</h3><div class="wkrow">${t.join("")}</div></section>`}
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
   return `<button class="kracher" id="openK" aria-label="Kracher öffnen">
    <span class="boom">${IC.flame}</span>
@@ -566,7 +599,7 @@ function renderOffers(){
   const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):WEEKEND?"Angebote ab Montag":"Angebote, die jetzt gelten");
   const shown=r.slice(0,S.limit);
   return `${kracherBtn()}
-   ${hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""}
+   ${S.q.trim()||S.cats.size?(hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""):weekHTML(hitCount)}
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${missingHTML()}
    ${fltCount()?`<p class="catoff fact">Filter aktiv: <b>${fltSummary().map(esc).join(" · ")}</b> <button class="linkbtn" data-fclear="1">Filter aus</button></p>`:""}
@@ -690,6 +723,7 @@ function renderDetail(){
      <dt>Quelle</dt><dd>${esc(o.src||"")}</dd>
     </dl>
     ${o.inf?`<div class="dtext"><h4>Beschreibung</h4><p>${esc(o.inf)}</p></div>`:""}
+    ${lowSince(o)?`<div class="alarm big">📉 <span><b>Preis-Alarm:</b> ${esc(lowSince(o).l)}</span></div>`:""}
     <div class="verdict ${vd.t}">${spark(o,90,24)}<span>${esc(vd.l)}</span></div>
     ${hist.length?`<div class="dtext"><h4>Preisverlauf</h4><ul class="dhist">${hist.map(([d,p])=>`<li><span>${fmtDate(d)}</span><b>${eur(p)}</b></li>`).join("")}</ul></div>`:""}
     <div class="dactions">
@@ -704,6 +738,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  98:["Neu oben bei den Angeboten: „Deine Woche“ – Merklisten-Treffer, Zettel, Geld-zurück-Bons und Preis-Alarme auf einen Blick.","Einkaufszettel sortiert nach dem Weg durch den Markt: Obst zuerst, Tiefkühl zuletzt.","„Günstiger einkaufen“ zeigt, was du ohne Umweg sparst und ob sich ein Abstecher zu einem anderen Markt lohnt – mit einem Tipp alles tauschen.","📉 Preis-Alarm: so günstig wie seit Wochen nicht (erscheint, sobald genug Preisverlauf da ist).","Am Handy 2 Angebote nebeneinander mit größeren Bildern, jede Karte mit der Farbe ihres Markts.","Merkliste genauer: „Butter“ meldet keine Buttermilch und keinen Butter-Spekulatius mehr, „Kaffee“ keinen Kaffeevollautomaten, „Käse“ keinen Leberkäse."],
   97:["Merkliste und Filter „Bio“/„Vegan“ lesen keine Werbetexte mehr mit: „ideal zu Bratkartoffeln“ meldet keine Gurkensülze mehr, wenn du dir Kartoffeln merkst."],
   96:["Am PC verteilen sich die Markt-Kacheln jetzt über die ganze Breite.","Artikel landen in der richtigen Kategorie: Katzenfutter-Kroketten nicht mehr bei Tiefkühl, Spielzeug nicht mehr bei Garten, Pflanzen nicht mehr bei Vorrat und vieles mehr.","Die Vorschau auf nächste Woche bei Rewe und Edeka bleibt jetzt drin, bis der echte Prospekt vollständig da ist."],
   95:["SparRadar startet schneller: Angebote werden nur noch neu geladen, wenn sich wirklich etwas geändert hat."],
@@ -903,13 +938,27 @@ function renderSaved(){const sv=savedOn().slice().sort((a,b)=>b.d.localeCompare(
    ${sv.length?days.map(d=>`<h4 class="svd">${fmtDate(d)}</h4>${sv.map((x,i)=>[x,S.saved.indexOf(x)]).filter(([x])=>x.d===d).map(([x,i])=>`<div class="svrow"><span>${sb(x.s)}${esc(x.n)}</span><b class="sv">${eur(x.v)}</b><button class="ibtn" data-saveddel="${i}" aria-label="${esc(x.n)} löschen">${IC.x}</button></div>`).join("")}`).join(""):`<p>Nichts mehr drin.</p>`}
    ${sv.length?`<div class="factions" style="grid-template-columns:1fr"><button class="btn ghost" data-savedreset="1">Alles auf 0 setzen</button></div>`:""}
   </div>`}
-// Gleicher Artikel woanders günstiger (gleiche Menge)? -> Tausch vorschlagen
-function swapTips(items){
-  const t=items.filter(o=>!S.checked.includes(o.id)).map(o=>{const c=sameElsewhere(o,weekOffers()).filter(r=>Math.abs(r.f-1)<.05&&!S.list.includes(r.x.id)).sort((a,b)=>fin(a.x)-fin(b.x))[0];
-    return c&&fin(c.x)<fin(o)-.04?{o,x:c.x}:null}).filter(Boolean);
-  if(!t.length)return "";
-  return `<section class="panel swaps"><h3>Woanders günstiger</h3><p>Derselbe Artikel in gleicher Menge kostet bei einem anderen Markt weniger.</p>
-   <div class="rows">${t.map(({o,x})=>`<div class="swap"><span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} ${eur(fin(o))} → ${esc(sname(x.s))} ${eur(fin(x))} · ${eur(fin(o)-fin(x))} weniger</small></span><button class="btn ghost sm" data-swap="${esc(o.id)}|${esc(x.id)}">Tauschen</button></div>`).join("")}</div></section>`}
+const AISLE={obst:0,brot:1,fleisch:2,kuehl:3,vorrat:4,kaffee:5,suess:6,getraenke:7,drogerie:8,baby:8,haushalt:9,katze:10,tier:10,wohnen:11,technik:11,mode:11,garten:11,freizeit:11,sonstiges:11,tk:12};
+const AISLE_N=["Obst & Gemüse","Brot & Backwaren","Fleisch & Fisch","Kühlregal","Vorrat","Kaffee & Tee","Süßes & Snacks","Getränke","Drogerie & Baby","Haushalt","Tierfutter","Aktionsware","Tiefkühl (zuletzt, bleibt kalt)"];
+// Günstigster Einkauf: Für jeden offenen Artikel derselbe Artikel (gleiche Menge) bei anderen Märkten.
+// a) ohne Umweg: billiger bei einem Markt, zu dem du sowieso gehst  b) mit Abstecher: der eine Markt, der zusätzlich am meisten spart
+function planOf(items){items=items.filter(o=>!S.checked.includes(o.id));if(!items.length)return null;
+  const mine=new Set(items.map(o=>o.s)),wo=weekOffers(),opt=items.map(o=>({o,alt:sameElsewhere(o,wo).filter(r=>Math.abs(r.f-1)<.05&&!S.list.includes(r.x.id)).map(r=>r.x)}));
+  const best=(o,alt)=>alt.filter(x=>fin(x)<fin(o)-.04).sort((a,b)=>fin(a)-fin(b))[0];
+  const free=opt.map(({o,alt})=>({o,x:best(o,alt.filter(x=>mine.has(x.s)))})).filter(r=>r.x);
+  const freeIds=new Set(free.map(r=>r.o.id)),by={};
+  opt.forEach(({o,alt})=>{if(freeIds.has(o.id))return;alt.filter(x=>!mine.has(x.s)&&fin(x)<fin(o)-.04).forEach(x=>{const b=by[x.s]=by[x.s]||[];const e=b.find(r=>r.o===o);if(!e)b.push({o,x});else if(fin(x)<fin(e.x))e.x=x})});
+  const sv=rs=>r2(rs.reduce((a,r)=>a+(fin(r.o)-fin(r.x))*qty(r.o.id),0));
+  const det=Object.entries(by).map(([s,rs])=>({s,rs,v:sv(rs)})).sort((a,b)=>b.v-a.v)[0];
+  const extra=det&&det.v>=2?det:null;  // Abstecher lohnt erst ab 2 €
+  return {free,freeV:sv(free),extra,save:r2(sv(free)+(extra?extra.v:0))}}
+function planHTML(items){const p=planOf(items);if(!p||(!p.free.length&&!p.extra))return "";
+  const row=({o,x})=>`<div class="swap"><span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} ${eur(fin(o))} → ${esc(sname(x.s))} ${eur(fin(x))} · ${eur(fin(o)-fin(x))} weniger${qty(o.id)>1?" je Stück":""}</small></span><button class="btn ghost sm" data-swap="${esc(o.id)}|${esc(x.id)}">Tauschen</button></div>`;
+  const all=rs=>rs.map(r=>r.o.id+"|"+r.x.id).join(",");
+  return `<section class="panel swaps plan"><h3>💡 Günstiger einkaufen</h3><p>Derselbe Artikel in gleicher Menge kostet bei einem anderen Markt weniger.</p>
+   ${p.free.length?`<h4>Ohne Umweg: ${eur(p.freeV)} sparen</h4><p class="ph">Bei Märkten, zu denen du sowieso gehst.</p><div class="rows">${p.free.map(row).join("")}</div>${p.free.length>1?`<button class="btn sm" data-swapall="${esc(all(p.free))}">Alle ${p.free.length} tauschen (${eur(p.freeV)} sparen)</button>`:""}`:""}
+   ${p.extra?`<h4>Mit Abstecher zu ${esc(sname(p.extra.s))}: noch ${eur(p.extra.v)} sparen</h4><p class="ph">Lohnt sich, wenn ${esc(sname(p.extra.s))} auf deinem Weg liegt.</p><div class="rows">${p.extra.rs.map(row).join("")}</div>${p.extra.rs.length>1?`<button class="btn ghost sm" data-swapall="${esc(all(p.extra.rs))}">Alle ${p.extra.rs.length} zu ${esc(sname(p.extra.s))} (${eur(p.extra.v)} sparen)</button>`:""}`:""}
+  </section>`}
 // Zettel-Einträge, deren Angebot abgelaufen ist: nicht still verschwinden lassen, sondern zeigen + neues Angebot vorschlagen
 function goneHTML(){const g=S.list.filter(id=>!byId(id)&&OLD.has(id)).map(id=>OLD.get(id));if(!g.length)return "";
   const wo=weekOffers().filter(x=>!S.list.includes(x.id));
@@ -1074,6 +1123,11 @@ function renderList(){
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const done=id=>S.checked.includes(id);
   const sortDone=a=>[...a.filter(x=>!done(x.id)),...a.filter(x=>done(x.id))];  // was im Wagen liegt, rutscht nach unten
+  // Laufweg im Markt: Obst & Gemüse vorne, Tiefkühl zuletzt (bleibt kalt), Non-Food dazwischen wie in den meisten Märkten
+  const aisle=o=>AISLE[o.c]??AISLE.sonstiges,walk=a=>a.slice().sort((x,y)=>aisle(x)-aisle(y));
+  const walkLines=os=>{let last=-1;const open=walk(os.filter(o=>!done(o.id)));
+    return open.map(o=>{const a=aisle(o),h=os.length>3&&a!==last?`<div class="raisle">${esc(AISLE_N[a])}</div>`:"";last=a;return h+line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")}).join("")
+      +os.filter(o=>done(o.id)).map(o=>line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")).join("")};
   const sum=items.reduce((a,o)=>a+lineP(o),0)+extra.reduce((a,x)=>a+extraP(x),0),reg=items.reduce((a,o)=>a+lineR(o),0)+extra.reduce((a,x)=>a+extraP(x),0);
   const rest=items.filter(o=>!done(o.id)).reduce((a,o)=>a+lineP(o),0)+extra.filter(x=>!done(x.id)).reduce((a,x)=>a+extraP(x),0);
   const todo=[...new Set(items.flatMap(comboLabels))];
@@ -1084,9 +1138,9 @@ function renderList(){
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i><span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
-  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${cbListTips(items)}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}</div>
+  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
-     ${sortDone(os).map(o=>line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")).join("")}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
+     ${walkLines(os)}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
    ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"")).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
@@ -1497,12 +1551,15 @@ document.addEventListener("click",e=>{
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
-  if(b.id==="goWatch"){S.tab="watch";render();return}
+  if(b.id==="goWatch"){S.tab="watch";render();scrollTo({top:0});return}
+  if(b.dataset.go){S.tab=b.dataset.go;render();scrollTo({top:0});return}
+  if(b.dataset.golow){S.flt.low=1;store.set("flt",S.flt);S.limit=60;render();document.querySelector(".meta")?.scrollIntoView({block:"start"});toast("Filter: nur Preis-Alarme und Tiefstpreise");return}
+  if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
   if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
   if(b.id==="scanBtn"){Scan.last="";Scan.res="";S.sheet="scan";render();return}
-  if(b.dataset.swap){const [a,c]=b.dataset.swap.split("|"),i=S.list.indexOf(a);if(i>=0)S.list[i]=c;const n=byId(c);save();toast(n?`Getauscht: jetzt bei ${sname(n.s)}`:"Getauscht");render();return}
+  if(b.dataset.swap){const [a,c]=b.dataset.swap.split("|"),i=S.list.indexOf(a);if(i>=0)S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}const n=byId(c);save();toast(n?`Getauscht: jetzt bei ${sname(n.s)}`:"Getauscht");render();return}
   if(b.dataset.check){const id=b.dataset.check,i=S.checked.indexOf(id);
     if(i>=0){S.checked.splice(i,1);const j=S.saved.map(x=>x.off?null:x.id).lastIndexOf(id);if(j>=0)S.saved.splice(j,1)}
     else{S.checked.push(id);try{if(TOUCH())navigator.vibrate?.(15)}catch(e){}wakeOn();
@@ -1579,7 +1636,7 @@ function pinTabs(){const desk=matchMedia("(min-width:721px)").matches,was=TABS.c
   if(pin!==was)TABS.classList.toggle("pinned",pin)}
 addEventListener("scroll",pinTabs,{passive:true});function repin(){TABS.classList.remove("pinned");TABS_PH.style.display="";TABS.style.left=TABS.style.width="";pinTabs()}
 addEventListener("resize",repin);
-function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));document.documentElement.style.zoom=ZOOM[i]>1?ZOOM[i]:"";
+function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));document.documentElement.style.zoom=ZOOM[i]>1?ZOOM[i]:"";document.documentElement.classList.toggle("zoomed",ZOOM[i]>1);
   const b=document.getElementById("zoomBtn");b.textContent=ZOOM_UI[i][0];b.setAttribute("aria-label",ZOOM_UI[i][1]);b.setAttribute("aria-pressed",i>0);if(window.repin)repin();return i}
 // Versteckter Zugang zu den Einstellungen: SparRadar-Logo oben links ca. 1 Sekunde gedrückt halten
 // (oder 5× schnell antippen). Bewusst ohne sichtbaren Knopf.
