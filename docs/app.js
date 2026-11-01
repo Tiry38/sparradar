@@ -377,10 +377,13 @@ function filtered(){
     if(S.cats.size){const rc=r.filter(o=>S.cats.has(o.c));if(rc.length||!r.length)r=rc;else S._catOff=true}}
   else if(S.cats.size)r=r.filter(o=>S.cats.has(o.c));
   r=r.filter(fltOk);
-  const f0={off:(a,b)=>sortPct(b)-sortPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
+  // Sortierung „Ersparnis“ (Kevins Wunsch 01.11.): erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tier, dann der Rest – innerhalb jeder Gruppe nach % Rabatt
+  const f0={off:(a,b)=>catGrp(a)-catGrp(b)||sortPct(b)-sortPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
   // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
   const f=qt.length?(a,b)=>f0(a,b)||relevance(a,qt)-relevance(b,qt):f0;
   return r.sort(f)}
+const CAT_GRP={getraenke:1,drogerie:2,katze:3,tier:3};
+const catGrp=o=>NONFOOD_CATS.includes(o.c)&&!CAT_GRP[o.c]?4:(CAT_GRP[o.c]??(o.c==="sonstiges"?4:0));
 // Zusatz-Filter (Fenster „Kategorien & Filter“), pro Gerät gespeichert
 const FLT_TXT=o=>`${o.b||""} ${o.n} ${o.d||""}`;
 const fltOk=o=>{const F=S.flt;
@@ -693,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  79:["Angebote nach Ersparnis: erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tierbedarf und zum Schluss Technik, Kleidung & Co. – innerhalb jeder Gruppe weiter nach dem höchsten Rabatt."],
   78:["Kracher: Jeder Markt mit einem belegten Rabatt bekommt einen Platz. Fehlt ein Markt (oft Rewe, der selten „statt“-Preise druckt), steht kurz dabei, warum."],
   77:["Am PC bleibt die ganze obere Leiste (Logo, Schriftgröße, Woche und Reiter) beim Scrollen stehen."],
   76:["Kracher der Woche: nur noch Lebensmittel & Drogerie – keine Töpfe, Leitern & Co. mehr. Und mehr Abwechslung statt zehnmal dasselbe."],

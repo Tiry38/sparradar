@@ -73,6 +73,7 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Merkliste-Abgleich** (`watchMatch`): Wörter einzeln (`oWords`), nie über Wort-/Feldgrenzen (vorher fand „More Barista“ „Dallmayr Prodo|mo Re|we“). Zusammengesetzte Wörter und Mehrzahl zählen (Bohnenkaffee, Weißbiere), Milkana ≠ Milka. Gemerkte Artikel als Liste mit Bild + Trefferzahl, antippen filtert (`S.wsel`).
 - **Hinweis beim Öffnen:** neue Merklisten-Treffer seit dem letzten Öffnen (`seenHits`) – kein Push, nur in der App.
 - **Vorschläge/Suche:** `BASE_WORDS` + `docs/data/names.json` (alle je gesehenen Artikelnamen, auch Lidl ohne Rabatt). Suche nur in Name, Marke, Markt; Kategoriename nur bei exakter Eingabe.
+- **Sortierung „Ersparnis“ nach Gruppen** (Kevins Wunsch 01.11.): `catGrp()` = Lebensmittel (0) -> Getränke (1) -> Drogerie & Pflege (2) -> Katze/Tier (3) -> Rest/Non-Food/Sonstiges (4), innerhalb jeder Gruppe nach % Rabatt. Gilt für alle Märkte.
 - **Kategorien:** mehrere gleichzeitig wählbar (`S.cats` = Set, `catTitle()`), antippen = an/aus, „Alle Kategorien“ = zurücksetzen.
 - **Obere Leiste am PC angeheftet** (Kevins Wunsch 01.11.): ab 721 px Breite bleibt `.pinbar` (Logo, A+, Woche, Reiter) beim Scrollen oben (`pinTabs()`, Klasse `.pinned` = `position:fixed`, Platzhalter `.tabs-ph` gegen Springen; `position:sticky` geht nicht, weil sie in `header.top` steckt). Am Handy weiter fest unten.
 - **Bedienung:** „A+“-Knopf (3 Schriftstufen per CSS-`zoom`), am Handy Märkte/Kategorien/Sortierung im Fenster „Märkte & Filter“. Look: Farbverläufe in `docs/look.css`.
