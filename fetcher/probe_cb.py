@@ -1,16 +1,31 @@
-import re, sys
-sys.path.insert(0, ".")
-from fetch_cashback import get, txt, URL
-p = get(URL)
-secs = re.split(r'<section', p)
-for s in secs[1:]:
-    sid = re.search(r'id="([^"]+)"', s[:300]); h = re.search(r'<h2[^>]*>(.*?)</h2>', s, re.S)
-    blks = re.split(r'<div class="tbl tbl-competition', s)[1:]
-    print("== SECTION", sid.group(1) if sid else "-", "|", txt(h.group(1)) if h else "-", "| Blöcke", len(blks))
-    for b in blks[:60]:
-        t = re.search(r'<div class="tbl-title">(.*?)</div>', b, re.S)
-        f = {txt(k): txt(v)[:90] for k, v in re.findall(r"<strong>(.*?)</strong>\s*:(.*?)</li>", b, re.S)}
-        l = re.search(r'href="([^"]+)"[^>]*class="tbl-button"', b) or re.search(r'class="tbl-button"[^>]*href="([^"]+)"', b)
-        print("  -", txt(t.group(1))[:60] if t else "?", "|", f.get("Cashback") or f.get("Rabatt") or list(f.items())[:2], "|", f.get("Aktionszeitraum", ""), "|", (l.group(1)[:50] if l else ""))
-print("== LINKS")
-for u in sorted(set(re.findall(r'href="(https://www\.mystipendium\.de/[^"#]*(?:cashback|geld-zurueck|gratis|coupon|gutschein|rabatt)[^"#]*)"', p))): print(u)
+import re, urllib.request, urllib.robotparser, html
+UA = "SparRadar/1.0 (+https://tiry38.github.io/sparradar/)"
+def get(u):
+    r = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA}), timeout=30)
+    return r.status, r.read().decode("utf-8", "replace")
+def txt(s): return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s))).strip()
+C = ["https://www.sparwelt.de/gratis/cashback", "https://www.mydealz.de/gruppe/geld-zurueck", "https://www.mydealz.de/rss/gruppe/geld-zurueck",
+     "https://www.mydealz.de/gruppe/gratis-testen", "https://www.mydealz.de/rss/gruppe/gratis-testen", "https://www.mydealz.de/rss/hot"]
+rob = {}
+for u in C:
+    host = "/".join(u.split("/")[:3])
+    if host not in rob:
+        rp = urllib.robotparser.RobotFileParser()
+        try: rp.parse(get(host + "/robots.txt")[1].splitlines())
+        except Exception as e: print("robots-Fehler", host, e)
+        rob[host] = rp
+    ok = rob[host].can_fetch(UA, u)
+    print("\n####", u, "robots erlaubt:", ok)
+    if not ok: continue
+    try: st, p = get(u)
+    except Exception as e: print("Fehler", e); continue
+    print("Status", st, "Größe", len(p))
+    items = re.findall(r"<item>(.*?)</item>", p, re.S)
+    if items:
+        for it in items[:25]:
+            t = re.search(r"<title>(.*?)</title>", it, re.S); print("  *", txt(t.group(1).replace("<![CDATA[", "").replace("]]>", ""))[:120])
+    else:
+        heads = re.findall(r"<(h2|h3)[^>]*>(.*?)</\1>", p, re.S)
+        for _, h in heads[:40]: print("  -", txt(h)[:120])
+        cls = re.findall(r'class="([^"]*(?:card|teaser|deal|thread|item)[^"]*)"', p)
+        from collections import Counter; print("  Klassen:", Counter(cls).most_common(8))
