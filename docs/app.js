@@ -660,6 +660,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  70:["Im Willkommens-Fenster steht jetzt: Fehler entdeckt? Einfach Kevin schreiben."],
   69:["Auf dem Einkaufszettel steht neben Lidl, Rewe und Edeka ein Knopf „📱 Lidl Plus“ usw. – ein Tipp öffnet die App des Markts, z. B. für deinen Code an der Kasse."],
   68:["Einkauf fertig im Lidl, Rewe oder Edeka? Nach dem letzten Haken öffnet SparRadar am Handy direkt die App des Markts – Code an der Kasse zeigen. Abschaltbar in den Einstellungen."],
   67:["Geräte verbinden: Jedes Gerät wählt jetzt selbst, was es teilt – Einkaufszettel, Merkliste, Coupons. So teilt die Familie den Einkaufszettel, während deine Merkliste nur auf deinem Handy und PC gleich ist.","Beim „Code kopieren“ wählst du gleich mit aus, was das neue Gerät teilen soll – auf dem anderen Gerät nur noch einfügen.","Neue Nutzer sehen beim ersten Öffnen ein Willkommens-Fenster mit allen wichtigen Funktionen (auch in den Einstellungen unter „Erste Schritte“)."],
@@ -723,7 +724,8 @@ function renderWelcome(){const it=[
   ["🔔","Merkliste","Artikel merken – SparRadar zeigt dir, sobald sie im Angebot sind."],
   ["🛒","Einkaufszettel","Mit ＋ auf den Zettel. Im Laden antippen, was im Wagen liegt. Mit 🎟️ trägst du einen Coupon mit einem Tipp ein."],
   ["👨‍👩‍👦","Geräte verbinden","Mehrere Handys, Tablets oder PCs teilen denselben Einkaufszettel. Ob auch die Merkliste gleich sein soll, wählt jedes Gerät selbst – z. B. dein Handy und dein PC ja, die Familie nur den Zettel."],
-  ["⚙️","Einstellungen","Ganz unten im Tab „Coupons“: Geräte verbinden, SparRadar teilen, Schriftgröße mit „A+“ oben rechts."]];
+  ["⚙️","Einstellungen","Ganz unten im Tab „Coupons“: Geräte verbinden, SparRadar teilen, Schriftgröße mit „A+“ oben rechts."],
+  ["💬","Fehler entdeckt?","Stimmt ein Preis nicht oder klemmt etwas? Schreib gern Kevin, der SparRadar gebaut hat – am einfachsten per WhatsApp. Jeder Hinweis hilft!"]];
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Willkommen bei SparRadar">
    <div class="sheet-h"><span class="newsico">👋</span><h2>Willkommen bei SparRadar</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <p style="margin:-6px 0 4px;color:var(--muted)">Deine Spar-App für alle Angebote in der Nähe. Das Wichtigste in 30 Sekunden:</p>
