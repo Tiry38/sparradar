@@ -327,6 +327,18 @@ function perk(o){
     if(c.length&&c[0].v>=fin(o)*1.05){const pct=Math.round((1-fin(o)/c[0].v)*100);
       r={pct,b:"günstigster Markt",s:`bei ${sname(c[0].x.s)} ${eur(c[0].v)}`,l:`Derselbe Artikel kostet beim nächstgünstigen Markt (${sname(c[0].x.s)}) ${eur(c[0].v)}. Hier sparst du ${pct} %.`}}}
   PERK.set(o.id,r);return r}
+// Vergleichspreis, wenn weder „statt“-Preis noch Vorteil bekannt ist (Kevin 01.11.: „Hauptsache, es steht ein Vergleichspreis da“).
+// Derselbe Artikel bei einem anderen Markt (gleiche Menge). Ein „Ø ähnlicher Artikel“ wurde getestet und verworfen: verglich z. B. Choco-Chips mit Kartoffelchips.
+// Nur echte Preise aus den Prospekten, klar beschriftet – kein erfundener Normalpreis.
+const CMP=new Map();
+function cmpPrice(o){
+  if(!o||o.o||o.bo||!o.p||offPct(o)||perk(o))return null;
+  if(CMP.has(o.id))return CMP.get(o.id);
+  const nx=isNextWk(o),pool=OFFERS.filter(x=>isNextWk(x)===nx);let r=null;
+  const c=sameElsewhere(o,pool).filter(x=>Math.abs(x.f-1)<.05).map(x=>({x:x.x,v:fin(x.x)})).sort((a,b)=>a.v-b.v);
+  if(c.length){const v=c[0].v,d=fin(o)-v;
+    r={s:`${sname(c[0].x.s)}: ${eur(v)}`,hi:d>.009,l:d>.009?`Derselbe Artikel kostet bei ${sname(c[0].x.s)} gerade ${eur(v)} – dort ${eur(d)} günstiger.`:`Derselbe Artikel kostet bei ${sname(c[0].x.s)} gerade ${eur(v)} – hier bist du gleich günstig oder günstiger.`}}
+  CMP.set(o.id,r);return r}
 function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${cbFor(o)?`<span class="cbtag" title="Geld zurück vom Hersteller – Details antippen">💸${appName(o)?"":" Geld zurück"}</span>`:""}${appName(o)?`<span class="apptag" title="App-Angebot: ${esc(o.ao?"Preis gilt nur mit "+o.ao:"günstiger mit "+appName(o))}">📱 ${esc(appName(o))}</span>`:""}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
 
 document.addEventListener("load",e=>{const i=e.target;if(i.tagName==="IMG"&&i.closest(".thumb")&&i.naturalWidth&&Math.max(i.naturalWidth,i.naturalHeight)<LOWPX)i.classList.add("lowres")},true);
@@ -447,7 +459,7 @@ async function load(){
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
     loadCashback().then(()=>render()); // Geld-zurück-Abzeichen an den Angeboten
-    RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();
+    RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();CMP.clear();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote<span id="tick"></span>${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;if(typeof tickShow==="function")tickShow();
@@ -572,7 +584,7 @@ function card(o,bestIds){
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
-     <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
+     <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:cmpPrice(o)?`<span class="cmpp${cmpPrice(o).hi?" hi":""}" title="${esc(cmpPrice(o).l)}">${esc(cmpPrice(o).s)}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    ${ls?`<div class="alarm" title="${esc(ls.l)}">📉 ${esc(ls.s)}</div>`:`<div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>`}
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}${o.from&&o.from>SHOP?" soon":""}">${validTxt(o)}</span>
@@ -728,7 +740,7 @@ function renderDetail(){
     ${o.d?`<p class="dsub">${esc(o.d)}</p>`:""}
     ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
-     <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
+     <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:cmpPrice(o)?`<div class="cmpp${cmpPrice(o).hi?" hi":""}">${esc(cmpPrice(o).l)}</div>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
     ${cbDetail(o)}${cpQuick(o)}
     ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
@@ -759,6 +771,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  115:["Jetzt hat fast jedes Angebot einen Vergleichspreis: Gibt es keinen „statt“-Preis, zeigt die Karte jetzt den Preis desselben Artikels bei einem anderen Markt (orange, wenn er dort günstiger ist)."],
   114:["Doppelte Karten desselben Artikels (z. B. Milch zweimal mit gleichem Preis) stehen jetzt nur noch einmal da. Fehlt im Prospekt der Preis pro Liter/Kilo, rechnet SparRadar ihn aus der Packungsgröße aus."],
   113:["Merkliste: Der Hinweis „Keine Treffer“ zeigt wieder einen normalen Text statt Zeichensalat."],
   112:["Der Knopf für die Woche danach zeigt jetzt das Datum, z. B. „Ab 09.11.“ – so ist klar, ab wann diese Angebote gelten."],

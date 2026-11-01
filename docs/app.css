@@ -582,3 +582,8 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .valid.soon{color:#fff;background:#2D7FF9;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;width:fit-content;align-self:flex-start}
 @media (max-width:559px){html:not(.zoomed) .grid>.card .valid.soon{flex:0 0 auto;margin-right:100%}}
 .mtile.none:not([aria-pressed="true"]){opacity:.5}
+/* v115: Vergleichspreis ohne „statt“ */
+.cmpp{display:block;font-size:.76rem;font-weight:700;line-height:1.2;color:var(--muted)}
+.cmpp.hi{color:#C2410C}
+@media (prefers-color-scheme:dark){.cmpp.hi{color:#FDBA74}}
+:root[data-theme="dark"] .cmpp.hi{color:#FDBA74}
