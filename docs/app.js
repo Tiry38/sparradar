@@ -221,7 +221,11 @@ const unitTxt = o => o.gp ? `1 ${o.gp.u} = ${eur(unit(o))}` : "";
 // Suche: Artikelname, Marke und Markt. Die Beschreibung nur als Notlösung, der Kategoriename nie
 // (sonst findet „Milch“ alles aus „Milch, Käse & Eier“).
 const hay = o => o._hay ??= [o.n,o.b,sname(o.s)].map(norm).join(" "); // Felder getrennt: „Prodomo“ + „Rewe“ ergibt nicht „…more…“
-const hayD = o => o._hayD ??= norm(o.d);
+// Beschreibung nur ohne Werbetext: „ideal zu Bratkartoffeln“, „mit Parmesan“, „aus der Region“ sagen nichts darüber, WAS der Artikel ist
+// (Merkliste „Kartoffeln“ fand sonst die Gurkensülze). Sorten-Angaben („oder Der Sahnige Frischkäse“, „versch. Sorten“) bleiben.
+const D_AD=/(^|\s)(mit|zu|zum|zur|ideal|passt|perfekt|aus|für|fuer|lecker|ohne|statt|garniert|verfeinert|gefüllt|gefuellt|serviert|schmeckt|genuss|spezialität|tipp)(\s|$)/i;
+const dClean = o => o._dc ??= (o.d||"").split(/[,;]|\.\s/).filter(x=>!D_AD.test(x.trim())).join(", ");
+const hayD = o => o._hayD ??= norm(dClean(o));
 // genauer Kategoriename (z. B. „Katzenfutter“, „Getränke“) findet die ganze Kategorie
 const matches = (o,k) => hay(o).includes(norm(k)) || norm(CATS[o.c]||"")===norm(k);
 const matchesAll = (o,t) => t.every(x=>matches(o,x));
@@ -240,11 +244,14 @@ const WATCH_FILL=/^(\d.*|g|kg|ml|l|cl|x|xl|xxl|st|stk|stueck|pack|packung|bigpac
 const WATCH_WEAK=new Set(["bio","gut","ja","mini","frisch","frische","original","classic","klassik","deluxe","premium","neu","extra"]);
 const wTokens = k => (k.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(t=>t.length>1&&!WATCH_FILL.test(t));
 // Wörter einzeln vergleichen (nie über Wortgrenzen hinweg: „Prodomo Rewe“ enthält sonst „more“)
-const oWords = o => [...new Set(`${o.b||""} ${o.n} ${o.d||""} ${sname(o.s)}`.toLowerCase().match(/[a-zäöüß0-9]+/g)||[])].map(norm).filter(Boolean);
+const toks = t => [...new Set(t.toLowerCase().match(/[a-zäöüß0-9]+/g)||[])].map(norm).filter(Boolean);
+const oWords = o => o._ow ??= toks(`${o.b||""} ${o.n} ${sname(o.s)}`);
+const oWordsD = o => o._owd ??= toks(dClean(o));
 function watchMatch(o,k){
   if(norm(CATS[o.c]||"")===norm(k))return true;
   const t=wTokens(k);if(!t.length)return false;
-  const w=oWords(o),inW=x=>w.some(v=>{const i=v.indexOf(x);if(i<0)return false;const r=v.slice(i+x.length);return /^(|e|n|en|s|es|er|ern|ns)$/.test(r)||r.length>=4}); // zusammengesetzte Wörter und Mehrzahl zählen (Bohnenkaffee, Kaffeebohnen, Weißbiere), Milkana ist aber nicht Milka
+  const w=oWords(o),wd=oWordsD(o),inW=x=>w.some(v=>{const i=v.indexOf(x);if(i<0)return false;const r=v.slice(i+x.length);return /^(|e|n|en|s|es|er|ern|ns)$/.test(r)||r.length>=4}) // zusammengesetzte Wörter und Mehrzahl zählen (Bohnenkaffee, Kaffeebohnen, Weißbiere), Milkana ist aber nicht Milka
+    ||wd.some(v=>v.startsWith(x)&&/^(|e|n|en|s|es|er|ern|ns)$/.test(v.slice(x.length))); // Beschreibung: nur ganzes Wort/Mehrzahl, keine Wortteile
   if(t.every(inW))return true;
   // „versch. Sorten“: Marke/Produktlinie reicht – aber nur als ganzes Wort oder Wortanfang, mind. 4 Buchstaben
   return t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&w.some(v=>v===t[0]||(v.startsWith(t[0])&&t[0].length>=5))&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))}
@@ -385,7 +392,7 @@ function filtered(){
 const CAT_GRP={getraenke:1,drogerie:2,katze:3,tier:3};
 const catGrp=o=>NONFOOD_CATS.includes(o.c)&&!CAT_GRP[o.c]?4:(CAT_GRP[o.c]??(o.c==="sonstiges"?4:0));
 // Zusatz-Filter (Fenster „Kategorien & Filter“), pro Gerät gespeichert
-const FLT_TXT=o=>`${o.b||""} ${o.n} ${o.d||""}`;
+const FLT_TXT=o=>`${o.b||""} ${o.n} ${dClean(o)}`;
 const fltOk=o=>{const F=S.flt;
   if(F.min&&offPct(o)<F.min)return false;
   if(F.max&&!(o.p>0&&fin(o)<=F.max))return false;
@@ -697,6 +704,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  97:["Merkliste und Filter „Bio“/„Vegan“ lesen keine Werbetexte mehr mit: „ideal zu Bratkartoffeln“ meldet keine Gurkensülze mehr, wenn du dir Kartoffeln merkst."],
   96:["Am PC verteilen sich die Markt-Kacheln jetzt über die ganze Breite.","Artikel landen in der richtigen Kategorie: Katzenfutter-Kroketten nicht mehr bei Tiefkühl, Spielzeug nicht mehr bei Garten, Pflanzen nicht mehr bei Vorrat und vieles mehr.","Die Vorschau auf nächste Woche bei Rewe und Edeka bleibt jetzt drin, bis der echte Prospekt vollständig da ist."],
   95:["SparRadar startet schneller: Angebote werden nur noch neu geladen, wenn sich wirklich etwas geändert hat."],
   94:["Einstellungen → Teilen: SparRadar für den PC per E-Mail schicken. Am PC die E-Mail öffnen, Link anklicken, installieren – fertig."],
