@@ -124,7 +124,7 @@ const Sync = {
   merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
     return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
       coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|")),
-      extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])],saved:u(a.saved||[],b.saved||[],x=>x.id+"|"+x.d),
+      extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])],saved:(()=>{const m=new Map();[...(a.saved||[]),...(b.saved||[])].forEach(e=>{const k=e.id+"|"+e.d,o=m.get(k);m.set(k,o&&(o.off||e.off)?{...e,off:1}:e)});return [...m.values()]})(), // gelöscht (off) bleibt gelöscht
       trips:u(a.trips||[],b.trips||[],x=>x.id).sort((x,y)=>(y.at||"").localeCompare(x.at||"")),qty:{...(a.qty||{}),...(b.qty||{})}}},
   mergeP(p,remote,local){return this.pick({...this.merge(remote,local)},p)},
   async connect(token,parts){store.set("sync",{token});
@@ -660,6 +660,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  71:["Gespart-Zähler antippen: Einträge einzeln löschen oder alles auf 0 setzen (z. B. nach einem Test)."],
   70:["Im Willkommens-Fenster steht jetzt: Fehler entdeckt? Einfach Kevin schreiben."],
   69:["Auf dem Einkaufszettel steht neben Lidl, Rewe und Edeka ein Knopf „📱 Lidl Plus“ usw. – ein Tipp öffnet die App des Markts, z. B. für deinen Code an der Kasse."],
   68:["Einkauf fertig im Lidl, Rewe oder Edeka? Nach dem letzten Haken öffnet SparRadar am Handy direkt die App des Markts – Code an der Kasse zeigen. Abschaltbar in den Einstellungen."],
@@ -814,10 +815,19 @@ function renderWatch(){
    ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>${S.wsel!=null?"Dieser Artikel ist gerade nicht im Angebot. SparRadar schaut bei jedem Abruf nach.":"Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis."}</div>'}`}
 
 // Ersparnis-Zähler: was auf dem Zettel abgehakt wird, zählt als gekauft
-function savedHTML(){if(!S.saved.length)return "";
+const savedOn=()=>S.saved.filter(x=>!x.off);
+function savedHTML(){const sv=savedOn();if(!sv.length)return "";
   const sum=a=>a.reduce((t,x)=>t+x.v,0),mon=TODAY.slice(0,7),wk=new Date(Date.now()-6*864e5).toISOString().slice(0,10);
-  const m=sum(S.saved.filter(x=>x.d.startsWith(mon))),w=sum(S.saved.filter(x=>x.d>=wk)),all=sum(S.saved);
-  return `<div class="savedc"><div><span>Diese Woche</span><b>${eur(w)}</b></div><div><span>Diesen Monat</span><b>${eur(m)}</b></div><div><span>Insgesamt</span><b>${eur(all)}</b></div><p>Gespart mit SparRadar · zählt beim Abhaken auf dem Zettel</p></div>`}
+  const m=sum(sv.filter(x=>x.d.startsWith(mon))),w=sum(sv.filter(x=>x.d>=wk)),all=sum(sv);
+  return `<button class="savedc" data-savedopen="1" title="Antippen zum Ansehen oder Löschen"><div><span>Diese Woche</span><b>${eur(w)}</b></div><div><span>Diesen Monat</span><b>${eur(m)}</b></div><div><span>Insgesamt</span><b>${eur(all)}</b></div><p>Gespart mit SparRadar · antippen zum Ansehen oder Löschen</p></button>`}
+// Fenster „Gespart“: jeden Eintrag einzeln löschen (z. B. Test-Abhaken) oder alles auf 0
+function renderSaved(){const sv=savedOn().slice().sort((a,b)=>b.d.localeCompare(a.d)),days=[...new Set(sv.map(x=>x.d))];
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Gespart">
+   <div class="sheet-h"><span class="newsico">💰</span><h2>Gespart: ${eur(sv.reduce((t,x)=>t+x.v,0))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <p style="margin:-6px 0 4px;color:var(--muted)">Stimmt etwas nicht (z. B. nur zum Testen abgehakt)? Mit ✕ rausnehmen.</p>
+   ${sv.length?days.map(d=>`<h4 class="svd">${fmtDate(d)}</h4>${sv.map((x,i)=>[x,S.saved.indexOf(x)]).filter(([x])=>x.d===d).map(([x,i])=>`<div class="svrow"><span>${sb(x.s)}${esc(x.n)}</span><b class="sv">${eur(x.v)}</b><button class="ibtn" data-saveddel="${i}" aria-label="${esc(x.n)} löschen">${IC.x}</button></div>`).join("")}`).join(""):`<p>Nichts mehr drin.</p>`}
+   ${sv.length?`<div class="factions" style="grid-template-columns:1fr"><button class="btn ghost" data-savedreset="1">Alles auf 0 setzen</button></div>`:""}
+  </div>`}
 // Gleicher Artikel woanders günstiger (gleiche Menge)? -> Tausch vorschlagen
 function swapTips(items){
   const t=items.filter(o=>!S.checked.includes(o.id)).map(o=>{const c=sameElsewhere(o,weekOffers()).filter(r=>Math.abs(r.f-1)<.05&&!S.list.includes(r.x.id)).sort((a,b)=>fin(a.x)-fin(b.x))[0];
@@ -1188,7 +1198,7 @@ function render(){
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,detail:renderDetail,trip:renderTrip}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -1264,7 +1274,7 @@ document.addEventListener("click",e=>{
   if(b.id==="scanBtn"){Scan.last="";Scan.res="";S.sheet="scan";render();return}
   if(b.dataset.swap){const [a,c]=b.dataset.swap.split("|"),i=S.list.indexOf(a);if(i>=0)S.list[i]=c;const n=byId(c);save();toast(n?`Getauscht: jetzt bei ${sname(n.s)}`:"Getauscht");render();return}
   if(b.dataset.check){const id=b.dataset.check,i=S.checked.indexOf(id);
-    if(i>=0){S.checked.splice(i,1);const j=S.saved.map(x=>x.id).lastIndexOf(id);if(j>=0)S.saved.splice(j,1)}
+    if(i>=0){S.checked.splice(i,1);const j=S.saved.map(x=>x.off?null:x.id).lastIndexOf(id);if(j>=0)S.saved.splice(j,1)}
     else{S.checked.push(id);try{if(TOUCH())navigator.vibrate?.(15)}catch(e){}wakeOn();
       const o=byId(id);if(o){const v=r2((ref(o)-fin(o))*qty(id));if(v>0){S.saved.push({id,n:o.n,s:o.s,v,d:TODAY});toast(`Im Wagen – ${eur(v)} gespart`)}}
       // Handy: letzter Artikel im Wagen -> Einkauf abgeschlossen
@@ -1277,6 +1287,9 @@ document.addEventListener("click",e=>{
   if(b.dataset.tripfinish){finishTrip([...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)].filter(x=>S.checked.includes(x)),false);return}
   if(b.dataset.triprestore){restoreTrip(b.dataset.triprestore);return}
   if(b.dataset.tripopen){S.tripId=b.dataset.tripopen;S.sheet="trip";hideTripPop();render();return}
+  if(b.dataset.savedopen){S.sheet="saved";render();return}
+  if(b.dataset.saveddel){const x=S.saved[+b.dataset.saveddel];if(x){x.off=1;save();render();toast(`„${x.n}“ zählt nicht mehr`)}return}
+  if(b.dataset.savedreset){if(!confirm("Den ganzen Gespart-Zähler auf 0 setzen?"))return;S.saved.forEach(x=>x.off=1);S.sheet=null;save();render();toast("Gespart-Zähler steht wieder auf 0");return}
   if(b.dataset.tripdel){if(!confirm("Diesen Einkauf aus dem Verlauf löschen?"))return;S.trips=S.trips.filter(x=>x.id!==b.dataset.tripdel);S.sheet=null;save();render();return}
   if(b.dataset.tripmore){S.tripLimit=(S.tripLimit||10)+20;render();return}
   if(b.dataset.tpclose){hideTripPop();return}
