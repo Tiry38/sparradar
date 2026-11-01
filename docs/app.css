@@ -454,3 +454,13 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .cbme input{width:100%}
 .cbme-a{margin-top:6px}
 .cbme-a .btn{width:auto}
+
+.thumb .cbtag{position:absolute;right:8px;bottom:8px;z-index:1;font-size:.72rem;font-weight:800;color:#fff;background:#f08a00;border:2px solid #fff;border-radius:8px;padding:2px 7px;box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:nowrap}
+.cbdet{margin:10px 0;padding:12px;border:2px solid #f08a00;border-radius:14px;background:color-mix(in srgb,#f08a00 9%,transparent)}
+.cbdet-h{font-weight:800;margin-bottom:4px}
+.cbdet p{margin:4px 0}
+.cbdet .btn{width:100%;justify-content:center;margin-top:6px}
+.cbtips{border:2px solid #f08a00}
+.cbt-r{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+.cbearned{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:linear-gradient(90deg,#2B3034,#1f9d55);color:#fff}
+.cbearned b{font-size:1.1em}

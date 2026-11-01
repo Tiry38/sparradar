@@ -302,7 +302,7 @@ function perk(o){
     if(c.length&&c[0].v>=fin(o)*1.05){const pct=Math.round((1-fin(o)/c[0].v)*100);
       r={pct,b:"günstigster Markt",s:`bei ${sname(c[0].x.s)} ${eur(c[0].v)}`,l:`Derselbe Artikel kostet beim nächstgünstigen Markt (${sname(c[0].x.s)}) ${eur(c[0].v)}. Hier sparst du ${pct} %.`}}}
   PERK.set(o.id,r);return r}
-function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${appName(o)?`<span class="apptag" title="App-Angebot: ${esc(o.ao?"Preis gilt nur mit "+o.ao:"günstiger mit "+appName(o))}">📱 ${esc(appName(o))}</span>`:""}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
+function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${cbFor(o)?`<span class="cbtag" title="Geld zurück vom Hersteller – Details antippen">💸${appName(o)?"":" Geld zurück"}</span>`:""}${appName(o)?`<span class="apptag" title="App-Angebot: ${esc(o.ao?"Preis gilt nur mit "+o.ao:"günstiger mit "+appName(o))}">📱 ${esc(appName(o))}</span>`:""}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
 
 document.addEventListener("load",e=>{const i=e.target;if(i.tagName==="IMG"&&i.closest(".thumb")&&i.naturalWidth&&Math.max(i.naturalWidth,i.naturalHeight)<LOWPX)i.classList.add("lowres")},true);
 // ---------- Daten ----------
@@ -420,6 +420,7 @@ async function load(){
     NAMES=Object.keys(nm||{});
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
+    loadCashback().then(()=>render()); // Geld-zurück-Abzeichen an den Angeboten
     RAW=o.offers.filter(x=>!x.to||x.to>=SHOP);OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();
     const g=new Date(o.generated);
     const pr=flyerInfo();
@@ -668,7 +669,7 @@ function renderDetail(){
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
      <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
-    ${cpQuick(o)}
+    ${cbDetail(o)}${cpQuick(o)}
     ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
     ${o.ous&&o.o?`<div class="rk perkbox"><h4>🏷️ Kostet eigentlich ${eur(o.o)}</h4><p>Das ist die UVP (Preisempfehlung des Herstellers). ${esc(sname(o.s))} nennt im Prospekt keinen „statt“-Preis – die UVP stammt von ${esc(sname(o.ous))} für denselben Markenartikel in gleicher Menge.</p></div>`:""}
     ${perk(o)?`<div class="rk perkbox"><h4>💡 Dein Vorteil</h4><p>${esc(perk(o).l)}</p></div>`:""}
@@ -696,6 +697,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  92:["Geld zurück siehst du jetzt überall: 💸-Abzeichen am Angebot, „Mitnehmen“ in der Detailansicht und auf dem Einkaufszettel – ohne extra suchen.","Im Tab „Coupons“ siehst du, wie viel du mit Geld zurück schon geholt hast."],
   91:["Geld zurück jetzt mit „💸 Jetzt Geld holen“: SparRadar führt dich Schritt für Schritt – Bon bereitlegen, Aktionsseite öffnen, Name, E-Mail und IBAN mit einem Tipp kopieren, fertig."],
   90:["Offene Geld-zurück-Bons: Der Reiter „Coupons“ leuchtet orange mit 💸, bis du den Bon hochgeladen und „Erledigt“ getippt hast.","Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen."],
   89:["Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen.","Geld zurück ganz einfach: Nach dem Einkauf zeigt SparRadar oben „💸 Geld zurückholen“ – Bon hochladen antippen, danach „Erledigt“.","Coupon-Finder: jetzt auch „2 kaufen, 1 gratis“ und feste Euro-Beträge vom Hersteller (z. B. 5 € zurück) – aus einer zweiten Übersicht, also deutlich mehr Aktionen."],
@@ -929,7 +931,9 @@ function finishTrip(ids,auto){
     extra:ex.map(x=>({id:x.id,n:x.n,q:qty(x.id),p:extraP(x)}))};
   t.paid=r2(t.items.reduce((a,x)=>a+x.p,0)+t.extra.reduce((a,x)=>a+x.p,0));t.saved=r2(t.items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
   S.trips.unshift(t);S.trips=S.trips.slice(0,400);
-  tripCb(t,1).forEach(c=>{if(!c.buy)c.buy=t.d}); // Geld-zurück: ab jetzt „Bon hochladen“ anzeigen
+  tripCb(t,1).forEach(c=>{if(!c.buy)c.buy=t.d; // Geld-zurück: ab jetzt „Bon hochladen“ anzeigen
+    const x=t.items.find(x=>(c.s==="all"||c.s===x.s)&&c.k.split(/\s+/).every(w=>norm(x.b+" "+x.n).includes(norm(w))));
+    if(x&&!c.amt){const q=x.q||1;c.amt=r2(Math.min(x.p,cpValue(c,x.p/q)*q))}});
   S.list=S.list.filter(id=>!ids.includes(id));S.extra=S.extra.filter(x=>!ids.includes(x.id));S.checked=S.checked.filter(id=>!ids.includes(id));
   ids.forEach(id=>delete S.qty[id]);
   if(!S.list.length&&!S.extra.length)wakeOff();
@@ -1068,7 +1072,7 @@ function renderList(){
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i><span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
-  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}</div>
+  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${cbListTips(items)}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
      ${sortDone(os).map(o=>line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")).join("")}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
    ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"")).join("")}</div>`:""}
@@ -1120,6 +1124,27 @@ function cbHitTxt(a,o){const p=fin(o),n=a.need||1,back=cbBack(a,p),pay=Math.max(
 function cbFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c.cb).filter(Boolean));
   return (CASHBACK?.items||[]).filter(a=>cbLive(a)&&!no.includes("cb:"+a.id)&&!have.has(a.id)).map(a=>{const os=cbOffers(a),o=os[0]||null;
     return {a,o,val:o?cbBack(a,fin(o)):(a.typ==="eur"?a.eur:a.max||a.w||0)}}).sort((x,y)=>(!!y.o-!!x.o)||y.val-x.val||String(x.a.kauf||x.a.ende).localeCompare(String(y.a.kauf||y.a.ende)))}
+// Angebot -> passende Geld-zurück-Aktion (für Abzeichen, Detail, Zettel); neu berechnet, wenn sich Angebote/Woche/Daten ändern
+let CBM=null,CBK=[];
+function cbFor(o){if(!CASHBACK?.items)return null;
+  if(CBK[0]!==OFFERS||CBK[1]!==S.week||CBK[2]!==CASHBACK){CBK=[OFFERS,S.week,CASHBACK];CBM=new Map();
+    CASHBACK.items.filter(cbLive).forEach(a=>cbOffers(a).forEach(x=>{if(!CBM.has(x.id))CBM.set(x.id,a)}))}
+  return CBM.get(o.id)||null}
+const cbHave=a=>S.coupons.some(c=>c.cb===a.id&&!c.done);
+function cbDetail(o){const a=cbFor(o);if(!a||!o.p)return "";const p=fin(o),back=cbBack(a,p);
+  if(cbHave(a))return "";
+  return `<div class="cbdet"><div class="cbdet-h">💸 Geld zurück vom Hersteller</div>
+   <p><b>${esc(cbLbl(a))}${a.max?" (max. "+eur(a.max)+")":""}</b>${back>=p*(a.need||1)-.005?" – damit ist der Artikel <b>gratis</b>.":" – du bekommst <b>"+eur(back)+"</b> zurück."}${a.kauf?" Kaufen bis "+fmtDate(a.kauf):""}</p>
+   <button class="btn big" data-cbtake="${esc(a.id)}" data-cbo="${esc(o.id)}">💸 Mitnehmen</button>
+   <p class="cpf-n">Landet auf dem Einkaufszettel. Nach dem Einkauf zeigt SparRadar dir, wie du das Geld holst – mit wenigen Tipps.</p></div>`}
+// Zettel: Artikel mit Geld-zurück-Aktion, die noch nicht mitgenommen wurde
+function cbListTips(items){const t=items.map(o=>({o,a:cbFor(o)})).filter(x=>x.a&&!cbHave(x.a));if(!t.length)return "";
+  return `<section class="panel cbtips"><h3>💸 Geld zurück möglich</h3><p>Für ${t.length===1?"diesen Artikel":"diese Artikel"} zahlt der Hersteller Geld zurück. Einmal tippen, den Rest erklärt SparRadar nach dem Einkauf.</p>
+   <div class="rows">${t.map(({o,a})=>`<div class="drow cbt-r"><div class="t">${esc(o.n)}<small>${esc(cbLbl(a))} · bis zu ${eur(cbBack(a,fin(o)))} zurück</small></div><button class="btn sm" data-cbtake="${esc(a.id)}" data-cbo="${esc(o.id)}">💸 Mitnehmen</button></div>`).join("")}</div>
+   ${t.length>1?`<button class="btn ghost" data-cbtakeall="1">Alle ${t.length} mitnehmen</button>`:""}</section>`}
+// Motivation: schon zurückgeholt (geschätzt aus dem Kassenpreis beim Einkauf)
+function cbEarnedHTML(){const d=S.coupons.filter(c=>c.cb&&c.done&&c.amt>0),sum=d.reduce((a,c)=>a+c.amt,0);if(!sum)return "";
+  return `<div class="cbearned">💸 Mit Geld zurück schon geholt: <b>${eur(sum)}</b> <small>(${d.length} Aktion${d.length===1?"":"en"})</small></div>`}
 const cbShopTxt=a=>a.shops?.length?"bei "+a.shops.map(sname).join(", "):"in vielen Märkten";
 const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
 function cpHowHTML(){return `<section class="panel cphow"><h3>Geheime Coupons: Geld zurück vom Hersteller</h3>
@@ -1145,7 +1170,7 @@ function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfi
     ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}`
     :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues</b>Alle aktuellen Geld-zurück-Aktionen hast du schon eingefügt oder abgelehnt. SparRadar sucht jeden Tag neu.</div>`}
     <p class="cpf-n">Gefunden in öffentlichen Übersichten von Hersteller-Aktionen (mystipendium.de, sparwelt.de), täglich neu. „Aktion ↗“ öffnet die Seite des Herstellers mit allen Bedingungen. Oft gilt: nur eine Teilnahme pro Person, begrenzte Teilnehmerzahl.</p></section>`}
-function cbAdd(id,quiet){const a=(CASHBACK?.items||[]).find(x=>x.id===id);if(!a)return 0;const o=cbOffers(a)[0],w=cbWords(a);
+function cbAdd(id,quiet,oid){const a=(CASHBACK?.items||[]).find(x=>x.id===id);if(!a)return 0;const o=(oid&&byId(oid))||cbOffers(a)[0],w=cbWords(a);
   const k=o?[w[0],...w.slice(1).filter(x=>cbHit(o,x)).slice(0,1)].join(" "):w.slice(0,2).join(" ");
   const n=a.need||1,val=a.typ==="eur"?{t:"euro",v:Math.round(a.eur/n*100)/100,mx:null}:a.typ==="nfor"?{t:"pct",v:Math.round(1000/n)/10,mx:a.max?Math.round(a.max/n*100)/100:null}:{t:"pct",v:a.pct??100,mx:a.max||null};
   S.coupons.push({id:"cb-"+a.id,s:o?o.s:(a.shops?.length===1?a.shops[0]:"all"),prog:"Geld zurück",k,...val,lbl:cbLbl(a),to:a.ende||a.kauf||null,cb:a.id,url:a.url,n:a.n});
@@ -1160,7 +1185,7 @@ function renderCoupons(){
   const popts=PROGS.map(p=>`<option ${p==="Rewe Bonus"?"selected":""}>${p}</option>`).join("");
   const topts=Object.entries(CP_TYPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
   const plus=7;const d=new Date(Date.now()+plus*864e5).toISOString().slice(0,10);
-  return `${cbDueHTML()}${cpFindHTML()}<section class="panel"><h3>Meine Coupons</h3>
+  return `${cbDueHTML()}${cbEarnedHTML()}${cpFindHTML()}<section class="panel"><h3>Meine Coupons</h3>
     <p>Coupon in Lidl Plus, der Rewe-App, bei Payback oder in einer Cashback-App aktiviert? Kurz hier eintragen. SparRadar rechnet ihn dann in alle passenden Angebote, den Kracher und den Einkaufszettel ein. Abgelaufene Coupons verschwinden von selbst.</p>
     <form class="form" id="cpForm">
      <div class="row"><label>Markt<select id="cpStore">${sopts}</select></label><label>Programm<select id="cpProg">${popts}</select></label></div>
@@ -1444,6 +1469,8 @@ document.addEventListener("click",e=>{
   if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set((CASHBACK?.items||[]).map(a=>"cb:"+a.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
   if(b.id==="cpFindAll"){const f=cbFinds().filter(x=>!S.cpfS||!x.a.shops?.length||x.a.shops.includes(S.cpfS)),n=f.reduce((a,x)=>a+cbAdd(x.a.id,true),0);save();toast(`${n} Geld-zurück-Aktionen eingefügt – Kassenbons aufheben!`);render();return}
   if(b.dataset.cbdone){const c=S.coupons.find(x=>x.id===b.dataset.cbdone);if(c){c.done=TODAY;if(S.sheet==="cbget")S.sheet=null;save();toast("Erledigt – das Geld kommt in ein paar Wochen.");render()}return}
+  if(b.dataset.cbtake){if(cbAdd(b.dataset.cbtake,true,b.dataset.cbo)){save();toast("💸 Mitgenommen – nach dem Einkauf zeigt SparRadar dir, wie du das Geld holst.");render()}return}
+  if(b.dataset.cbtakeall){const n=S.list.map(byId).filter(Boolean).map(o=>({o,a:cbFor(o)})).filter(x=>x.a&&!cbHave(x.a)).reduce((m,x)=>m+(cbHave(x.a)?0:cbAdd(x.a.id,true,x.o.id)),0);save();toast(`💸 ${n} mitgenommen`);render();return}
   if(b.dataset.cbget){const c=S.coupons.find(x=>x.id===b.dataset.cbget);if(c&&!c.buy)c.buy=TODAY;S.cbget=b.dataset.cbget;S.cbEdit=false;hideTripPop();S.sheet="cbget";save();render();return}
   if(b.dataset.copy!=null&&b.dataset.copyl){copy(b.dataset.copy,b.dataset.copyl+" kopiert – im Formular lange drücken und „Einfügen“");return}
   if(b.dataset.cbmeedit){S.cbEdit=true;render();return}
