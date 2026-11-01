@@ -1,16 +1,19 @@
-"""Diagnose (nur von Hand): Open Prices (Open Food Facts) als Quelle für echte Ladenpreise prüfen."""
-import json, urllib.request
-UA = {"User-Agent": "SparRadar/1.0 (+https://github.com/Tiry38/sparradar) Preisvergleich"}
-def get(u, n=3000):
-    try:
-        r = urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=40)
-        b = r.read(n); return r.status, b.decode("utf-8", "replace")
-    except Exception as e:
-        return "ERR", str(e)[:300]
-for u in ["https://prices.openfoodfacts.org/robots.txt",
-          "https://prices.openfoodfacts.org/api/v1/prices?product_code=4000405004562&size=3",
-          "https://prices.openfoodfacts.org/api/v1/prices?location__osm_address_country=Deutschland&size=1",
-          "https://huggingface.co/api/datasets/openfoodfacts/open-prices/tree/main",
-          "https://huggingface.co/robots.txt"]:
-    s, t = get(u)
-    print("==", u, s); print(t[:1500])
+"""Diagnose (nur von Hand): Open-Prices-Datenexport (Hugging Face, ODbL) – wie viele echte Ladenpreise gibt es für unsere Märkte?"""
+import subprocess, sys, collections, urllib.request
+subprocess.run([sys.executable, "-m", "pip", "install", "-q", "pyarrow"], check=True)
+import pyarrow.parquet as pq
+URL = "https://huggingface.co/datasets/openfoodfacts/open-prices/resolve/main/prices.parquet"
+req = urllib.request.Request(URL, headers={"User-Agent": "SparRadar/1.0 (+https://github.com/Tiry38/sparradar)"})
+open("/tmp/p.parquet", "wb").write(urllib.request.urlopen(req, timeout=120).read())
+t = pq.read_table("/tmp/p.parquet")
+print("Zeilen", t.num_rows); print(t.schema)
+rows = t.to_pylist()
+print(rows[0])
+cc = collections.Counter(r.get("location_osm_address_country_code") or r.get("location_osm_address_country") for r in rows)
+print(cc.most_common(10))
+de = [r for r in rows if (r.get("location_osm_address_country_code") or "") == "DE" or (r.get("location_osm_address_country") or "") in ("Deutschland", "Germany")]
+print("DE", len(de))
+br = collections.Counter((r.get("location_osm_brand") or r.get("location_osm_name") or "?") for r in de)
+print(br.most_common(30))
+print("Datum", min(str(r.get("date")) for r in de), max(str(r.get("date")) for r in de))
+print("Produkte DE", len({r.get("product_code") for r in de}))
