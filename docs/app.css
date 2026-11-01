@@ -150,6 +150,8 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .dpic svg.ill{width:55%}
 .dpic .off{position:absolute;right:12px;top:12px;font-size:1.1rem}
 .dpic .zhint{position:absolute;left:12px;bottom:10px;font-size:.72rem;font-weight:700;background:rgba(0,0,0,.55);color:#fff;border-radius:999px;padding:3px 9px}
+.dpic .badimg{all:unset;position:absolute;right:12px;bottom:10px;z-index:2;font-size:.72rem;font-weight:700;background:rgba(0,0,0,.55);color:#fff;border-radius:999px;padding:3px 9px;cursor:pointer}
+.dpic .badimg:hover,.dpic .badimg:focus-visible{background:rgba(0,0,0,.8);outline:2px solid #fff;outline-offset:1px}
 .dthumbs{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
 .dthumbs button{flex:none;width:64px;height:64px;border-radius:12px;border:2px solid var(--line);background:#fff;padding:3px;cursor:pointer}
 .dthumbs button[aria-pressed="true"]{border-color:#1E9E5A}

@@ -1049,7 +1049,8 @@ def update_names(offers, today):
     names = {k: v for k, v in names.items() if v >= cutoff}
     names = dict(sorted(names.items(), key=lambda kv: kv[1], reverse=True)[:6000])
     save("names.json", names)
-    save("names-img.json", {k: v for k, v in imgs.items() if k in names and isinstance(v, str) and v.startswith("https://")})
+    bad = load("img-bad.json", {})
+    save("names-img.json", {k: v for k, v in imgs.items() if k in names and isinstance(v, str) and v.startswith("https://") and img_id(v) not in bad})
 
 
 # ---------- Schnell in die App (Kevins Wunsch: neue Angebote so früh wie möglich, nicht erst nach 40 Minuten) ----------
@@ -1211,9 +1212,46 @@ def better_images(offers):
     log(f"Unscharfe Bilder ersetzt: {n}")
 
 
+def img_id(u):
+    """Bild-ID = Dateiname ohne Endung (kaufDA nutzt dieselbe Datei in mehreren Ordnern)."""
+    return re.sub(r"\.\w+$", "", str(u or "").split("?")[0].rsplit("/", 1)[-1])
+
+
+def fix_bad_images(offers):
+    """Falsche Bilder entfernen (Quelle lieferte das Bild eines anderen Artikels, z. B. Lidl Schoko Drink mit
+    H-Milch-Bild). Liste von Hand: docs/data/img-bad.json {Bild-ID: {n: Notiz, r: Ersatzbild (optional)}}."""
+    bad = load("img-bad.json", {})
+    if not isinstance(bad, dict) or not bad:
+        return
+    isbad = lambda u: bool(u) and img_id(u) in bad
+    n = 0
+    for o in offers:
+        allu = [o.get("img"), o.get("il"), *(o.get("ims") or [])]
+        if not any(isbad(u) for u in allu):
+            continue
+        rep = next((bad[img_id(u)].get("r") for u in allu if isbad(u) and isinstance(bad[img_id(u)], dict) and bad[img_id(u)].get("r")), None)
+        ims = [u for u in (o.get("ims") or []) if u and not isbad(u)]
+        if isbad(o.get("img")) or isbad(o.get("il")):
+            o.pop("il", None)
+        if isbad(o.get("img")):
+            o.pop("iw", None)
+            o.pop("io", None)
+            o["img"] = rep if rep and not isbad(rep) else (ims.pop(0) if ims else None)
+            if not o["img"]:
+                o.pop("img")
+        if ims:
+            o["ims"] = ims
+        else:
+            o.pop("ims", None)
+        n += 1
+    if n:
+        log(f"Falsche Bilder korrigiert: {n}")
+
+
 def finalize(offers, save_uvp=False):
     today = dt.date.today().isoformat()
     offers = drop_previews(merge(offers))
+    fix_bad_images(offers)
     for o in offers:  # auch schon gespeicherte Angebote nach den Geräte-Regeln einordnen
         dev = special(o.get("n"), o.get("b"), o.get("cat")) or appliance(o.get("n"), o.get("cat"))
         if dev and o.get("c") != dev:

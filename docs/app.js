@@ -325,6 +325,16 @@ function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.lengt
 // Scharfe Bilder: kaufDA liefert unter derselben Adresse ohne „?impolicy=…“ die volle Auflösung,
 // Aldi in größerer Breite. Gilt auch für schon gespeicherte Angebote.
 const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails)$/,"").replace(/\/scaleWidth\/500\//,"/scaleWidth/1000/");
+// Falsche Bilder (Quelle liefert manchmal das Bild eines anderen Artikels): Liste für alle docs/data/img-bad.json
+// {Bild-ID:{n,r?}} (r = Ersatzbild) + auf diesem Gerät über „Falsches Bild?“ ausgeblendete (sr_badimg, nicht im Sync)
+const imgId=u=>String(u||"").split("?")[0].split("/").pop().replace(/\.\w+$/,"");
+let IMG_BAD={};const IMG_MINE=new Set(store.get("badimg",[]));
+const badImg=u=>!!u&&(IMG_MINE.has(imgId(u))||!!IMG_BAD[imgId(u)]);
+function fixImg(o){const all=[o.img,o.il,...(o.ims||[])];if(!all.some(badImg))return o;
+  const rep=all.map(u=>badImg(u)&&IMG_BAD[imgId(u)]&&IMG_BAD[imgId(u)].r).find(Boolean),ims=(o.ims||[]).filter(u=>u&&!badImg(u));
+  if(badImg(o.img)||badImg(o.il))delete o.il;
+  if(badImg(o.img)){delete o.iw;delete o.io;o.img=rep&&!badImg(rep)?rep:ims.shift()||"";if(!o.img)delete o.img}
+  if(ims.length)o.ims=ims;else delete o.ims;return o}
 // Winzige Prospekt-Ausschnitte (kaufDA, z. B. 150 px) nicht auf Kartengröße aufblasen – das macht sie pixelig.
 // Größe kommt vom Abruf (o.iw) oder wird beim Laden gemessen (lowres()).
 const LOWPX=320;
@@ -550,8 +560,8 @@ function autoRenew(){const wo=OFFERS.filter(o=>!isNextWk(o)),got=[];
 
 async function load(){
   try{
-    const [o,h,nm]=await Promise.all([fetch("data/offers.json",{cache:"no-cache"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-cache"}).then(r=>r.json()).catch(()=>({})),fetch("data/names.json",{cache:"no-cache"}).then(r=>r.json()).catch(()=>({}))]);
-    NAMES=Object.keys(nm||{});
+    const [o,h,nm,bi]=await Promise.all([fetch("data/offers.json",{cache:"no-cache"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-cache"}).then(r=>r.json()).catch(()=>({})),fetch("data/names.json",{cache:"no-cache"}).then(r=>r.json()).catch(()=>({})),fetch("data/img-bad.json",{cache:"no-cache"}).then(r=>r.json()).catch(()=>({}))]);
+    NAMES=Object.keys(nm||{});IMG_BAD=bi&&typeof bi==="object"?bi:{};o.offers.forEach(fixImg);
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;HPC=new WeakMap();HOC=new WeakMap();
     loadCashback().then(()=>render()); // Geld-zurück-Abzeichen an den Angeboten
@@ -641,7 +651,7 @@ function simImg(t){if(!SIMG||!CATALOG||!SIMG.cat.length)return "";const w=wToken
 function sugImg(t){
   const k=norm(t),o=OFFERS.find(x=>x.img&&(norm(x.n)===k||norm((x.b||"")+x.n)===k));if(o)return sharp(o.img);
   if(!SIMG)return "";
-  const n=SIMG.names[t]||SIMG.extra[t]||SIMG.extraN[k];if(n)return n;
+  const n=[SIMG.names[t],SIMG.extra[t],SIMG.extraN[k]].find(u=>u&&!badImg(u));if(n)return n;
   if(CATALOG_N&&SIMG.cat.length){if(!CAT_IDX){CAT_IDX=new Map();CATALOG_N.forEach((x,i)=>{if(!CAT_IDX.has(x))CAT_IDX.set(x,i)})}
     const c=SIMG.cat[CAT_IDX.get(k)];if(c)return (c[0]==="b"?"https://images.openbeautyfacts.org":"https://images.openfoodfacts.org")+"/images/products/"+c.slice(2)+".jpg"}
   return ""}
@@ -938,7 +948,7 @@ function renderDetail(){
   const share=`${o.n}${o.b?" ("+o.b+")":""} bei ${sname(o.s)}: ${o.bo?eur(o.bo)+" Bonus":eur(fin(o))}${offPct(o)?` (−${offPct(o)} %)`:""}${validTxt(o)?", "+validTxt(o):""}\n\nGefunden mit SparRadar: ${APP_URL}`;
   return `<div class="sheet detail" role="dialog" aria-modal="true" aria-label="${esc(o.n)}">
    <div class="sheet-h">${sb(o.s,true)}<h2>${esc(sname(o.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
-   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span>`:""}</div>
+   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span><button class="badimg" data-badimg="${esc(cur)}" title="Bild zeigt einen anderen Artikel? Dann hier ausblenden.">Falsches Bild?</button>`:""}</div>
    ${ims.length>1?`<div class="dthumbs">${ims.map((u,i)=>`<button data-dimg="${i}" aria-pressed="${u===cur}" aria-label="Bild ${i+1}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb="1"></button>`).join("")}</div>`:""}
    <div class="dinfo">
     ${o.b?`<span class="store">${esc(o.b)}</span>`:""}
@@ -981,6 +991,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  127:["🖼️ Zeigt ein Bild einen anderen Artikel? In der Detailansicht unten rechts auf „Falsches Bild?“ tippen – dann wird es ausgeblendet. Der Schoko Drink von Lidl hat jetzt das richtige Bild."],
   126:["🍾 Einkaufszettel: Pfand wird jetzt mitgerechnet (bei Getränken mit „zzgl. Pfand“). Die Summe stimmt also mit der Kasse überein.","🧾 Hast du schon Kassenbons eingetragen? Dann steht bei eigenen Einträgen wie „Brot“, was du zuletzt dafür bezahlt hast, und die Summe rechnet es mit „ca.“ ein.","💪 Neuer Filter „Eiweiß pro €“: zeigt, wo du Eiweiß am günstigsten bekommst (z. B. Quark, Hähnchen, Thunfisch, Eier).","🎌 Feiertage: Die App sagt dir vorher, wann die Märkte geschlossen haben, damit du rechtzeitig einkaufst.","🎤 Zettel: Neuer Knopf „Sprechen“. Sag z. B. „Milch, Butter und drei Eier“ – alles steht sofort drauf.","📲 App-Symbol lange drücken: direkt zum Einkaufszettel, zum Scanner oder zur Merkliste."],
   125:["📷 Einkaufszettel: Neuer Knopf „Scannen“. Im Laden einfach den Strichcode scannen – der Artikel kommt sofort auf den Zettel. Ist er im Angebot, steht er gleich mit Angebotspreis drauf. Während des Einkaufs liegt er direkt im Wagen."],
   124:["🌅 Neue Angebote kommen jetzt jeden Morgen eine Stunde früher: fertig gegen 5 Uhr (im Sommer gegen 6 Uhr). So kannst du auch vor einem frühen Einkauf noch reinschauen."],
@@ -2208,6 +2219,8 @@ document.addEventListener("click",e=>{
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openFilter"||b.id==="openFilter2"){S.sheet="filter";render();return}
   if(b.dataset.zoom){S.lightbox=b.dataset.zoom;render();return}
+  if(b.dataset.badimg){if(!confirm("Zeigt das Bild einen anderen Artikel? Dann wird es auf diesem Gerät ausgeblendet."))return;
+    IMG_MINE.add(imgId(b.dataset.badimg));store.set("badimg",[...IMG_MINE].slice(-300));[...RAW,...OFFERS,...OLD.values()].forEach(fixImg);S.dImg=0;render();toast("🖼️ Bild ausgeblendet – danke!");return}
   if(b.dataset.dimg!==undefined){S.dImg=+b.dataset.dimg;render();return}
   if(b.id==="openSettings"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="settingsBtn"){S.sheet="settings";render();checkVersion();return}
