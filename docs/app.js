@@ -55,7 +55,7 @@ const IC = {
 
 // ---------- Zustand ----------
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
-const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,noapp:0,low:0},store.get("flt",{})),useApp:store.get("useApp",true),
+const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0},store.get("flt",{})),useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),sheet:null,limit:60};
 let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
@@ -259,7 +259,7 @@ function perk(o){
     if(c.length&&c[0].v>=fin(o)*1.05){const pct=Math.round((1-fin(o)/c[0].v)*100);
       r={pct,b:"günstigster Markt",s:`bei ${sname(c[0].x.s)} ${eur(c[0].v)}`,l:`Derselbe Artikel kostet beim nächstgünstigen Markt (${sname(c[0].x.s)}) ${eur(c[0].v)}. Hier sparst du ${pct} %.`}}}
   PERK.set(o.id,r);return r}
-function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
+function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${appName(o)?`<span class="apptag" title="App-Angebot: ${esc(o.ao?"Preis gilt nur mit "+o.ao:"günstiger mit "+appName(o))}">📱 ${esc(appName(o))}</span>`:""}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
 
 document.addEventListener("load",e=>{const i=e.target;if(i.tagName==="IMG"&&i.closest(".thumb")&&i.naturalWidth&&Math.max(i.naturalWidth,i.naturalHeight)<LOWPX)i.classList.add("lowres")},true);
 // ---------- Daten ----------
@@ -346,11 +346,14 @@ const fltOk=o=>{const F=S.flt;
   if(F.bio&&!/\bbio\b|\bbio-|naturland|demeter|bioland/i.test(FLT_TXT(o)))return false;
   if(F.vegan&&!/vegan|pflanzlich/i.test(FLT_TXT(o)))return false;
   if(F.real&&(!(o.o>0)||dealWarn(o)||offPct(o)<=0))return false;
-  if(F.noapp&&(o.ap||(o.x||[]).length))return false;
+  if(F.noapp&&(o.ap||o.ao||(o.x||[]).length))return false;
+  if(F.app&&!appName(o))return false;
   if(F.low&&verdict(o).t!=="low")return false;
   return true};
 const fltCount=()=>Object.values(S.flt).filter(Boolean).length;
-const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",noapp:"Ohne App & Karte",low:"Tiefstpreis"};
+const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis"};
+// App-Angebot? (Preis nur mit App = ao, oder extra App-Preis = ap) -> Name der App fürs Abzeichen
+const appName = o => (o.ao||"").replace(/-App$/," App")||(o.ap&&o.ap<o.p?(o.s==="lidl"?"Lidl Plus":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App":"App")):"");
 const fltSummary=()=>[].concat(S.flt.min?[`ab ${S.flt.min} %`]:[],S.flt.max?[`bis ${eur(S.flt.max)}`]:[],Object.keys(FLT_LABEL).filter(k=>S.flt[k]).map(k=>FLT_LABEL[k]));
 const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o.rk&&o.rk.t==="ok"?3:0)-(o.rk&&o.rk.t==="open"&&o.ou===1?20:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
@@ -637,6 +640,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  66:["App-Angebote sind jetzt auf einen Blick erkennbar: Abzeichen „📱 Lidl Plus“ direkt auf dem Bild.","Neuer Filter „Nur App-Angebote“. „Ohne App & Karte“ blendet jetzt auch Preise aus, die nur mit der App gelten."],
   65:["Einkaufszettel: Neben jedem Artikel gibt es jetzt 🎟️. Im Laden antippen, Coupon-Wert wählen – fertig, Preis und Summe sind sofort angepasst."],
   64:["Coupon mit einem Tipp: Im Angebot auf „🎟️ Ich habe einen Coupon dafür“ tippen und den Wert wählen (z. B. −1 € oder −20 %). Markt, Artikel und Gültigkeit übernimmt SparRadar selbst und rechnet den Coupon sofort ein.","Merkliste: Gemerkte Artikel zeigen jetzt ihr Produktbild (aus dem Artikelstamm), auch wenn sie gerade nicht im Angebot sind."],
   63:["Geräte verbinden: Beliebig viele Geräte mit demselben Code verbinden (z. B. Handys von Mama und Stefan, Tablet, PC) – alle haben denselben Einkaufszettel und dieselbe Merkliste.","In den Einstellungen siehst du jetzt, welche Geräte verbunden sind und wann sie zuletzt aktiv waren. Jedem Gerät kannst du einen Namen geben, z. B. „Mamas Handy“."],
@@ -1166,11 +1170,11 @@ document.addEventListener("click",e=>{
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
   if(b.dataset.toggleapp){S.useApp=!S.useApp;save();render();return}
-  if(b.dataset.freset){S.stores.clear();S.cats.clear();S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
+  if(b.dataset.freset){S.stores.clear();S.cats.clear();S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
   if(b.dataset.fmin!=null){S.flt.min=+b.dataset.fmin;S.limit=60;store.set("flt",S.flt);render();return}
   if(b.dataset.fmax!=null){S.flt.max=+b.dataset.fmax;S.limit=60;store.set("flt",S.flt);render();return}
   if(b.dataset.fflag){const k=b.dataset.fflag;S.flt[k]=S.flt[k]?0:1;S.limit=60;store.set("flt",S.flt);render();return}
-  if(b.dataset.fclear){S.flt={min:0,max:0,bio:0,vegan:0,real:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
+  if(b.dataset.fclear){S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
   if(b.dataset.fdone){S.sheet=null;render();scrollTo({top:0});return}
   if(b.id==="closeSheet"){S.sheet=null;render();return}
   if(b.id==="more"){S.limit+=60;render();return}

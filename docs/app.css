@@ -374,3 +374,6 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
  .rline:has(.qstep) .rcheck+*{margin-left:auto}
  .rline .cpbtn small{display:none}
 }
+
+/* App-Angebot: Abzeichen auf dem Bild */
+.thumb .apptag{position:absolute;left:10px;bottom:8px;z-index:1;display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:800;color:#fff;background:#0050aa;border:2px solid #fff200;border-radius:8px;padding:2px 8px;box-shadow:0 2px 6px rgba(0,0,0,.25);white-space:nowrap}
