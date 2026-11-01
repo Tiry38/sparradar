@@ -697,6 +697,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  93:["Geld holen: Feld für die PayPal-E-Mail (manche Aktionen zahlen per PayPal) und Hinweis, wie ausgezahlt wird. Aktionen mit zusätzlichem Gewinnspiel sind mit 🎲 markiert – Mitmachen ist freiwillig."],
   92:["Geld zurück siehst du jetzt überall: 💸-Abzeichen am Angebot, „Mitnehmen“ in der Detailansicht und auf dem Einkaufszettel – ohne extra suchen.","Im Tab „Coupons“ siehst du, wie viel du mit Geld zurück schon geholt hast."],
   91:["Geld zurück jetzt mit „💸 Jetzt Geld holen“: SparRadar führt dich Schritt für Schritt – Bon bereitlegen, Aktionsseite öffnen, Name, E-Mail und IBAN mit einem Tipp kopieren, fertig."],
   90:["Offene Geld-zurück-Bons: Der Reiter „Coupons“ leuchtet orange mit 💸, bis du den Bon hochgeladen und „Erledigt“ getippt hast.","Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen."],
@@ -976,7 +977,7 @@ function cbDueHTML(){const d=cbDue().sort((a,b)=>String(a.to||"9").localeCompare
    <div class="rows">${d.map(c=>`<div class="drow cbd-r"><div class="t">${esc(c.n||c.k)}<small>${esc(c.lbl||cpValueTxt(c))}${c.to?" · Bon hochladen bis "+fmtDate(c.to):""}</small></div>
      <div class="cpf-b"><button class="btn sm" data-cbget="${esc(c.id)}">💸 Jetzt Geld holen</button><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div></div>`).join("")}</div></section>`}
 // Eigene Angaben fürs Formular des Herstellers: NUR auf diesem Gerät (localStorage „cbMe“), nie im Sync, nie verschickt
-const CB_ME=[["vn","Vorname","given-name"],["nn","Nachname","family-name"],["mail","E-Mail","email"],["iban","IBAN (Kontonummer)","off"],["str","Straße und Hausnummer","street-address"],["ort","PLZ und Ort","address-level2"]];
+const CB_ME=[["vn","Vorname","given-name"],["nn","Nachname","family-name"],["mail","E-Mail","email"],["iban","IBAN (Kontonummer)","off"],["pp","PayPal-E-Mail (nur falls die Aktion per PayPal zahlt)","email"],["str","Straße und Hausnummer","street-address"],["ort","PLZ und Ort","address-level2"]];
 function renderCbGet(){const c=S.coupons.find(x=>x.id===S.cbget);
   const close=`<button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button>`;
   if(!c)return `<div class="sheet"><div class="sheet-h"><h2>Geld holen</h2>${close}</div><div class="empty"><b>Schon erledigt</b></div></div>`;
@@ -999,7 +1000,7 @@ function renderCbGet(){const c=S.coupons.find(x=>x.id===S.cbget);
        ${CB_ME.map(([k,l,ac])=>`<label>${esc(l)}<input data-cbme="${k}" value="${esc(me[k]||"")}" autocomplete="${ac}" ${k==="iban"?'inputmode="text" spellcheck="false" style="text-transform:uppercase"':""}${k==="mail"?' type="email"':""}></label>`).join("")}
        <button class="btn" data-cbmesave="1">Speichern</button></div>`
       :`<div class="cbme-a"><button class="btn ghost sm" data-cbmeedit="1">Meine Angaben ändern</button></div>`}</li>
-    <li><h4>Abgeschickt?</h4><p>Das Geld kommt meist nach 2–6 Wochen aufs Konto. Den Bon bis dahin aufheben.</p>
+    <li><h4>Abgeschickt?</h4><p>Das Geld kommt meist nach 2–6 Wochen – fast immer per <b>Überweisung aufs Konto</b>, manchmal per PayPal. Den Bon bis dahin aufheben.</p>${c.gw?`<p class="cbgw">🎲 Diese Aktion hat zusätzlich ein Gewinnspiel. Mitmachen ist freiwillig – das Geld zurück bekommst du auch ohne.</p>`:""}
      <button class="btn big" data-cbdone="${esc(c.id)}">✓ Erledigt</button></li>
    </ol>
    <p class="cpf-n">Die meisten Aktionen nehmen auch einen digitalen Bon (Screenshot oder PDF) an, wenn Markt, Datum, Artikel und Preis zu sehen sind. Was genau gilt, steht in den Teilnahmebedingungen der Aktion.</p>
@@ -1163,7 +1164,7 @@ function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfi
   return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Finder</h3><button class="ibtn" id="cpFindX" aria-label="Coupon-Finder schließen">${IC.x}</button></div>
     ${chips}${f.length?`<p><b>${f.length} Geld-zurück-Aktion${f.length===1?"":"en"} gefunden – zusammen bis zu ${eur(tot)} zurück.</b> Ganz oben: was es gerade auch im Angebot gibt – doppelt gespart.</p>
     <div class="rows">${f.map(({a,o,val})=>`<div class="drow cpf-r">${o?`<button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>`:`<span class="mini cbico" aria-hidden="true">${CB_ICO[a.cat]||"💸"}</span>`}
-      <div class="t">${esc(a.n)}<small>${esc(cbLbl(a))}${a.max?" (max. "+eur(a.max)+")":""}${a.min?" · ab "+eur(a.min)+" Einkauf":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
+      <div class="t">${esc(a.n)}<small>${esc(cbLbl(a))}${a.max?" (max. "+eur(a.max)+")":""}${a.min?" · ab "+eur(a.min)+" Einkauf":""}${a.gw?" · 🎲 mit Gewinnspiel (freiwillig)":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
        ${o?`<small class="cbhit">🔥 Gerade im Angebot: ${esc(sname(o.s))} ${eur(fin(o))}${cbHitTxt(a,o)}</small>`:""}</div>
       <div class="pr"><b>${val?"−"+eur(val):a.typ==="nfor"?"1 gratis":"gratis"}</b><small>${esc(cbShort(a))}</small></div>
       <div class="cpf-b"><button class="btn sm" data-cbadd="${esc(a.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="cb:${esc(a.id)}">Nein</button><a class="btn ghost sm" href="${esc(a.url)}" target="_blank" rel="noopener nofollow">Aktion ↗</a></div></div>`).join("")}</div>
@@ -1173,7 +1174,7 @@ function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfi
 function cbAdd(id,quiet,oid){const a=(CASHBACK?.items||[]).find(x=>x.id===id);if(!a)return 0;const o=(oid&&byId(oid))||cbOffers(a)[0],w=cbWords(a);
   const k=o?[w[0],...w.slice(1).filter(x=>cbHit(o,x)).slice(0,1)].join(" "):w.slice(0,2).join(" ");
   const n=a.need||1,val=a.typ==="eur"?{t:"euro",v:Math.round(a.eur/n*100)/100,mx:null}:a.typ==="nfor"?{t:"pct",v:Math.round(1000/n)/10,mx:a.max?Math.round(a.max/n*100)/100:null}:{t:"pct",v:a.pct??100,mx:a.max||null};
-  S.coupons.push({id:"cb-"+a.id,s:o?o.s:(a.shops?.length===1?a.shops[0]:"all"),prog:"Geld zurück",k,...val,lbl:cbLbl(a),to:a.ende||a.kauf||null,cb:a.id,url:a.url,n:a.n});
+  S.coupons.push({id:"cb-"+a.id,s:o?o.s:(a.shops?.length===1?a.shops[0]:"all"),prog:"Geld zurück",k,...val,lbl:cbLbl(a),to:a.ende||a.kauf||null,cb:a.id,url:a.url,n:a.n,gw:a.gw||0});
   if(o&&!S.list.includes(o.id))S.list.push(o.id);
   if(o&&n>1)S.qty[o.id]=Math.max(S.qty[o.id]||1,n); // „2 kaufen, 1 gratis“: gleich 2 Stück auf den Zettel
   if(!quiet){save();toast(o?`Eingefügt und auf dem Zettel: ${a.n}. Kassenbon aufheben!`:`Eingefügt: ${a.n}. Beim Kauf Kassenbon aufheben!`)}return 1}

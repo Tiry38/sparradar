@@ -84,6 +84,7 @@ def mystipendium():
             "w": float(wert.group(1).replace(",", ".")) if wert else None,
             "ab": ab, "kauf": kauf, "ende": ende, "shops": shops, "url": link.group(1),
             "lim": f.get("Anzahl Teilnehmer", "")[:80], "src": "mystipendium.de",
+            "gw": 1 if re.search(r"gewinn(chance|spiel)|verlos", txt(blk), re.I) else 0,
         })
     print("mystipendium.de:", len(items))
     return items
@@ -157,6 +158,7 @@ def sparwelt():
             "min": money(mn.group(1)) if mn and mn.group(2) else None, "w": None,
             "ab": date(txt(zr.group(1))) if zr and date(txt(zr.group(1))) and date(txt(zr.group(1))) > today else None,
             "kauf": kauf, "ende": ende, "shops": shops, "url": url, "lim": "", "src": "sparwelt.de",
+            "gw": 1 if re.search(r"gewinn(chance|spiel)|verlos", low) else 0,
         })
     print("sparwelt.de:", len(items))
     return items

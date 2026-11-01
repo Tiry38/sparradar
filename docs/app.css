@@ -464,3 +464,4 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .cbt-r{grid-template-columns:minmax(0,1fr) auto;align-items:center}
 .cbearned{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:linear-gradient(90deg,#2B3034,#1f9d55);color:#fff}
 .cbearned b{font-size:1.1em}
+.cbgw{font-size:.9em;color:var(--muted)}
