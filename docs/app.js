@@ -100,46 +100,66 @@ const Sync = {
   devId(){let id=store.get("devId","");if(!id){id=Math.random().toString(36).slice(2,10);store.set("devId",id)}return id},
   devType(){const u=navigator.userAgent;return /iPad|Tablet|SM-T|Tab\b/i.test(u)||(/Android/i.test(u)&&!/Mobile/i.test(u))?"tablet":/Android|iPhone|Mobile/i.test(u)?"phone":"pc"},
   devName(){return store.get("devName","")||({phone:/iPhone/.test(navigator.userAgent)?"iPhone":"Android-Handy",tablet:"Tablet",pc:/Mac/.test(navigator.userAgent)?"Mac":"Windows-PC"})[this.devType()]},
-  devs(){const me={n:this.devName(),t:this.devType(),at:Date.now()},old=Date.now()-90*864e5;
+  devs(){const me={n:this.devName(),t:this.devType(),at:Date.now(),sh:this.on()},old=Date.now()-90*864e5;
     const d=Object.fromEntries(Object.entries(this.devices||{}).filter(([k,v])=>v&&v.at>old&&k!==this.devId()));d[this.devId()]=me;return d},
-  data(){return {watch:S.watch,list:S.list,coupons:S.coupons,extra:S.extra,checked:S.checked,saved:S.saved,trips:S.trips,qty:S.qty}},
-  snap(){return JSON.stringify(this.data())},
+  // Bereiche: jedes Gerät wählt selbst, was es mit den anderen teilt (Kevins Wunsch: Familie teilt den Einkaufszettel,
+  // die Merkliste nur, wer sie teilen will). Jeder Bereich hat einen eigenen Zeitstempel -> nichts wird überschrieben.
+  PARTS:{list:{n:"Einkaufszettel",keys:["list","extra","checked","qty","trips","saved"]},watch:{n:"Merkliste",keys:["watch"]},coupons:{n:"Coupons",keys:["coupons"]}},
+  SKEY:{watch:"watch2"},
+  share(){const d=store.get("syncParts",null);return d||(this.cfg()?.gist?{list:true,watch:true,coupons:true}:{list:true,watch:false,coupons:false})},
+  on(){const sh=this.share();return Object.keys(this.PARTS).filter(p=>sh[p])},
+  get(p){return Object.fromEntries(this.PARTS[p].keys.map(k=>[k,S[k]]))},
+  set(p,d){this.PARTS[p].keys.forEach(k=>{S[k]=d[k]??(k==="qty"?{}:[]);store.set(this.SKEY[k]||k,S[k])})},
+  pick(d,p){return Object.fromEntries(this.PARTS[p].keys.filter(k=>d&&d[k]!=null).map(k=>[k,d[k]]))},
+  snap(p){return JSON.stringify(this.get(p))},
+  // alte Datei {updatedAt,data} (vor Version 67) in Bereiche umrechnen; ist „data“ neuer, gewinnt es
+  norm(r){const parts={...(r.parts||{})};if(r.data)Object.keys(this.PARTS).forEach(p=>{if(!parts[p]||(r.updatedAt||0)>(parts[p].at||0))parts[p]={at:r.updatedAt||1,d:this.pick(r.data,p)}});return parts},
   async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
     if(r.status===401)throw new Error("Schlüssel ungültig oder abgelaufen");if(!r.ok)throw new Error("GitHub antwortet nicht ("+r.status+")");return r.json()},
-  apply(d){S.watch=d.watch||[];S.list=d.list||[];S.coupons=d.coupons||[];S.extra=d.extra||[];S.checked=d.checked||[];S.saved=d.saved||S.saved||[];S.trips=d.trips||S.trips||[];S.qty=d.qty||S.qty||{};
-    store.set("trips",S.trips);store.set("qty",S.qty);store.set("extra",S.extra);store.set("checked",S.checked);store.set("saved",S.saved);
-    store.set("watch2",S.watch);store.set("list",S.list);store.set("coupons",S.coupons);},
+  async load(){const c=this.cfg(),g=await this.req("/gists/"+c.gist),f=g.files[this.FILE];
+    const raw=f?(f.truncated?await (await fetch(f.raw_url,{cache:"no-store"})).text():f.content):"{}";const r=JSON.parse(raw||"{}");
+    if(r.devices&&typeof r.devices==="object"){this.devices=r.devices;store.set("syncDevs",r.devices)}
+    return {parts:this.norm(r),devices:r.devices||{}}},
   // beide Seiten geändert: nichts verlieren, alles zusammenführen
   merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
     return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
       coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|")),
       extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])],saved:u(a.saved||[],b.saved||[],x=>x.id+"|"+x.d),
       trips:u(a.trips||[],b.trips||[],x=>x.id).sort((x,y)=>(y.at||"").localeCompare(x.at||"")),qty:{...(a.qty||{}),...(b.qty||{})}}},
-  async connect(token){store.set("sync",{token});
+  mergeP(p,remote,local){return this.pick({...this.merge(remote,local)},p)},
+  async connect(token,parts){store.set("sync",{token});
     try{const gs=await this.req("/gists?per_page=100");let g=gs.find(x=>x.description===this.DESC&&x.files[this.FILE]);
-      if(!g)g=await this.req("/gists",{method:"POST",body:JSON.stringify({description:this.DESC,public:false,files:{[this.FILE]:{content:JSON.stringify({updatedAt:Date.now(),data:this.data()})}}})});
-      store.set("sync",{token,gist:g.id});store.set("syncSnap",null);store.set("syncRemoteAt",0);await this.pull(true);return true}
+      if(!g)g=await this.req("/gists",{method:"POST",body:JSON.stringify({description:this.DESC,public:false,files:{[this.FILE]:{content:JSON.stringify({v:2,updatedAt:Date.now(),parts:{},devices:{}})}}})});
+      store.set("sync",{token,gist:g.id});if(parts)store.set("syncParts",parts);store.set("syncAt",{});store.set("syncSnaps",{});await this.pull(true);return true}
     catch(e){store.set("sync",null);throw e}},
-  disconnect(){store.set("sync",null);store.set("syncSnap",null);this.status=""},
-  async pull(first){const c=this.cfg();if(!c?.gist||this.busy)return;this.busy=true;
-    try{const g=await this.req("/gists/"+c.gist);const f=g.files[this.FILE];
-      const raw=f.truncated?await (await fetch(f.raw_url,{cache:"no-store"})).text():f.content;const remote=JSON.parse(raw||"{}");
-      if(remote.devices&&typeof remote.devices==="object"){this.devices=remote.devices;store.set("syncDevs",remote.devices)}
-      const mine=(this.devices||{})[this.devId()],stale=!mine||mine.n!==this.devName()||Date.now()-mine.at>6*36e5;
-      const remoteNew=(remote.updatedAt||0)>store.get("syncRemoteAt",0),localNew=this.snap()!==store.get("syncSnap",null);
-      if(remoteNew&&remote.data){
-        if(localNew&&!first){this.apply(this.merge(remote.data,this.data()));this.busy=false;return this.push()}
-        if(first){this.apply(this.merge(remote.data,this.data()))}else this.apply(remote.data);
-        store.set("syncRemoteAt",remote.updatedAt);store.set("syncSnap",this.snap());
-        if(first){this.busy=false;return this.push()}
-        render()}
-      else if(localNew||stale){this.busy=false;return this.push()}
+  disconnect(){store.set("sync",null);store.set("syncAt",{});store.set("syncSnaps",{});store.set("syncParts",null);this.status=""},
+  // neu geteilten Bereich beim nächsten Abgleich zusammenführen statt überschreiben
+  setShare(sh){const old=this.share();store.set("syncParts",sh);const sn=store.get("syncSnaps",{}),at=store.get("syncAt",{});
+    Object.keys(this.PARTS).forEach(p=>{if(sh[p]&&!old[p]){delete sn[p];at[p]=-1}});store.set("syncSnaps",sn);store.set("syncAt",at)},
+  async pull(){const c=this.cfg();if(!c?.gist||this.busy)return;this.busy=true;
+    try{const {parts}=await this.load(),at=store.get("syncAt",{}),sn=store.get("syncSnaps",{});let push=false,changed=false;
+      for(const p of this.on()){const rp=parts[p],localNew=this.snap(p)!==sn[p],fresh=at[p]==null||at[p]<0;
+        if(rp&&(rp.at||0)>(at[p]||0)){
+          if(localNew||fresh){this.set(p,this.mergeP(p,rp.d,this.get(p)));push=true}else this.set(p,{...this.get(p),...rp.d});
+          at[p]=rp.at;if(!push)sn[p]=this.snap(p);changed=true}
+        else if(localNew||!rp)push=true}
+      store.set("syncAt",at);store.set("syncSnaps",sn);
+      const mine=(this.devices||{})[this.devId()];
+      if(!mine||mine.n!==this.devName()||Date.now()-mine.at>6*36e5||JSON.stringify(mine.sh||[])!==JSON.stringify(this.on()))push=true;
+      if(changed)render();
+      if(push){this.busy=false;return this.push()}
       this.ok()}
     catch(e){this.fail(e)}finally{this.busy=false}},
+  // lesen – zusammenführen – schreiben: so gehen Änderungen anderer Geräte/Personen nie verloren
   async push(){const c=this.cfg();if(!c?.gist)return;if(this.busy){this.changed();return}this.busy=true;
-    try{const at=Date.now();await this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify({updatedAt:at,data:this.data(),devices:this.devs()})}}})});
-      this.devices=this.devs();store.set("syncDevs",this.devices);
-      store.set("syncRemoteAt",at);store.set("syncSnap",this.snap());this.ok()}
+    try{const {parts}=await this.load(),at=store.get("syncAt",{}),sn=store.get("syncSnaps",{}),now=Date.now();let changed=false;
+      for(const p of this.on()){const rp=parts[p];
+        if(rp&&(rp.at||0)>(at[p]||0)){this.set(p,this.mergeP(p,rp.d,this.get(p)));changed=true}
+        if(!rp||this.snap(p)!==sn[p]||(rp.at||0)>(at[p]||0)){parts[p]={at:now,d:this.get(p)};at[p]=now}
+        sn[p]=this.snap(p)}
+      const devs=this.devs();
+      await this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify({v:2,updatedAt:now,parts,devices:devs})}}})});
+      this.devices=devs;store.set("syncDevs",devs);store.set("syncAt",at);store.set("syncSnaps",sn);this.ok();if(changed)render()}
     catch(e){this.fail(e)}finally{this.busy=false}},
   changed(){if(!this.cfg()?.gist)return;clearTimeout(this.timer);this.timer=setTimeout(()=>this.push(),1500)},
   ok(){this.status="Verbunden · abgeglichen "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+" Uhr";const el=document.getElementById("syncState");if(el)el.textContent=this.status},
@@ -640,6 +660,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  67:["Geräte verbinden: Jedes Gerät wählt jetzt selbst, was es teilt – Einkaufszettel, Merkliste, Coupons. So teilt die Familie den Einkaufszettel, während deine Merkliste nur auf deinem Handy und PC gleich ist.","Beim „Code kopieren“ wählst du gleich mit aus, was das neue Gerät teilen soll – auf dem anderen Gerät nur noch einfügen.","Neue Nutzer sehen beim ersten Öffnen ein Willkommens-Fenster mit allen wichtigen Funktionen (auch in den Einstellungen unter „Erste Schritte“)."],
   66:["App-Angebote sind jetzt auf einen Blick erkennbar: Abzeichen „📱 Lidl Plus“ direkt auf dem Bild.","Neuer Filter „Nur App-Angebote“. „Ohne App & Karte“ blendet jetzt auch Preise aus, die nur mit der App gelten."],
   65:["Einkaufszettel: Neben jedem Artikel gibt es jetzt 🎟️. Im Laden antippen, Coupon-Wert wählen – fertig, Preis und Summe sind sofort angepasst."],
   64:["Coupon mit einem Tipp: Im Angebot auf „🎟️ Ich habe einen Coupon dafür“ tippen und den Wert wählen (z. B. −1 € oder −20 %). Markt, Artikel und Gültigkeit übernimmt SparRadar selbst und rechnet den Coupon sofort ein.","Merkliste: Gemerkte Artikel zeigen jetzt ihr Produktbild (aus dem Artikelstamm), auch wenn sie gerade nicht im Angebot sind."],
@@ -684,7 +705,7 @@ function checkWhatsNew(){
   if(!MYV)return;
   const last=store.get("seenVersion",null);
   // Erstinstallation: nichts zeigen. Wer SparRadar schon vorher benutzt hat, sieht die letzten Neuigkeiten.
-  if(last==null&&!WAS_USER){store.set("seenVersion",MYV);return}
+  if(last==null&&!WAS_USER){store.set("seenVersion",MYV);if(!S.sheet||S.sheet==="news"){S.sheet="welcome";render()}return}
   if(S.sheet)return;
   if(String(last)===String(MYV))return;
   const vs=Object.keys(CHANGES).map(Number).sort((a,b)=>b-a);
@@ -692,6 +713,21 @@ function checkWhatsNew(){
   if(!pick.length)pick=vs.filter(v=>v<=+MYV).slice(0,1);
   S.whatsNew=pick.flatMap(v=>CHANGES[v]).slice(0,7);
   store.set("seenVersion",MYV);S.sheet="whatsnew";render()}
+// Erstes Öffnen nach der Installation: kurz erklären, was SparRadar kann (auch später über Einstellungen erreichbar)
+function renderWelcome(){const it=[
+  ["🏷️","Alle Angebote rund um Wörth","Lidl, Aldi, Rewe, Netto, Edeka und dm – jeden Tag neu. Samstagabend siehst du schon die Angebote ab Montag."],
+  ["🔎","Suchen & filtern","Oben suchen oder nach Markt und Kategorie filtern. Mehrere Kategorien gleichzeitig gehen auch."],
+  ["📱","App-Angebote erkennen","Das Abzeichen „📱 Lidl Plus“ usw. zeigt: Dieser Preis gilt nur mit der App des Markts."],
+  ["🔔","Merkliste","Artikel merken – SparRadar zeigt dir, sobald sie im Angebot sind."],
+  ["🛒","Einkaufszettel","Mit ＋ auf den Zettel. Im Laden antippen, was im Wagen liegt. Mit 🎟️ trägst du einen Coupon mit einem Tipp ein."],
+  ["👨‍👩‍👦","Geräte verbinden","Mehrere Handys, Tablets oder PCs teilen denselben Einkaufszettel. Ob auch die Merkliste gleich sein soll, wählt jedes Gerät selbst – z. B. dein Handy und dein PC ja, die Familie nur den Zettel."],
+  ["⚙️","Einstellungen","Ganz unten im Tab „Coupons“: Geräte verbinden, SparRadar teilen, Schriftgröße mit „A+“ oben rechts."]];
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Willkommen bei SparRadar">
+   <div class="sheet-h"><span class="newsico">👋</span><h2>Willkommen bei SparRadar</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <p style="margin:-6px 0 4px;color:var(--muted)">Deine Spar-App für alle Angebote in der Nähe. Das Wichtigste in 30 Sekunden:</p>
+   <ul class="welc">${it.map(([i,t,d])=>`<li><span class="wi">${i}</span><span><b>${t}</b><small>${d}</small></span></li>`).join("")}</ul>
+   <div class="factions"><button class="btn ghost" data-welcome="sync">Geräte verbinden</button><button class="btn" data-welcome="ok">Los geht's</button></div>
+  </div>`}
 function renderWhatsNew(){const n=S.whatsNew||[];
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="SparRadar wurde aktualisiert">
    <div class="sheet-h"><span class="newsico">✨</span><h2>SparRadar wurde aktualisiert</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
@@ -704,9 +740,9 @@ function renderWhatsNew(){const n=S.whatsNew||[];
 function checkNews(){
   if(S.sheet)return;
   const hits=[...new Map(watchHits(0).flatMap(x=>x.hits).map(o=>[o.id,o])).values()];
-  const seen=new Set(store.get("seenHits",[])),fresh=hits.filter(o=>!seen.has(o.id));
+  const sh0=store.get("seenHits",[]),seen=new Set(Array.isArray(sh0)?sh0:[]),fresh=hits.filter(o=>!seen.has(o.id));
   store.set("seenHits",hits.map(o=>o.id));
-  if(!fresh.length)return;
+  if(!fresh.length||!WAS_USER)return; // Erstinstallation: zuerst Willkommen, kein Treffer-Fenster
   S.news=fresh.sort((a,b)=>offPct(b)-offPct(a));S.sheet="news";render()}
 function renderNews(){
   const n=S.news||[];
@@ -955,21 +991,30 @@ function renderCoupons(){
     ${S.useApp?"":`<p style="color:var(--alert)">„Apps &amp; Coupons einrechnen“ ist ausgeschaltet. Coupons werden gerade nicht berücksichtigt.</p>`}
    </section>`}
 
+// Code mit Auswahl: "ghp_…#sr:list,watch" -> das andere Gerät übernimmt die Auswahl beim Einfügen
+const DEF_PICK={list:true,watch:false,coupons:false};
+function codeParse(v){const m=String(v||"").trim().match(/^(\S+?)(?:#sr:([a-z,]*))?$/);if(!m)return{t:"",p:null};
+  return{t:m[1],p:m[2]==null?null:Object.fromEntries(Object.keys(Sync.PARTS).map(k=>[k,m[2].split(",").includes(k)]))}}
+function shareChecks(sh,attr){return `<div class="shchk">${Object.entries(Sync.PARTS).map(([p,v])=>`<button class="chip${sh[p]?" on":""}" ${attr}="${p}" aria-pressed="${!!sh[p]}">${sh[p]?"✓ ":""}${esc(v.n)}</button>`).join("")}</div>`}
 function renderSync(){
   const c=Sync.cfg();
   return `<section class="panel" id="syncPanel"><h3>📱 ↔ 💻 Geräte verbinden</h3>
    ${c?.gist?(()=>{const ds=Object.entries(Sync.devs()).sort((a,b)=>(b[0]===Sync.devId())-(a[0]===Sync.devId())||b[1].at-a[1].at),ic={phone:"📱",tablet:"📱",pc:"💻"};
      const ago=t=>{const m=Math.round((Date.now()-t)/6e4);return m<2?"gerade aktiv":m<60?`vor ${m} Min.`:m<1440?`vor ${Math.round(m/60)} Std.`:`vor ${Math.round(m/1440)} Tag${Math.round(m/1440)===1?"":"en"}`};
-     return `<p><b>${ds.length} ${ds.length===1?"Gerät":"Geräte"} verbunden.</b> Alle sehen dieselbe Merkliste, denselben Einkaufszettel und dieselben Coupons – Änderungen kommen automatisch überall an.</p>
-     <div class="devlist">${ds.map(([k,v])=>`<div class="dev${k===Sync.devId()?" me":""}"><span class="di">${ic[v.t]||"📱"}</span><span class="dt"><b>${esc(v.n||"Gerät")}</b><small>${k===Sync.devId()?"dieses Gerät":ago(v.at)}</small></span></div>`).join("")}</div>
+     const pn=a=>(a||[]).map(p=>Sync.PARTS[p]?.n).filter(Boolean).join(", ")||"nichts";
+     return `<p><b>${ds.length} ${ds.length===1?"Gerät":"Geräte"} verbunden.</b> Jedes Gerät wählt selbst, was es mit den anderen teilt. Änderungen kommen automatisch überall an.</p>
+     <div class="shbox"><b>Dieses Gerät teilt:</b>${shareChecks(Sync.share(),"data-share")}<small>Beispiel: Dein Handy und dein PC teilen Einkaufszettel <i>und</i> Merkliste. Mama und Stefan teilen nur den Einkaufszettel – ihre Merkliste bleibt privat.</small></div>
+     <div class="devlist">${ds.map(([k,v])=>`<div class="dev${k===Sync.devId()?" me":""}"><span class="di">${ic[v.t]||"📱"}</span><span class="dt"><b>${esc(v.n||"Gerät")}</b><small>${k===Sync.devId()?"dieses Gerät":ago(v.at)}</small><small class="dsh">teilt: ${esc(pn(k===Sync.devId()?Sync.on():v.sh))}</small></span></div>`).join("")}</div>
      <form class="addrow" id="devForm"><input id="devName" value="${esc(Sync.devName())}" maxlength="30" placeholder="Name dieses Geräts, z. B. Mamas Handy" autocomplete="off"><button class="btn ghost" type="submit">Name speichern</button></form>
      <p id="syncState">${esc(Sync.status||"Verbunden")}</p>
      <p><b>Weiteres Gerät verbinden</b> (beliebig viele, z. B. das Handy von Mama und Stefan, Tablet oder PC): Code kopieren, per WhatsApp schicken und auf dem anderen Gerät hier unter „Geräte verbinden“ einfügen. Wer den Code hat, sieht und ändert eure gemeinsamen Listen – also nur an Familie geben.</p>`})()+`
+     <div class="shbox"><b>Was soll das neue Gerät mit euch teilen?</b>${shareChecks(store.get("syncGive",null)||DEF_PICK,"data-give")}<small>Kommt mit im Code – das andere Gerät muss nur noch einfügen. Für deinen eigenen PC: alles anhaken. Für Mama oder Stefan: nur Einkaufszettel.</small></div>
      <div class="links"><button class="btn sm" id="syncCopy">Code kopieren</button><button class="btn ghost sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
-   :`<p>Damit du auf Handy und PC dieselbe Merkliste, denselben Einkaufszettel und dieselben Coupons siehst. Einmal pro Gerät den Schlüssel eintragen, danach läuft alles unsichtbar im Hintergrund.</p>
+   :`<p>Damit mehrere Geräte denselben Einkaufszettel haben – deine eigenen (Handy, PC, Tablet) oder die deiner Familie. Ob auch Merkliste und Coupons gleich sein sollen, wählst du selbst. Einmal pro Gerät den Schlüssel eintragen, danach läuft alles unsichtbar im Hintergrund.</p>
      <p><b>Schon ein Gerät verbunden?</b> Dort „Code kopieren“ drücken, dir schicken und hier einfügen. Fertig.</p>
      <details class="steps-d"><summary>Noch kein Gerät verbunden? So bekommst du den Code (einmalig, am besten am PC)</summary>
      <ol class="steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=SparRadar" target="_blank" rel="noopener">Hier tippen</a> und bei GitHub anmelden.</li><li>Bei „Expiration“ <b>No expiration</b> auswählen. Der Haken bei <b>gist</b> ist schon gesetzt, sonst nichts anhaken.</li><li>Ganz unten auf den grünen Knopf <b>Generate token</b>.</li><li>Den langen Code, der mit <code>ghp_</code> anfängt, kopieren und unten einfügen.</li></ol></details>
+     <div class="shbox"><b>Was soll mit den anderen Geräten gleich sein?</b>${shareChecks(store.get("syncPick",null)||DEF_PICK,"data-pick")}<small>Eigenes zweites Gerät (z. B. dein PC)? Dann auch Merkliste und Coupons anhaken. Familie: meist nur den Einkaufszettel. Wurde die Auswahl schon beim Kopieren des Codes getroffen, wird sie beim Einfügen automatisch übernommen.</small></div>
      <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="Code einfügen (ghp_…)" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Verbinden</button></form>
      <p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p>`}
   </section>`}
@@ -994,6 +1039,7 @@ function renderSettings(){
    <div class="sheet-h"><span class="newsico">${IC.gear}</span><h2>Einstellungen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    ${renderShare()}
    ${renderSync()}
+   <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
    <section class="panel"><h3>SparRadar als App</h3><p>Android: APK aufs Handy laden und öffnen. Windows: Setup starten. Beide aktualisieren sich danach selbst und zeigen immer die neueste Version.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
    <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen gegen 5:15 Uhr neu abgerufen${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
@@ -1128,7 +1174,7 @@ function render(){
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,detail:renderDetail,trip:renderTrip}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,detail:renderDetail,trip:renderTrip}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -1165,7 +1211,11 @@ document.addEventListener("click",e=>{
   if(b.id==="settingsBtn"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="reloadApp"){location.reload();return}
   if(b.id==="appUpdNow"){try{window.SparRadarApp.checkUpdate()}catch(e){location.href=APK_URL}return}
-  if(b.id==="syncCopy"){copy(Sync.cfg().token,"Code kopiert. Jetzt an dich selbst schicken und auf dem anderen Gerät einfügen.");return}
+  if(b.id==="syncCopy"){const g=store.get("syncGive",null)||DEF_PICK,on=Object.keys(Sync.PARTS).filter(k=>g[k]);
+    copy(`${Sync.cfg().token}#sr:${on.join(",")}`,`Code kopiert (teilt: ${on.map(k=>Sync.PARTS[k].n).join(", ")||"nichts"}). Jetzt schicken und auf dem anderen Gerät einfügen.`);return}
+  if(b.dataset.give){const sh={...(store.get("syncGive",null)||DEF_PICK)};sh[b.dataset.give]=!sh[b.dataset.give];store.set("syncGive",sh);render();return}
+  if(b.dataset.share){const sh={...Sync.share()};sh[b.dataset.share]=!sh[b.dataset.share];Sync.setShare(sh);render();Sync.pull().then(()=>{toast(sh[b.dataset.share]?`${Sync.PARTS[b.dataset.share].n} wird jetzt geteilt`:`${Sync.PARTS[b.dataset.share].n} bleibt jetzt nur auf diesem Gerät`);render()});return}
+  if(b.dataset.pick){const sh={...(store.get("syncPick",null)||DEF_PICK)};sh[b.dataset.pick]=!sh[b.dataset.pick];store.set("syncPick",sh);render();return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
@@ -1221,6 +1271,8 @@ document.addEventListener("click",e=>{
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
   if(b.id==="shareOther"){navigator.share({title:"Persönliche Einladung zu SparRadar",text:inviteText()}).catch(()=>{});return}
   if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){S.watch.push({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
+  if(b.dataset.showwelcome){S.sheet="welcome";S._shown=null;render();return}
+  if(b.dataset.welcome){if(b.dataset.welcome==="sync"){S.sheet="settings";render();setTimeout(()=>document.getElementById("syncPanel")?.scrollIntoView({block:"start",behavior:"smooth"}),80)}else{S.sheet=null;render()}return}
   if(b.dataset.newsdone){S.sheet=null;if(b.dataset.newsdone==="watch")S.tab="watch";render();return}
 });
 function copy(txt,ok){const fail=()=>toast("Kopieren hat nicht geklappt. Bitte Text markieren und von Hand kopieren.");try{navigator.clipboard.writeText(txt).then(()=>toast(ok),fail)}catch(e){fail()}}
@@ -1232,9 +1284,10 @@ document.addEventListener("submit",e=>{
   if(e.target.id==="extraForm"){e.preventDefault();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p}:{id,n:x.n});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
   if(e.target.id==="cpqForm"){e.preventDefault();cpqSave(e.target.dataset.id,document.getElementById("cpqType").value,parseNum(document.getElementById("cpqVal").value));return}
   if(e.target.id==="devForm"){e.preventDefault();const v=document.getElementById("devName").value.trim().slice(0,30);store.set("devName",v);Sync.push().then(()=>{toast(v?`Dieses Gerät heißt jetzt „${v}“`:"Name zurückgesetzt");render()});return}
-  if(e.target.id==="syncForm"){e.preventDefault();const t=document.getElementById("syncToken").value.trim();
+  if(e.target.id==="syncForm"){e.preventDefault();const cp=codeParse(document.getElementById("syncToken").value),t=cp.t;if(cp.p)store.set("syncPick",cp.p);
     if(!/^(ghp_|github_pat_)/.test(t)){toast("Das sieht nicht wie ein GitHub-Schlüssel aus (beginnt mit ghp_).");return}
-    toast("Verbinde …");Sync.connect(t).then(()=>{toast("Verbunden! Deine Listen sind jetzt auf allen Geräten gleich.");render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
+    const pick=store.get("syncPick",null)||DEF_PICK;
+    toast("Verbinde …");Sync.connect(t,pick).then(()=>{toast(`Verbunden! Geteilt: ${Sync.on().map(p=>Sync.PARTS[p].n).join(", ")||"nichts"}`);render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
   if(e.target.id==="eanForm"){e.preventDefault();const v=document.getElementById("eanIn").value;Scan.last=v;Scan.lookup(v);return}
   if(e.target.id==="cpForm"){e.preventDefault();
     const val=id=>document.getElementById(id).value.trim();
@@ -1251,6 +1304,8 @@ document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getEl
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render();showSugg("qSugg",S.q,"q")});
 document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.target.value,"q"));
 document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");
+  if(e.target.id==="syncToken"){const cp=codeParse(e.target.value);if(cp.p){store.set("syncPick",cp.p);
+    document.querySelectorAll("[data-pick]").forEach(c=>{const on=cp.p[c.dataset.pick];c.classList.toggle("on",on);c.setAttribute("aria-pressed",on);c.textContent=(on?"✓ ":"")+Sync.PARTS[c.dataset.pick].n})}}
   if(e.target.id==="inviteName"){store.set("inviteName",e.target.value.trim());const a=document.getElementById("inviteWa");if(a)a.href=waLink(inviteText())}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key==="Enter"&&e.target.id==="q"){hideSugg();e.target.blur()}});
 // Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
