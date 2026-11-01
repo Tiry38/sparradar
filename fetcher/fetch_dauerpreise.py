@@ -33,9 +33,11 @@ def robots():
 
 
 def row(it):
-    if it.get("onSaleDate") or it.get("notForSale") or it.get("discontinued"):
-        return None
+    # Diagnose 01.11.: Dauersortiment hat KEIN Verkaufsdatum; Aktionsware hat eins („Verfügbar ab/seit …“, Abzeichen „Aktion“).
+    # notForSale steht bei fast allem (= nicht online bestellbar) und sagt nichts. Gerade reduziert (was/savings) = Angebot, kein Normalpreis.
     pr = it.get("price") or {}
+    if it.get("onSaleDate") or it.get("discontinued") or pr.get("wasPriceDisplay") or pr.get("savingsDisplay"):
+        return None
     amount = pr.get("amountRelevant") or pr.get("amount")
     name = f.clean_text(it.get("name") or "")
     if not amount or not name:
