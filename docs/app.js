@@ -696,7 +696,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  84:["Coupons nur noch digital und ganz einfach: suchen, einfügen, in der Markt-App aktivieren – an der Kasse reicht ein Scan der Kundenkarte."],
+  85:["Coupons nur noch digital und ganz einfach: suchen, einfügen, in der Markt-App aktivieren – an der Kasse reicht ein Scan der Kundenkarte."],
+  84:["Kasse noch einfacher: großer Zähler und klare Tipps."],
   83:["Einstellungen und Willkommens-Infos neu erklärt – Schritt für Schritt, für jeden verständlich.","Am PC bleibt die obere Leiste auch mit großer Schrift (A+) im Bild."],
   82:["Nach dem letzten Haken auf dem Zettel öffnet sich die App des Markts – Kundenkarte zeigen, fertig."],
   81:["Neu im Tab „Coupons“: Knopf „🔍 Coupon suchen“. Zeigt alle App- und Bonus-Vorteile der Woche (Lidl Plus, Edeka-/Netto-App, Rewe Bonus), die größten zuerst – einfach „Einfügen“ oder „Nein“."],
