@@ -30,11 +30,7 @@ STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backfill-state
 PATTERNS = [
     ("kd", "www.kaufda.de/Lidl/Sortiment/*"),
     ("kd", "www.kaufda.de/Netto-Marken-Discount/Sortiment/*"),
-    ("kd", "www.kaufda.de/Woerth-am-Rhein/Lidl/p-r74"),
-    ("kd", "www.kaufda.de/Woerth-am-Rhein/Netto-Marken-Discount/p-r9"),
-    ("aldi", "www.aldi-sued.de/de/angebote*"),
-    ("aldi", "aldi-sued.de/de/angebote*"),
-]
+]  # Händlerseiten Wörth und Aldi-Angebotsseiten: im Archiv nicht vorhanden (geprüft 01.11.)
 KEEP = {"lidl", "netto", "aldi"}
 
 
@@ -165,13 +161,25 @@ def collect(path):
         json.dump(st, open(STATE, "w"))
     todo = [s for s in st["snaps"] if f"{s[1]}|{s[2]}" not in done]
     log(f"Offen: {len(todo)} von {len(st['snaps'])} Schnappschüssen")
-    n_new = 0
+    n_new, ok, miss = 0, 0, 0
+    fail = st.setdefault("fail", {})
     for i, (kind, ts, url) in enumerate(todo):
         if (time.time() - t0) / 60 > MAX_MIN:
             log("Zeit um – nächster Lauf macht weiter")
             break
         html = get(f"https://web.archive.org/web/{ts}id_/{url}")
         time.sleep(PAUSE)
+        key = f"{ts}|{url}"
+        if not html:  # Archiv hat nicht geantwortet: in der nächsten Etappe noch einmal, danach aufgeben
+            miss += 1
+            fail[key] = fail.get(key, 0) + 1
+            if fail[key] < 2:
+                if miss >= 30 and ok == 0:
+                    log("Internet-Archiv antwortet gerade nicht – Etappe beendet")
+                    break
+                continue
+        else:
+            ok += 1
         offs = (offers_kd(html) if kind == "kd" else offers_aldi(html, url)) if html else []
         for o in offs:
             k = f"{o['s']}|{f.norm(o['n'])[:40]}"
@@ -181,7 +189,8 @@ def collect(path):
             cur = rows.setdefault(k, {})
             if dk not in cur or o["p"] < cur[dk]:
                 cur[dk] = o["p"]; n_new += 1
-        done.add(f"{ts}|{url}")
+        done.add(key)
+        fail.pop(key, None)
         if i % 100 == 99:
             st["done"] = sorted(done); json.dump(st, open(STATE, "w")); json.dump(rows, open(path, "w"))
             log(f"  {i + 1}/{len(todo)} · {len(rows)} Artikel · {n_new} Preise")
@@ -189,8 +198,9 @@ def collect(path):
     json.dump(st, open(STATE, "w"))
     json.dump(rows, open(path, "w"))
     left = len(st["snaps"]) - len(done)
-    log(f"Fertig: {len(rows)} Artikel, {n_new} neue Preise, noch offen: {left}")
-    print(f"left={left}")
+    log(f"Etappe fertig: {ok} Seiten gelesen, {miss} ohne Antwort, {len(rows)} Artikel, {n_new} neue Preise, noch offen: {left}")
+    # Kam gar nichts an (Archiv gestört), nicht endlos neu starten – dann von Hand später wieder anstoßen
+    print(f"left={left if ok else 0}")
 
 
 def merge(path):
