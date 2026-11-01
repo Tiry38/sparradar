@@ -696,7 +696,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  89:["Geld zurück ganz einfach: Nach dem Einkauf zeigt SparRadar oben „💸 Geld zurückholen“ – Bon hochladen antippen, danach „Erledigt“.","Coupon-Finder: jetzt auch „2 kaufen, 1 gratis“ und feste Euro-Beträge vom Hersteller (z. B. 5 € zurück) – aus einer zweiten Übersicht, also deutlich mehr Aktionen."],
+  90:["Offene Geld-zurück-Bons: Der Reiter „Coupons“ leuchtet orange mit 💸, bis du den Bon hochgeladen und „Erledigt“ getippt hast.","Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen."],
+  89:["Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen.","Geld zurück ganz einfach: Nach dem Einkauf zeigt SparRadar oben „💸 Geld zurückholen“ – Bon hochladen antippen, danach „Erledigt“.","Coupon-Finder: jetzt auch „2 kaufen, 1 gratis“ und feste Euro-Beträge vom Hersteller (z. B. 5 € zurück) – aus einer zweiten Übersicht, also deutlich mehr Aktionen."],
   88:["Die Coupon-Suche heißt jetzt „Coupon-Finder“."],
   87:["Neu: der Coupon-Finder findet jetzt geheime Geld-zurück-Aktionen der Hersteller (oft 100 % zurück), die in keiner Markt-App stehen. App-Preise siehst du weiter direkt bei den Angeboten.","Nach dem Einkauf erinnert SparRadar dich, den Kassenbon hochzuladen."],
   86:["Coupon-Bericht: oben nach Markt filtern – z. B. nur Lidl-Coupons ansehen."],
@@ -908,7 +909,9 @@ const qty=id=>Math.max(1,S.qty[id]||1);
 // Menge direkt beim Hinzufügen: auf Karte und im Detail erscheint „− 1 +“, sobald der Artikel auf dem Zettel ist
 function qStep(id,big){return `<span class="qstep cq${big?" big":""}" title="Menge auf dem Einkaufszettel"><button data-qm="${esc(id)}" aria-label="weniger">−</button><b>${qty(id)}<small>×</small></b><button data-qp="${esc(id)}" aria-label="mehr">+</button></span>`}
 const r2=v=>Math.round(v*100)/100;
-const lineP=o=>r2(fin(o)*qty(o.id)),lineR=o=>r2(Math.max(ref(o),fin(o))*qty(o.id)),extraP=x=>x.p?r2(x.p*qty(x.id)):0;
+// an der Kasse bezahlt: ohne Geld zurück / Cashback / Payback (kommt erst später)
+const finTill=o=>Math.round(steps(o).filter(x=>x.t!=="cb").reduce((a,x)=>a+x.v,0)*100)/100;
+const lineP=o=>r2(finTill(o)*qty(o.id)),lineR=o=>r2(Math.max(ref(o),finTill(o))*qty(o.id)),extraP=x=>x.p?r2(x.p*qty(x.id)):0;
 // „3x Joghurt“, „Brot 1,99“, „Kaffee 4,49 €“ -> Menge, Name, Preis
 function parseExtra(v){let q=1,n=v.trim(),p=0,m=n.match(/^(\d{1,2})\s*[x×*]\s*(.+)$/i)||n.match(/^(\d{1,2})\s+(.+)$/);
   if(m&&+m[1]>0&&+m[1]<50){q=+m[1];n=m[2]}
@@ -953,7 +956,7 @@ function tripPop(t,auto){
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
    <div class="tp-n">${n} Artikel · bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</div>
    <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>
-   ${tripCb(t).length?`<div class="tp-cbh">💸 Geld zurück! <b>Kassenbon aufheben</b> und jetzt oder später hochladen:</div>`:""}${tripCb(t).map(c=>`<a class="btn sm tp-cb" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 ${esc(c.n||c.k)}: Bon hochladen ↗</a>`).join("")}
+   ${tripCb(t).length?`<div class="tp-cbh">💸 Geld zurück! <b>Kassenbon aufheben</b> (oder den digitalen Bon in der Markt-App) und jetzt oder später hochladen:</div>`:""}${tripCb(t).map(c=>`<a class="btn sm tp-cb" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 ${esc(c.n||c.k)}: Bon hochladen ↗</a>`).join("")}
    ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${auto&&store.get("openMktApp",true)?`${esc(MKT_APP[ms].n)} öffnet sich – Kundenkarte an der Kasse zeigen`:`${esc(MKT_APP[ms].n)}-App öffnen`}</button>`:""}`;
   el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms||tripCb(t).length?15000:auto?9000:6000);
   if(ms&&auto&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),350);
@@ -964,11 +967,11 @@ function tripCb(t,all){return S.coupons.filter(c=>c.cb&&c.url&&cpActive(c)&&t.it
 const cbDue=()=>S.coupons.filter(c=>c.cb&&c.buy&&cpActive(c));
 function cbDueHTML(){const d=cbDue();if(!d.length)return "";
   return `<section class="panel cbdue"><h3>💸 Geld zurückholen</h3>
-   <p>Du hast ${d.length===1?"einen Artikel":d.length+" Artikel"} mit Geld-zurück-Aktion gekauft. <b>Kassenbon bereitlegen</b>, dann:</p>
-   <ol class="cbsteps"><li><b>„Bon hochladen“</b> antippen</li><li>Kassenbon fotografieren, Name und Kontonummer (IBAN) eingeben, absenden</li><li>Hier <b>„Erledigt“</b> tippen</li></ol>
+   <p>Du hast ${d.length===1?"einen Artikel":d.length+" Artikel"} mit Geld-zurück-Aktion gekauft. <b>Kassenbon bereitlegen</b> – Papier oder digital in der Markt-App –, dann:</p>
+   <ol class="cbsteps"><li><b>„Bon hochladen“</b> antippen</li><li><b>Papier-Bon:</b> fotografieren. <b>Digitaler Bon</b> (z. B. in Lidl Plus, REWE, dm): in der Markt-App öffnen, <b>Screenshot</b> machen und den hochladen.</li><li>Name und Kontonummer (IBAN) eingeben, absenden</li><li>Hier <b>„Erledigt“</b> tippen</li></ol>
    <div class="rows">${d.map(c=>`<div class="drow cbd-r"><div class="t">${esc(c.n||c.k)}<small>${esc(c.lbl||cpValueTxt(c))}${c.to?" · Bon hochladen bis "+fmtDate(c.to):""}</small></div>
-     <div class="cpf-b"><a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen</a><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div></div>`).join("")}</div>
-   <p class="cpf-n">Das Geld kommt meist nach 2–6 Wochen aufs Konto. Den Bon bis dahin aufheben.</p></section>`}
+     <div class="cpf-b"><a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen</a><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button>${ANDROID&&MKT_APP[c.s]?`<button class="btn ghost sm cbapp" data-mktapp="${c.s}">📱 Digitaler Bon: ${esc(MKT_APP[c.s].n)} öffnen</button>`:""}</div></div>`).join("")}</div>
+   <p class="cpf-n">Die meisten Aktionen nehmen auch einen digitalen Bon an (Screenshot oder PDF), solange Markt, Datum, Artikel und Preis darauf zu sehen sind. Was genau gilt, steht in den Teilnahmebedingungen der Aktion. Das Geld kommt meist nach 2–6 Wochen aufs Konto. Den Bon bis dahin aufheben.</p></section>`}
 function hideTripPop(){const el=document.getElementById("tripPop");if(el)el.hidden=true}
 const monKey=d=>d.slice(0,7),monName=k=>new Date(k+"-15").toLocaleDateString("de-DE",{month:"long",year:"numeric"});
 function storeSplit(ts){const m={};ts.forEach(t=>t.items.forEach(x=>m[x.s]=(m[x.s]||0)+x.p));const ex=ts.reduce((a,t)=>a+t.extra.reduce((b,x)=>b+x.p,0),0);if(ex>0)m._=ex;return Object.entries(m).sort((a,b)=>b[1]-a[1])}
@@ -1094,8 +1097,8 @@ const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
 function cpHowHTML(){return `<section class="panel cphow"><h3>Geheime Coupons: Geld zurück vom Hersteller</h3>
   <p>Viele Hersteller zahlen dir Geld zurück: oft den ganzen Kaufpreis („Gratis testen“), manchmal einen festen Betrag oder „2 kaufen, 1 gratis“. Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag für dich.</p>
   <ol><li><b>🔍 Coupon-Finder</b> antippen und bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
-   <li><b>Ganz normal einkaufen</b> und den <b>Kassenbon aufheben</b>.</li>
-   <li><b>💸 Geld holen:</b> Nach dem Einkauf auf „Bon hochladen“ tippen, Kassenbon fotografieren, Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
+   <li><b>Ganz normal einkaufen</b> und den <b>Kassenbon aufheben</b> – digitale Bons aus der Markt-App gehen meist auch.</li>
+   <li><b>💸 Geld holen:</b> Nach dem Einkauf auf „Bon hochladen“ tippen, Kassenbon fotografieren (digitaler Bon: Screenshot), Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
   <p class="cpf-n">Rabatte, die nur mit der Markt-App gelten, siehst du direkt bei den Angeboten am 📱-Abzeichen. In der Markt-App aktivieren und an der Kasse die Kundenkarte zeigen – ein Scan.</p></section>`}
 function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfind" id="cpFind">🔍 Coupon-Finder starten</button>`;
   if(!CASHBACK)return `<section class="panel cpf"><p>Coupon-Finder sucht …</p></section>`;
@@ -1320,7 +1323,7 @@ function render(){
   const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;
   const ln=S.list.filter(id=>byId(id)&&!S.checked.includes(id)).length+S.extra.filter(x=>!S.checked.includes(x.id)).length;
   const lb=document.getElementById("listBadge");lb.textContent=ln;lb.hidden=!ln;
-  const nc=S.coupons.filter(cpActive).length,cb=document.getElementById("cpBadge");cb.textContent=nc;cb.hidden=!nc;
+  const nc=S.coupons.filter(cpActive).length,nd=cbDue().length,cb=document.getElementById("cpBadge");cb.textContent=nd?"💸 "+nd:nc;cb.hidden=!nc&&!nd;cb.classList.toggle("due",!!nd);cb.title=nd?"Geld zurückholen: Bon hochladen":"";
   const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
   // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
   document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mn">Alle</span><em>${OFFERS.length}</em></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></button>`).join("");
