@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  91:["Geld zurück jetzt mit „💸 Jetzt Geld holen“: SparRadar führt dich Schritt für Schritt – Bon bereitlegen, Aktionsseite öffnen, Name, E-Mail und IBAN mit einem Tipp kopieren, fertig."],
   90:["Offene Geld-zurück-Bons: Der Reiter „Coupons“ leuchtet orange mit 💸, bis du den Bon hochgeladen und „Erledigt“ getippt hast.","Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen."],
   89:["Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen.","Geld zurück ganz einfach: Nach dem Einkauf zeigt SparRadar oben „💸 Geld zurückholen“ – Bon hochladen antippen, danach „Erledigt“.","Coupon-Finder: jetzt auch „2 kaufen, 1 gratis“ und feste Euro-Beträge vom Hersteller (z. B. 5 € zurück) – aus einer zweiten Übersicht, also deutlich mehr Aktionen."],
   88:["Die Coupon-Suche heißt jetzt „Coupon-Finder“."],
@@ -956,7 +957,7 @@ function tripPop(t,auto){
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
    <div class="tp-n">${n} Artikel · bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</div>
    <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>
-   ${tripCb(t).length?`<div class="tp-cbh">💸 Geld zurück! <b>Kassenbon aufheben</b> (oder den digitalen Bon in der Markt-App) und jetzt oder später hochladen:</div>`:""}${tripCb(t).map(c=>`<a class="btn sm tp-cb" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 ${esc(c.n||c.k)}: Bon hochladen ↗</a>`).join("")}
+   ${tripCb(t).length?`<div class="tp-cbh">💸 Geld zurück! <b>Kassenbon aufheben</b> (oder den digitalen Bon in der Markt-App) und jetzt oder später hochladen:</div>`:""}${tripCb(t).map(c=>`<button class="btn sm tp-cb" data-cbget="${esc(c.id)}">💸 ${esc(c.n||c.k)}: Geld holen</button>`).join("")}
    ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${auto&&store.get("openMktApp",true)?`${esc(MKT_APP[ms].n)} öffnet sich – Kundenkarte an der Kasse zeigen`:`${esc(MKT_APP[ms].n)}-App öffnen`}</button>`:""}`;
   el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms||tripCb(t).length?15000:auto?9000:6000);
   if(ms&&auto&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),350);
@@ -965,13 +966,40 @@ function tripPop(t,auto){
 function tripCb(t,all){return S.coupons.filter(c=>c.cb&&c.url&&cpActive(c)&&t.items.some(x=>(c.s==="all"||c.s===x.s)&&c.k.split(/\s+/).every(w=>norm((x.b+" "+x.n)).includes(norm(w))))).slice(0,all?99:3)}
 // Offene Geld-zurück-Bons: gekauft (beim Abschluss des Einkaufs erkannt), Bon noch nicht hochgeladen
 const cbDue=()=>S.coupons.filter(c=>c.cb&&c.buy&&cpActive(c));
-function cbDueHTML(){const d=cbDue();if(!d.length)return "";
+function cbDueHTML(){const d=cbDue().sort((a,b)=>String(a.to||"9").localeCompare(String(b.to||"9")));if(!d.length)return "";
   return `<section class="panel cbdue"><h3>💸 Geld zurückholen</h3>
-   <p>Du hast ${d.length===1?"einen Artikel":d.length+" Artikel"} mit Geld-zurück-Aktion gekauft. <b>Kassenbon bereitlegen</b> – Papier oder digital in der Markt-App –, dann:</p>
-   <ol class="cbsteps"><li><b>„Bon hochladen“</b> antippen</li><li><b>Papier-Bon:</b> fotografieren. <b>Digitaler Bon</b> (z. B. in Lidl Plus, REWE, dm): in der Markt-App öffnen, <b>Screenshot</b> machen und den hochladen.</li><li>Name und Kontonummer (IBAN) eingeben, absenden</li><li>Hier <b>„Erledigt“</b> tippen</li></ol>
+   <p>Du hast ${d.length===1?"einen Artikel":d.length+" Artikel"} mit Geld-zurück-Aktion gekauft. Tippe auf <b>„Jetzt Geld holen“</b> – SparRadar führt dich Schritt für Schritt.</p>
    <div class="rows">${d.map(c=>`<div class="drow cbd-r"><div class="t">${esc(c.n||c.k)}<small>${esc(c.lbl||cpValueTxt(c))}${c.to?" · Bon hochladen bis "+fmtDate(c.to):""}</small></div>
-     <div class="cpf-b"><a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen</a><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button>${ANDROID&&MKT_APP[c.s]?`<button class="btn ghost sm cbapp" data-mktapp="${c.s}">📱 Digitaler Bon: ${esc(MKT_APP[c.s].n)} öffnen</button>`:""}</div></div>`).join("")}</div>
-   <p class="cpf-n">Die meisten Aktionen nehmen auch einen digitalen Bon an (Screenshot oder PDF), solange Markt, Datum, Artikel und Preis darauf zu sehen sind. Was genau gilt, steht in den Teilnahmebedingungen der Aktion. Das Geld kommt meist nach 2–6 Wochen aufs Konto. Den Bon bis dahin aufheben.</p></section>`}
+     <div class="cpf-b"><button class="btn sm" data-cbget="${esc(c.id)}">💸 Jetzt Geld holen</button><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div></div>`).join("")}</div></section>`}
+// Eigene Angaben fürs Formular des Herstellers: NUR auf diesem Gerät (localStorage „cbMe“), nie im Sync, nie verschickt
+const CB_ME=[["vn","Vorname","given-name"],["nn","Nachname","family-name"],["mail","E-Mail","email"],["iban","IBAN (Kontonummer)","off"],["str","Straße und Hausnummer","street-address"],["ort","PLZ und Ort","address-level2"]];
+function renderCbGet(){const c=S.coupons.find(x=>x.id===S.cbget);
+  const close=`<button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button>`;
+  if(!c)return `<div class="sheet"><div class="sheet-h"><h2>Geld holen</h2>${close}</div><div class="empty"><b>Schon erledigt</b></div></div>`;
+  const me=store.get("cbMe",{}),app=MKT_APP[c.s],has=CB_ME.some(([k])=>me[k]),edit=S.cbEdit||!has;
+  const kauf=c.buy?c.buy.split("-").reverse().join("."):""; // TT.MM.JJJJ wie in den Formularen
+  const cp=(l,v)=>v?`<button class="cbcopy" data-copy="${esc(v)}" data-copyl="${esc(l)}"><span>${esc(l)}</span><b>${esc(v)}</b><i>Kopieren</i></button>`:"";
+  return `<div class="sheet cbget" role="dialog" aria-modal="true" aria-label="Geld holen">
+   <div class="sheet-h"><span class="newsico">💸</span><h2>Geld holen: ${esc(c.n||c.k)}</h2>${close}</div>
+   <p class="cbg-sub">${esc(c.lbl||cpValueTxt(c))}${c.to?` · <b>Bon hochladen bis ${fmtDate(c.to)}</b>`:""}</p>
+   <ol class="cbg">
+    <li><h4>Kassenbon bereitlegen</h4>
+     <p><b>Papier-Bon:</b> einfach in die Hand nehmen – du fotografierst ihn gleich auf der Aktionsseite.</p>
+     <p><b>Digitaler Bon</b>${app?` (${esc(app.n)}-App)`:""}: in der Markt-App öffnen und einen <b>Screenshot</b> machen.</p>
+     ${ANDROID&&app?`<button class="btn ghost" data-mktapp="${c.s}">📱 ${esc(app.n)}-App öffnen</button>`:""}</li>
+    <li><h4>Aktionsseite öffnen</h4><p>Dort „Teilnehmen“ bzw. „Bon hochladen“ wählen und den Bon hochladen.</p>
+     <a class="btn big" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🌐 Aktionsseite öffnen</a></li>
+    <li><h4>Formular ausfüllen – antippen zum Kopieren</h4>
+     <div class="cbcopies">${cp("Kaufdatum",kauf)}${cp("Markt",c.s&&c.s!=="all"?sname(c.s):"")}${cp("Artikel",c.n||c.k)}${edit?"":CB_ME.map(([k,l])=>cp(l,me[k])).join("")}</div>
+     ${edit?`<div class="form cbme"><p class="cpf-n">Einmal eintragen, dann musst du es nie wieder tippen. <b>Bleibt nur auf diesem Gerät</b> – wird nicht geteilt und nicht verschickt.</p>
+       ${CB_ME.map(([k,l,ac])=>`<label>${esc(l)}<input data-cbme="${k}" value="${esc(me[k]||"")}" autocomplete="${ac}" ${k==="iban"?'inputmode="text" spellcheck="false" style="text-transform:uppercase"':""}${k==="mail"?' type="email"':""}></label>`).join("")}
+       <button class="btn" data-cbmesave="1">Speichern</button></div>`
+      :`<div class="cbme-a"><button class="btn ghost sm" data-cbmeedit="1">Meine Angaben ändern</button></div>`}</li>
+    <li><h4>Abgeschickt?</h4><p>Das Geld kommt meist nach 2–6 Wochen aufs Konto. Den Bon bis dahin aufheben.</p>
+     <button class="btn big" data-cbdone="${esc(c.id)}">✓ Erledigt</button></li>
+   </ol>
+   <p class="cpf-n">Die meisten Aktionen nehmen auch einen digitalen Bon (Screenshot oder PDF) an, wenn Markt, Datum, Artikel und Preis zu sehen sind. Was genau gilt, steht in den Teilnahmebedingungen der Aktion.</p>
+  </div>`}
 function hideTripPop(){const el=document.getElementById("tripPop");if(el)el.hidden=true}
 const monKey=d=>d.slice(0,7),monName=k=>new Date(k+"-15").toLocaleDateString("de-DE",{month:"long",year:"numeric"});
 function storeSplit(ts){const m={};ts.forEach(t=>t.items.forEach(x=>m[x.s]=(m[x.s]||0)+x.p));const ex=ts.reduce((a,t)=>a+t.extra.reduce((b,x)=>b+x.p,0),0);if(ex>0)m._=ex;return Object.entries(m).sort((a,b)=>b[1]-a[1])}
@@ -1143,7 +1171,7 @@ function renderCoupons(){
     ${act.length?`<div class="rows">${act.map(({c,i})=>{const n=wo.filter(o=>couponsFor(o).includes(c)).length;
       return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#2B3034"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#2B3034">%</span>`:sb(c.s,true)}</div>
        <div class="t">${esc(c.cb&&c.n?c.n:c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?(c.cb?"Bon einsenden bis ":"bis ")+fmtDate(c.to):"ohne Ende"}</small>
-        ${c.cb&&c.url?`<div class="cpf-b cblink"><a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen ↗</a><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div>`:""}
+        ${c.cb&&c.url?`<div class="cpf-b cblink"><button class="btn sm" data-cbget="${esc(c.id)}">💸 Geld holen</button><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div>`:""}
         <div class="pills"><span class="pill ${n?"cb":""}">${n?`passt zu ${n} Angebot${n===1?"":"en"}`:"gerade kein passendes Angebot"}</span></div></div>
        <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`
       :'<div class="empty" style="padding:16px"><b>Noch keine Coupons</b>Trag oben deinen ersten aktivierten Coupon ein.</div>'}
@@ -1339,7 +1367,7 @@ function render(){
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip,cbget:renderCbGet}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -1415,7 +1443,11 @@ document.addEventListener("click",e=>{
   if(b.dataset.cbadd){cbAdd(b.dataset.cbadd);render();return}
   if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set((CASHBACK?.items||[]).map(a=>"cb:"+a.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
   if(b.id==="cpFindAll"){const f=cbFinds().filter(x=>!S.cpfS||!x.a.shops?.length||x.a.shops.includes(S.cpfS)),n=f.reduce((a,x)=>a+cbAdd(x.a.id,true),0);save();toast(`${n} Geld-zurück-Aktionen eingefügt – Kassenbons aufheben!`);render();return}
-  if(b.dataset.cbdone){const c=S.coupons.find(x=>x.id===b.dataset.cbdone);if(c){c.done=TODAY;save();toast("Erledigt – das Geld kommt in ein paar Wochen.");render()}return}
+  if(b.dataset.cbdone){const c=S.coupons.find(x=>x.id===b.dataset.cbdone);if(c){c.done=TODAY;if(S.sheet==="cbget")S.sheet=null;save();toast("Erledigt – das Geld kommt in ein paar Wochen.");render()}return}
+  if(b.dataset.cbget){const c=S.coupons.find(x=>x.id===b.dataset.cbget);if(c&&!c.buy)c.buy=TODAY;S.cbget=b.dataset.cbget;S.cbEdit=false;hideTripPop();S.sheet="cbget";save();render();return}
+  if(b.dataset.copy!=null&&b.dataset.copyl){copy(b.dataset.copy,b.dataset.copyl+" kopiert – im Formular lange drücken und „Einfügen“");return}
+  if(b.dataset.cbmeedit){S.cbEdit=true;render();return}
+  if(b.dataset.cbmesave){const me={};document.querySelectorAll("[data-cbme]").forEach(i=>{const v=i.value.trim();if(v)me[i.dataset.cbme]=i.dataset.cbme==="iban"?v.toUpperCase().replace(/\s+/g,"").replace(/(.{4})/g,"$1 ").trim():v});store.set("cbMe",me);S.cbEdit=false;toast(Object.keys(me).length?"Gespeichert – nur auf diesem Gerät":"Angaben gelöscht");render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
