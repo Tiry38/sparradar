@@ -11,11 +11,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - name: Schon gelaufen? (GitHubs Zeitplan kommt oft Stunden zu spät, der Cloudflare-Taktgeber war dann schneller)
+        id: gate
+        if: github.event_name == 'schedule'
+        run: |
+          H=$(python3 -c "import json,datetime as d;g=d.datetime.fromisoformat(json.load(open('docs/data/cashback.json'))['at']);print(int((d.datetime.now(d.timezone.utc)-g).total_seconds()//3600))" 2>/dev/null || echo 99)
+          if [ "$H" -lt 12 ]; then echo "skip=1" >> $GITHUB_OUTPUT; echo "Letzter Abruf vor $H h – diesmal übersprungen"; fi
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: python fetcher/fetch_cashback.py
+        if: steps.gate.outputs.skip != '1'
       - name: Speichern
+        if: steps.gate.outputs.skip != '1'
         run: |
           git config user.name "SparRadar Bot"
           git config user.email "actions@users.noreply.github.com"

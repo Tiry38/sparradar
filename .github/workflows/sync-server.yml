@@ -17,6 +17,7 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      GH_DISPATCH_TOKEN: ${{ secrets.GH_DISPATCH_TOKEN }}
     steps:
       - uses: actions/checkout@v5
       - name: Secrets vorhanden?
@@ -51,7 +52,7 @@ jobs:
           compatibility_date = "2025-01-01"
           workers_dev = true
           [triggers]
-          crons = ["17 3 * * SUN"]
+          crons = ["17 3 * * SUN", "10 * * * *"]
           [[d1_databases]]
           binding = "DB"
           database_name = "sparradar-sync"
@@ -75,6 +76,9 @@ jobs:
         run: |
           npx --yes wrangler@3.114.1 d1 execute sparradar-sync --remote --file schema.sql
           npx --yes wrangler@3.114.1 deploy
+          # Taktgeber: GitHub-Schlüssel (nur Actions) als Worker-Secret, damit Cloudflare die Abrufe pünktlich startet
+          if [ -n "$GH_DISPATCH_TOKEN" ]; then printf '%s' "$GH_DISPATCH_TOKEN" | npx --yes wrangler@3.114.1 secret put GH_TOKEN; echo "Taktgeber aktiv";
+          else echo "::warning::Secret GH_DISPATCH_TOKEN fehlt – Abrufe laufen nur über GitHubs (unzuverlässige) Zeitpläne. Anleitung: cloudflare/README.md"; fi
       - name: Probelauf (Code erstellen, speichern, lesen)
         if: steps.chk.outputs.ok == 'true'
         run: |

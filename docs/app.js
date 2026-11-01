@@ -416,7 +416,7 @@ const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?
 
 async function load(){
   try{
-    const [o,h,nm]=await Promise.all([fetch("data/offers.json",{cache:"no-store"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({})),fetch("data/names.json",{cache:"no-store"}).then(r=>r.json()).catch(()=>({}))]);
+    const [o,h,nm]=await Promise.all([fetch("data/offers.json",{cache:"no-cache"}).then(r=>r.json()),fetch("data/history.json",{cache:"no-cache"}).then(r=>r.json()).catch(()=>({})),fetch("data/names.json",{cache:"no-cache"}).then(r=>r.json()).catch(()=>({}))]);
     NAMES=Object.keys(nm||{});
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
@@ -697,6 +697,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  95:["SparRadar startet schneller: Angebote werden nur noch neu geladen, wenn sich wirklich etwas geändert hat."],
   94:["Einstellungen → Teilen: SparRadar für den PC per E-Mail schicken. Am PC die E-Mail öffnen, Link anklicken, installieren – fertig."],
   93:["Geld holen: Feld für die PayPal-E-Mail (manche Aktionen zahlen per PayPal) und Hinweis, wie ausgezahlt wird. Aktionen mit zusätzlichem Gewinnspiel sind mit 🎲 markiert – Mitmachen ist freiwillig."],
   92:["Geld zurück siehst du jetzt überall: 💸-Abzeichen am Angebot, „Mitnehmen“ in der Detailansicht und auf dem Einkaufszettel – ohne extra suchen.","Im Tab „Coupons“ siehst du, wie viel du mit Geld zurück schon geholt hast."],

@@ -19,12 +19,20 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v5
+      - name: Schon gelaufen? (GitHubs Zeitplan kommt oft Stunden zu spät, der Cloudflare-Taktgeber war dann schneller)
+        id: gate
+        if: github.event_name == 'schedule'
+        run: |
+          H=$(python3 -c "import json,datetime as d;g=d.datetime.fromisoformat(json.load(open('docs/data/stand.json'))['generated']);print(int((d.datetime.now(d.timezone.utc)-g).total_seconds()//3600))" 2>/dev/null || echo 99)
+          if [ "$H" -lt 6 ]; then echo "skip=1" >> $GITHUB_OUTPUT; echo "Letzter Abruf vor $H h – diesmal übersprungen"; fi
 
       - uses: actions/setup-python@v6
+        if: steps.gate.outputs.skip != '1'
         with:
           python-version: "3.12"
 
       - name: Angebote holen
+        if: steps.gate.outputs.skip != '1'
         # SR_EARLY_PUSH: neue Angebote eines Markts sofort als Zwischenstand hochladen, nicht erst am Ende (ca. 40 min)
         env:
           SR_EARLY_PUSH: "1"
@@ -34,10 +42,12 @@ jobs:
           python fetcher/fetch_offers.py
 
       - name: Sichtbare Prospekte merken (für den Prospekt-Wächter)
+        if: steps.gate.outputs.skip != '1'
         working-directory: fetcher
         run: python check_new.py --save
 
       - name: Daten speichern
+        if: steps.gate.outputs.skip != '1'
         run: |
           git config user.name "SparRadar Bot"
           git config user.email "actions@users.noreply.github.com"

@@ -64,7 +64,26 @@ export default {
     return json(req, { error: "method" }, 405);
   },
   // Aufräumen: Familien-Codes, die 1 Jahr lang niemand benutzt hat, werden gelöscht
-  async scheduled(ev, env) {
-    await env.DB.prepare("DELETE FROM sync WHERE at < ?").bind(Date.now() - 365 * 864e5).run();
+  // Zusätzlich: Taktgeber für die GitHub-Abrufe. GitHubs eigene Zeitpläne kommen bei diesem Repo oft Stunden zu spät
+  // oder gar nicht (01.11.: Morgen-Abruf fiel aus). Cloudflare-Cron ist pünktlich und startet die Abrufe per workflow_dispatch.
+  // Braucht den Worker-Secret GH_TOKEN (fein-granularer GitHub-Schlüssel, nur dieses Repo, nur „Actions: Read and write“).
+  async scheduled(ev, env, ctx) {
+    if (ev.cron === "17 3 * * SUN") {
+      await env.DB.prepare("DELETE FROM sync WHERE at < ?").bind(Date.now() - 365 * 864e5).run();
+      return;
+    }
+    if (!env.GH_TOKEN) return;
+    const d = new Date(ev.scheduledTime), h = d.getUTCHours(), wd = d.getUTCDay(); // 0 = So
+    const due = [];
+    if (h === 4) due.push("angebote.yml", "cashback.yml");                       // jeden Morgen ca. 5:10/6:10 Uhr
+    if (h === 17 && [5, 6, 0].includes(wd)) due.push("angebote.yml");             // Fr, Sa, So abends
+    if (h === 2 && wd === 0) due.push("artikelstamm.yml");                        // sonntags nachts
+    const pros = [4, 5, 6, 0].includes(wd) ? h >= 5 && h <= 21 : wd === 1 ? h >= 5 && h <= 20 : [5, 9, 15].includes(h);
+    if (pros && !due.includes("angebote.yml")) due.push("prospekte.yml");         // Prospekt-Wächter
+    ctx.waitUntil(Promise.all(due.map(f => fetch(`https://api.github.com/repos/Tiry38/sparradar/actions/workflows/${f}/dispatches`, {
+      method: "POST",
+      headers: { Authorization: "Bearer " + env.GH_TOKEN, Accept: "application/vnd.github+json", "User-Agent": "SparRadar-Taktgeber", "Content-Type": "application/json" },
+      body: JSON.stringify({ ref: "main" }),
+    }).then(r => console.log(f, r.status)))));
   },
 };
