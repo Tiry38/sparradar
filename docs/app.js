@@ -55,7 +55,7 @@ const IC = {
 
 // ---------- Zustand ----------
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
-const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0},store.get("flt",{})),useApp:store.get("useApp",true),
+const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0},store.get("flt",{}),store.get("fltq")?{}:{cb:0}),useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),act:store.get("act",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),sheet:null,limit:60};
 let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
@@ -758,6 +758,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  106:["Der Filter „Geld zurück“ (und „Preis-Alarm“) aus „Deine Woche“ ist jetzt schlau: Er gilt nur für das, was du gerade ansiehst. Wechselst du den Markt, die Kategorie oder die Woche oder suchst etwas, geht er von selbst aus – so siehst du nie eine leere Liste."],
   105:["Die Kacheln „Geld zurück“ und „Preis-Alarm“ bei „Deine Woche“ sind jetzt Schalter: antippen = Filter an (grün), nochmal antippen = Filter aus. Wechselst du den Markt, bleibt die grüne Kachel sichtbar, damit du den Filter jederzeit ausschalten kannst."],
   104:["„Meine Coupons“ ist jetzt einfacher: oben steht in 3 Schritten, wie du einen Coupon direkt beim Artikel einträgst. Das lange Formular ist eingeklappt – nur noch für Coupons, die für eine ganze Marke gelten."],
   103:["Einkaufszettel = Kassenpreis: Die Summe zeigt jetzt genau, was du an der Kasse zahlst. App-Preise zählen erst, wenn du beim Artikel „Aktiviert ✓“ antippst – SparRadar sagt dir dabei, was in welcher App zu tun ist.","Rewe-Bonus-Guthaben, Payback und Geld zurück werden nicht mehr von der Summe abgezogen (die kommen ja erst später). Sie stehen als „Kommt später zurück“ beim Artikel."],
@@ -1638,7 +1639,18 @@ function closeExit(stay){const el=document.getElementById("exitAsk");if(el)el.hi
   try{window.close()}catch(e){}
   setTimeout(()=>{history.back();toast("Zum Schließen jetzt noch einmal Zurück tippen.")},150)}
 
-function render(){
+// Schnellfilter (Kacheln „Geld zurück“/„Preis-Alarm“ bei „Deine Woche“): gelten nur für die Ansicht, in der sie
+// angetippt wurden. Anderer Markt, andere Kategorie, Suche oder Woche -> Filter geht von selbst aus (nie leere Liste).
+let QUICK=null;if(!store.get("fltq")){store.set("fltq",1);fltStore()}
+const viewKey=()=>[...S.stores].sort().join()+"|"+[...S.cats].sort().join()+"|"+S.week+"|"+S.q.trim();
+function fltStore(){const f={...S.flt};if(QUICK)for(const k of QUICK.keys)f[k]=0;store.set("flt",f)}
+function quickCheck(){if(!QUICK||QUICK.at===viewKey())return;
+  const ks=[...QUICK.keys];QUICK=null;ks.forEach(k=>S.flt[k]=0);
+  if(ks.length)toast(ks.includes("cb")?"💸 Geld-zurück-Filter aus – du siehst wieder alle Angebote":"📉 Preis-Alarm-Filter aus – du siehst wieder alle Angebote")}
+function quickToggle(k){const on=!S.flt[k];S.flt[k]=on?1:0;
+  if(on)QUICK={keys:new Set([...(QUICK&&QUICK.at===viewKey()?QUICK.keys:[]),k]),at:viewKey()};else if(QUICK)QUICK.keys.delete(k);
+  S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});return on}
+function render(){quickCheck();
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
   document.getElementById("wk1").textContent=nextLabel();document.getElementById("wk0").textContent=WEEKEND?"Ab Montag":"Jetzt gültig";
@@ -1718,11 +1730,11 @@ document.addEventListener("click",e=>{
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
   if(b.dataset.toggleapp){S.useApp=!S.useApp;save();render();return}
-  if(b.dataset.freset){S.stores.clear();S.cats.clear();S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0,cb:0};store.set("flt",S.flt);render();return}
-  if(b.dataset.fmin!=null){S.flt.min=+b.dataset.fmin;S.limit=60;store.set("flt",S.flt);render();return}
-  if(b.dataset.fmax!=null){S.flt.max=+b.dataset.fmax;S.limit=60;store.set("flt",S.flt);render();return}
-  if(b.dataset.fflag){const k=b.dataset.fflag;S.flt[k]=S.flt[k]?0:1;S.limit=60;store.set("flt",S.flt);render();return}
-  if(b.dataset.fclear){S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0,cb:0};store.set("flt",S.flt);render();return}
+  if(b.dataset.freset){S.stores.clear();S.cats.clear();S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0,cb:0};fltStore();render();return}
+  if(b.dataset.fmin!=null){S.flt.min=+b.dataset.fmin;S.limit=60;fltStore();render();return}
+  if(b.dataset.fmax!=null){S.flt.max=+b.dataset.fmax;S.limit=60;fltStore();render();return}
+  if(b.dataset.fflag){const k=b.dataset.fflag;if(QUICK)QUICK.keys.delete(k);S.flt[k]=S.flt[k]?0:1;S.limit=60;fltStore();render();return}
+  if(b.dataset.fclear){S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0,cb:0};fltStore();render();return}
   if(b.dataset.fdone){S.sheet=null;render();scrollTo({top:0});return}
   if(b.id==="closeSheet"){S.sheet=null;render();return}
   if(b.id==="more"){S.limit+=60;render();return}
@@ -1751,8 +1763,8 @@ document.addEventListener("click",e=>{
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();scrollTo({top:0});return}
   if(b.dataset.go){S.tab=b.dataset.go;render();scrollTo({top:0});return}
-  if(b.dataset.gocb){const on=!S.flt.cb;if(on)S.flt.cb=1;else delete S.flt.cb;store.set("flt",S.flt);S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});toast(on?"Filter an: nur Angebote mit Geld zurück":"Filter aus: alle Angebote");return}
-  if(b.dataset.golow){const on=!S.flt.low;if(on)S.flt.low=1;else delete S.flt.low;store.set("flt",S.flt);S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});toast(on?"Filter an: nur Preis-Alarme und Tiefstpreise":"Filter aus: alle Angebote");return}
+  if(b.dataset.gocb){toast(quickToggle("cb")?"Filter an: nur Angebote mit Geld zurück – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
+  if(b.dataset.golow){toast(quickToggle("low")?"Filter an: nur Preis-Alarme – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
