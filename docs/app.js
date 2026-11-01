@@ -696,7 +696,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  87:["Coupon-Suche neu: findet jetzt geheime Geld-zurück-Aktionen der Hersteller (oft 100 % zurück), die in keiner Markt-App stehen. App-Preise siehst du weiter direkt bei den Angeboten.","Nach dem Einkauf erinnert SparRadar dich, den Kassenbon hochzuladen."],
+  88:["Die Coupon-Suche heißt jetzt „Coupon-Finder“."],
+  87:["Neu: der Coupon-Finder findet jetzt geheime Geld-zurück-Aktionen der Hersteller (oft 100 % zurück), die in keiner Markt-App stehen. App-Preise siehst du weiter direkt bei den Angeboten.","Nach dem Einkauf erinnert SparRadar dich, den Kassenbon hochzuladen."],
   86:["Coupon-Bericht: oben nach Markt filtern – z. B. nur Lidl-Coupons ansehen."],
   85:["Coupons nur noch digital und ganz einfach: suchen, einfügen, in der Markt-App aktivieren – an der Kasse reicht ein Scan der Kundenkarte."],
   84:["Kasse noch einfacher: großer Zähler und klare Tipps."],
@@ -777,7 +778,7 @@ function renderWelcome(){const it=[
   ["🔔","Merkliste","Artikel merken – SparRadar zeigt dir, sobald sie im Angebot sind."],
   ["🛒","Einkaufszettel","Mit ＋ auf den Zettel. Im Laden antippen, was im Wagen liegt. Mit 🎟️ trägst du einen Coupon mit einem Tipp ein."],
   ["👨‍👩‍👦","Geräte verbinden","Mehrere Handys, Tablets oder PCs teilen denselben Einkaufszettel. Ob auch die Merkliste gleich sein soll, wählt jedes Gerät selbst – z. B. eigene Geräte alles, andere Menschen nur den Zettel."],
-  ["🎟️","Coupons","Tab „Coupons“: „Coupon suchen“ zeigt die größten App-Rabatte der Woche. Papier-Coupons einfach fotografieren – an der Kasse kommen sie groß zum Scannen."],
+  ["🎟️","Coupons","Tab „Coupons“: Der Coupon-Finder zeigt Aktionen, bei denen dir der Hersteller den Kaufpreis zurückzahlt – oft komplett. Einfügen, einkaufen, Kassenbon hochladen."],
   ["⚙️","Einstellungen","Ganz unten im Tab „Coupons“: Geräte verbinden, SparRadar teilen. Schrift größer: „A+“ oben rechts."],
   ["💬","Fehler entdeckt?","Stimmt ein Preis nicht oder klemmt etwas? Sag gern der Person Bescheid, von der du SparRadar bekommen hast. Jeder Hinweis hilft!"]];
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Willkommen bei SparRadar">
@@ -1052,7 +1053,7 @@ function cpqSave(id,t,v){const o=byId(id);if(!o||!v)return;
   S.coupons.push({s:o.s,prog:defaultProg(o.s),k:k.replace(/\s+/g," ").trim(),t,v,to:o.to||null});S.cpq=null;save();
   toast(S.useApp?`Coupon gespeichert – du zahlst jetzt ${eur(fin(o))}`:"Coupon gespeichert. „Apps & Coupons einrechnen“ ist ausgeschaltet – in den Einstellungen einschalten.");render()}
 
-// ---------- Coupon-Sucher (Kevins Wunsch 01.11.) ----------
+// ---------- Coupon-Finder (Kevins Wunsch 01.11.) ----------
 // Zeigt NUR Vorteile, die nicht schon in den Angeboten stehen: Geld-zurück-Aktionen der Hersteller („Gratis testen“).
 // Daten: docs/data/cashback.json (täglicher Abruf einer öffentlichen Übersicht, nur Fakten + Link zur Hersteller-Aktion).
 // App-Preise der Märkte stehen schon bei den Angeboten (📱-Abzeichen) und kommen hier bewusst nicht vor.
@@ -1075,18 +1076,18 @@ const cbShopTxt=a=>a.shops?.length?"bei "+a.shops.map(sname).join(", "):"in viel
 const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
 function cpHowHTML(){return `<section class="panel cphow"><h3>Geheime Coupons: Geld zurück vom Hersteller</h3>
   <p>Viele Hersteller zahlen dir den Kaufpreis zurück („Gratis testen“). Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag für dich.</p>
-  <ol><li><b>🔍 Coupon suchen</b> antippen und bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
+  <ol><li><b>🔍 Coupon-Finder</b> antippen und bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
    <li><b>Ganz normal einkaufen</b> und den <b>Kassenbon aufheben</b>.</li>
    <li><b>💸 Geld holen:</b> Nach dem Einkauf auf „Bon hochladen“ tippen, Kassenbon fotografieren, Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
   <p class="cpf-n">Rabatte, die nur mit der Markt-App gelten, siehst du direkt bei den Angeboten am 📱-Abzeichen. In der Markt-App aktivieren und an der Kasse die Kundenkarte zeigen – ein Scan.</p></section>`}
-function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfind" id="cpFind">🔍 Coupon suchen</button>`;
-  if(!CASHBACK)return `<section class="panel cpf"><p>Suche Coupons …</p></section>`;
+function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfind" id="cpFind">🔍 Coupon-Finder starten</button>`;
+  if(!CASHBACK)return `<section class="panel cpf"><p>Coupon-Finder sucht …</p></section>`;
   const all=cbFinds(),cnt={};all.forEach(x=>(x.a.shops?.length?x.a.shops:["_"]).forEach(s=>cnt[s]=(cnt[s]||0)+1));
   if(S.cpfS&&!cnt[S.cpfS])S.cpfS=null;
   const f=S.cpfS?all.filter(x=>!x.a.shops?.length||x.a.shops.includes(S.cpfS)):all,tot=f.reduce((a,x)=>a+x.val,0);
   const ks=Object.keys(STORES).filter(k=>cnt[k]);
   const chips=ks.length?`<div class="cpf-ch">${[["","Alle",all.length],...ks.map(k=>[k,STORES[k].n,cnt[k]+(cnt._||0)])].map(([k,n,c])=>`<button class="chip${(S.cpfS||"")===k?" on":""}" data-cpfs="${k}" aria-pressed="${(S.cpfS||"")===k}">${k?sb(k)+" ":""}${esc(n)} <small>${c}</small></button>`).join("")}</div>`:"";
-  return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Bericht</h3><button class="ibtn" id="cpFindX" aria-label="Bericht schließen">${IC.x}</button></div>
+  return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Finder</h3><button class="ibtn" id="cpFindX" aria-label="Coupon-Finder schließen">${IC.x}</button></div>
     ${chips}${f.length?`<p><b>${f.length} Geld-zurück-Aktion${f.length===1?"":"en"} gefunden – zusammen bis zu ${eur(tot)} zurück.</b> Ganz oben: was es gerade auch im Angebot gibt – doppelt gespart.</p>
     <div class="rows">${f.map(({a,o,val})=>`<div class="drow cpf-r">${o?`<button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>`:`<span class="mini cbico" aria-hidden="true">${CB_ICO[a.cat]||"💸"}</span>`}
       <div class="t">${esc(a.n)}<small>${a.pct??100} % Geld zurück${a.max?" (max. "+eur(a.max)+")":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
