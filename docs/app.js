@@ -758,6 +758,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  111:["Die Zahlen an den Märkten oben gelten jetzt für die gewählte Woche. Hat ein Markt für nächste Woche noch keinen Prospekt, steht dort „noch nichts“."],
   110:["„Diese Woche“ zeigt jetzt alle Angebote bis Samstag – auch die, die erst ab Donnerstag gelten (mit „ab Do“ auf der Karte). So planst du deinen Einkauf ohne Umschalten. „Nächste Woche“ zeigt alles ab Montag."],
   109:["Oben neben „Stand“ siehst du jetzt, wann SparRadar zuletzt nach neuen Prospekten gesucht hat. „Stand“ ist der letzte komplette Abruf aller Angebote."],
   108:["App-Angebote stehen nicht mehr doppelt da: Der App-Preis steht jetzt nur noch an einer Karte (z. B. Skyr bei Netto)."],
@@ -1671,11 +1672,11 @@ function render(){quickCheck();
   const ln=S.list.filter(id=>byId(id)&&!S.checked.includes(id)).length+S.extra.filter(x=>!S.checked.includes(x.id)).length;
   const lb=document.getElementById("listBadge");lb.textContent=ln;lb.hidden=!ln;
   const nc=S.coupons.filter(cpActive).length,nd=cbDue().length,cb=document.getElementById("cpBadge");cb.textContent=nd?"💸 "+nd:nc;cb.hidden=!nc&&!nd;cb.classList.toggle("due",!!nd);cb.title=nd?"Geld zurückholen: Bon hochladen":"";
-  const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
-  const cbc={};weekOffers().forEach(o=>{if(cbFor(o))cbc[o.s]=(cbc[o.s]||0)+1});const cbAll=Object.values(cbc).reduce((a,n)=>a+n,0);
+  const WO=weekOffers(),counts={},ccount={};WO.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
+  const cbc={};WO.forEach(o=>{if(cbFor(o))cbc[o.s]=(cbc[o.s]||0)+1});const cbAll=Object.values(cbc).reduce((a,n)=>a+n,0);
   const cbTag=n=>n?`<span class="mcb" title="${n} ${n===1?"Angebot":"Angebote"} mit Geld zurück">💸${n}</span>`:"";
   // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
-  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mtx"><span class="mn">Alle</span><em>${OFFERS.length}${cbTag(cbAll)}</em></span></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mtx"><span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}${cbTag(cbc[k])}</em></span></button>`).join("");
+  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mtx"><span class="mn">Alle</span><em>${WO.length}${cbTag(cbAll)}</em></span></button>`+Object.keys(STORES).map(k=>`<button class="mtile${counts[k]?"":" none"}" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mtx"><span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||"noch nichts"}${cbTag(cbc[k])}</em></span></button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cats.size}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cats.has(k)).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cats.has(k)}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("sort").value=S.sort;
