@@ -660,6 +660,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  68:["Einkauf fertig im Lidl, Rewe oder Edeka? Nach dem letzten Haken öffnet SparRadar am Handy direkt die App des Markts – Code an der Kasse zeigen. Abschaltbar in den Einstellungen."],
   67:["Geräte verbinden: Jedes Gerät wählt jetzt selbst, was es teilt – Einkaufszettel, Merkliste, Coupons. So teilt die Familie den Einkaufszettel, während deine Merkliste nur auf deinem Handy und PC gleich ist.","Beim „Code kopieren“ wählst du gleich mit aus, was das neue Gerät teilen soll – auf dem anderen Gerät nur noch einfügen.","Neue Nutzer sehen beim ersten Öffnen ein Willkommens-Fenster mit allen wichtigen Funktionen (auch in den Einstellungen unter „Erste Schritte“)."],
   66:["App-Angebote sind jetzt auf einen Blick erkennbar: Abzeichen „📱 Lidl Plus“ direkt auf dem Bild.","Neuer Filter „Nur App-Angebote“. „Ohne App & Karte“ blendet jetzt auch Preise aus, die nur mit der App gelten."],
   65:["Einkaufszettel: Neben jedem Artikel gibt es jetzt 🎟️. Im Laden antippen, Coupon-Wert wählen – fertig, Preis und Summe sind sofort angepasst."],
@@ -863,14 +864,23 @@ function restoreTrip(id){const t=S.trips.find(x=>x.id===id);if(!t)return;
   t.extra.forEach(x=>{if(!S.extra.some(e=>e.id===x.id))S.extra.push({id:x.id,n:x.n,p:x.q&&x.p?r2(x.p/x.q):0});S.qty[x.id]=x.q||1;if(!S.checked.includes(x.id))S.checked.push(x.id)});
   S.trips=S.trips.filter(x=>x.id!==id);S.tab="list";S.sheet=null;hideTripPop();save();render();scrollTo({top:0});
   toast("Einkauf ist wieder auf dem Zettel")}
+// Nach dem Einkauf die Kunden-App des Markts öffnen (Kundenkarte/Code an der Kasse zeigen). Nur Android, nur geprüfte Paketnamen.
+const MKT_APP={lidl:{n:"Lidl Plus",pkg:"com.lidl.eci.lidlplus"},rewe:{n:"REWE",pkg:"de.rewe.app.mobile"},edeka:{n:"EDEKA",pkg:"de.edeka.genuss"}};
+const ANDROID=/Android/i.test(navigator.userAgent),IN_APK=/SparRadarAndroid|; wv\)/.test(navigator.userAgent);
+function tripStore(t){const c={};t.items.forEach(x=>c[x.s]=(c[x.s]||0)+1);const s=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];return s&&MKT_APP[s]?s:null}
+function openMktApp(s){const a=MKT_APP[s];if(!a)return;const play=`https://play.google.com/store/apps/details?id=${a.pkg}`;
+  // Chrome/Web-App: intent-Link öffnet die App, fehlt sie, kommt der Play Store. Alte APK-Hülle kennt nur normale Links -> Play Store mit „Öffnen“.
+  location.href=IN_APK?play:`intent://#Intent;package=${a.pkg};action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=${encodeURIComponent(play)};end`}
 let tpT;
 function tripPop(t,auto){let el=document.getElementById("tripPop");
   if(!el){el=document.createElement("div");el.id="tripPop";el.className="trippop";el.setAttribute("role","status");document.body.appendChild(el)}
-  const n=t.items.length+t.extra.length;
+  const n=t.items.length+t.extra.length,ms=ANDROID?tripStore(t):null;
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
    <div class="tp-n">${n} Artikel · bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</div>
-   <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>`;
-  el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,auto?9000:6000);
+   <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>
+   ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${esc(MKT_APP[ms].n)}-App öffnen</button>`:""}`;
+  el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms?15000:auto?9000:6000);
+  if(ms&&auto&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),700);
   try{if(TOUCH())navigator.vibrate?.([30,60,30])}catch(e){}}
 function hideTripPop(){const el=document.getElementById("tripPop");if(el)el.hidden=true}
 const monKey=d=>d.slice(0,7),monName=k=>new Date(k+"-15").toLocaleDateString("de-DE",{month:"long",year:"numeric"});
@@ -1039,6 +1049,7 @@ function renderSettings(){
    <div class="sheet-h"><span class="newsico">${IC.gear}</span><h2>Einstellungen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    ${renderShare()}
    ${renderSync()}
+   ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hast du am Handy den letzten Artikel abgehakt, öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA) – dann kannst du an der Kasse gleich deinen Code zeigen.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
    <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
    <section class="panel"><h3>SparRadar als App</h3><p>Android: APK aufs Handy laden und öffnen. Windows: Setup starten. Beide aktualisieren sich danach selbst und zeigen immer die neueste Version.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
@@ -1258,6 +1269,8 @@ document.addEventListener("click",e=>{
       if(TOUCH()&&all.length&&all.every(x=>S.checked.includes(x))){finishTrip(all,true);return}}
     save();render();return}
   if(b.dataset.qp||b.dataset.qm){const id=b.dataset.qp||b.dataset.qm;S.qty[id]=Math.min(49,Math.max(1,qty(id)+(b.dataset.qp?1:-1)));if(S.qty[id]===1)delete S.qty[id];save();render();return}
+  if(b.dataset.mktapp){openMktApp(b.dataset.mktapp);return}
+  if(b.dataset.mktauto){store.set("openMktApp",!store.get("openMktApp",true));render();return}
   if(b.dataset.tripfinish){finishTrip([...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)].filter(x=>S.checked.includes(x)),false);return}
   if(b.dataset.triprestore){restoreTrip(b.dataset.triprestore);return}
   if(b.dataset.tripopen){S.tripId=b.dataset.tripopen;S.sheet="trip";hideTripPop();render();return}
