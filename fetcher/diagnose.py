@@ -1,24 +1,35 @@
-"""Diagnose: Dauer- vs. Aktionsware auf den Aldi-Süd-Kategorieseiten (Verkaufsdatum, Abzeichen, Rabatt-Felder)"""
-import collections
+"""Diagnose: Aldi-Dauerpreise – fehlen Kategorien (Obst & Gemüse) oder Folgeseiten (?page=)?"""
+import re
 import time
 
 import fetch_dauerpreise as d
 import fetch_offers as f
 
 start = f.http(d.BASE + "/") or ""
-cats = sorted(set(d.CAT.findall(start)))
-pick = [c for c in cats if any(w in c for w in ("milch", "butter", "brot", "kaffee", "nudeln", "hygiene", "wasch"))][:6]
-print("Kategorien:", len(cats), pick)
-dates = collections.Counter()
+time.sleep(2)
+more = f.http(d.BASE + "/produkte") or ""
+cats = sorted(set(d.CAT.findall(start)) | set(d.CAT.findall(more)))
+print("Kategorien:", len(cats))
+for c in cats:
+    if re.search(r"obst|gemuese|frisch|milch|butter|brot|backwaren", c):
+        print("  ", c)
+# Obst/Gemüse-Links überhaupt auf der Seite?
+print("obst-Links:", sorted(set(re.findall(r'href="([^"]*obst[^"]*)"', start + more)))[:15])
+
+pick = [c for c in cats if re.search(r"obst|gemuese", c)][:2] + [c for c in cats if re.search(r"milchprodukte|kuehlregal", c)][:1] \
+    + [c for c in cats if re.search(r"butter", c)][:1]
 for path in pick:
     time.sleep(2)
     h = f.http(d.BASE + path) or ""
     its = f.aldi_items(h)
-    print(f"\n=== {path}: {len(its)} Artikel")
-    for it in its[:40]:
+    print(f"\n=== {path}: {len(its)} Artikel, HTML {len(h)} Zeichen")
+    print("  PAGE-Links:", d.PAGE.findall(h)[:8])
+    print("  page= im HTML:", [h[max(0, m.start() - 80):m.end() + 20].replace("\n", " ") for m in re.finditer(r"page=\d", h)][:4])
+    for k in ("totalCount", "total", "numFound", "pageCount", "totalPages", "hits"):
+        mm = re.search(r'"' + k + r'"\s*[:,]\s*(\d+)', h)
+        if mm:
+            print(f"  {k}: {mm.group(1)}")
+    for it in its[:25]:
         pr = it.get("price") or {}
-        od = str(it.get("onSaleDate") or "-")
-        dates[od[:7]] += 1
-        print(f"  {od} | {it.get('onSaleDateDisplay')} | nfs={it.get('notForSale')} | badges={[b.get('text') or b.get('name') or b for b in (it.get('badges') or [])][:3]}"
-              f" | {pr.get('amountRelevantDisplay')} was={pr.get('wasPriceDisplay')} sav={pr.get('savingsDisplay')} | {it.get('brandName')} {it.get('name')}")
-print("\nVerkaufsdatum (Monat):", dates.most_common(20))
+        print(f"  {str(it.get('onSaleDate') or '-')[:10]} disc={it.get('discontinued')} | {pr.get('amountRelevantDisplay')} was={pr.get('wasPriceDisplay')}"
+              f" sav={pr.get('savingsDisplay')} | {it.get('brandName')} {it.get('name')}")
