@@ -660,6 +660,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  69:["Auf dem Einkaufszettel steht neben Lidl, Rewe und Edeka ein Knopf „📱 Lidl Plus“ usw. – ein Tipp öffnet die App des Markts, z. B. für deinen Code an der Kasse."],
   68:["Einkauf fertig im Lidl, Rewe oder Edeka? Nach dem letzten Haken öffnet SparRadar am Handy direkt die App des Markts – Code an der Kasse zeigen. Abschaltbar in den Einstellungen."],
   67:["Geräte verbinden: Jedes Gerät wählt jetzt selbst, was es teilt – Einkaufszettel, Merkliste, Coupons. So teilt die Familie den Einkaufszettel, während deine Merkliste nur auf deinem Handy und PC gleich ist.","Beim „Code kopieren“ wählst du gleich mit aus, was das neue Gerät teilen soll – auf dem anderen Gerät nur noch einfügen.","Neue Nutzer sehen beim ersten Öffnen ein Willkommens-Fenster mit allen wichtigen Funktionen (auch in den Einstellungen unter „Erste Schritte“)."],
   66:["App-Angebote sind jetzt auf einen Blick erkennbar: Abzeichen „📱 Lidl Plus“ direkt auf dem Bild.","Neuer Filter „Nur App-Angebote“. „Ohne App & Karte“ blendet jetzt auch Preise aus, die nur mit der App gelten."],
@@ -878,9 +879,9 @@ function tripPop(t,auto){let el=document.getElementById("tripPop");
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
    <div class="tp-n">${n} Artikel · bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</div>
    <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>
-   ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${esc(MKT_APP[ms].n)}-App öffnen</button>`:""}`;
+   ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${auto&&store.get("openMktApp",true)?`${esc(MKT_APP[ms].n)} öffnet sich – Code an der Kasse zeigen`:`${esc(MKT_APP[ms].n)}-App öffnen`}</button>`:""}`;
   el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms?15000:auto?9000:6000);
-  if(ms&&auto&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),700);
+  if(ms&&auto&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),350);
   try{if(TOUCH())navigator.vibrate?.([30,60,30])}catch(e){}}
 function hideTripPop(){const el=document.getElementById("tripPop");if(el)el.hidden=true}
 const monKey=d=>d.slice(0,7),monName=k=>new Date(k+"-15").toLocaleDateString("de-DE",{month:"long",year:"numeric"});
@@ -951,7 +952,7 @@ function renderList(){
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
   return `${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}</div>
-   ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>
+   ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
      ${sortDone(os).map(o=>line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")).join("")}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
    ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"")).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
