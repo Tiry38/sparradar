@@ -28,7 +28,7 @@ jobs:
           if [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
             ACC=$(curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" "https://api.cloudflare.com/client/v4/accounts" | jq -r '.result[0].id // empty')
             [ -n "$ACC" ] || { echo "::error::Account-ID nicht gefunden – Schlüssel prüfen (Vorlage „Edit Cloudflare Workers“)"; exit 1; }
-            echo "CLOUDFLARE_ACCOUNT_ID=$ACC" >> $GITHUB_ENV
+            echo "::add-mask::$ACC"; echo "CLOUDFLARE_ACCOUNT_ID=$ACC" >> $GITHUB_ENV
           fi
           echo "ok=true" >> $GITHUB_OUTPUT
       - uses: actions/setup-node@v4
@@ -75,6 +75,15 @@ jobs:
         run: |
           npx --yes wrangler@3.114.1 d1 execute sparradar-sync --remote --file schema.sql
           npx --yes wrangler@3.114.1 deploy
+      - name: Probelauf (Code erstellen, speichern, lesen)
+        if: steps.chk.outputs.ok == 'true'
+        run: |
+          URL="https://sparradar-sync.$SUB.workers.dev"; O="Origin: https://tiry38.github.io"
+          for i in 1 2 3 4 5 6; do curl -fsS "$URL/ping" && break; sleep 10; done
+          ID=$(curl -fsS -X POST -H "$O" "$URL/new" | jq -r .id); echo "::add-mask::$ID"
+          curl -fsS -X PUT -H "$O" -H "Content-Type: application/json" "$URL/s/$ID" -d '{"probe":42}' >/dev/null
+          [ "$(curl -fsS -H "$O" "$URL/s/$ID" | jq -r .probe)" = "42" ] && echo "Probelauf ok" || { echo "::error::Probelauf fehlgeschlagen"; exit 1; }
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -H 'Origin: https://fremd.example' "$URL/s/$ID")" = "403" ] && echo "fremde Seiten gesperrt: ok"
       - name: Adresse in die App schreiben
         if: steps.chk.outputs.ok == 'true'
         run: |
