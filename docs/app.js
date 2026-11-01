@@ -757,6 +757,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  104:["„Meine Coupons“ ist jetzt einfacher: oben steht in 3 Schritten, wie du einen Coupon direkt beim Artikel einträgst. Das lange Formular ist eingeklappt – nur noch für Coupons, die für eine ganze Marke gelten."],
   103:["Einkaufszettel = Kassenpreis: Die Summe zeigt jetzt genau, was du an der Kasse zahlst. App-Preise zählen erst, wenn du beim Artikel „Aktiviert ✓“ antippst – SparRadar sagt dir dabei, was in welcher App zu tun ist.","Rewe-Bonus-Guthaben, Payback und Geld zurück werden nicht mehr von der Summe abgezogen (die kommen ja erst später). Sie stehen als „Kommt später zurück“ beim Artikel."],
   102:["Geld zurück: Die Zahl bei „Deine Woche“ passt jetzt zum gewählten Markt. Antippen zeigt direkt die Angebote mit Geld zurück.","Den Coupon-Finder gibt es nicht mehr – SparRadar findet Geld-zurück-Aktionen automatisch und zeigt sie direkt bei den Angeboten (oranges Abzeichen „💸“)."],
   101:["Neu: Kassenbon eintragen. Im Einkaufszettel „📷 Bon fotografieren“ antippen – oder in der Markt-App (Lidl Plus, REWE, EDEKA, Netto, dm …) beim Bon auf „Teilen“ → SparRadar. Passt alles, ist der Einkauf sofort mit den echten Preisen gespeichert. Der Bon bleibt nur auf deinem Gerät."],
@@ -1445,21 +1446,22 @@ function renderCoupons(){
   const popts=PROGS.map(p=>`<option ${p==="Rewe Bonus"?"selected":""}>${p}</option>`).join("");
   const topts=Object.entries(CP_TYPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
   const plus=7;const d=new Date(Date.now()+plus*864e5).toISOString().slice(0,10);
-  return `${cbDueHTML()}${cbEarnedHTML()}${cpHowHTML()}<section class="panel"><h3>Meine Coupons</h3>
-    <p>Coupon in Lidl Plus, der Rewe-App, bei Payback oder in einer Cashback-App aktiviert? Kurz hier eintragen. SparRadar rechnet ihn dann in alle passenden Angebote, den Kracher und den Einkaufszettel ein. Abgelaufene Coupons verschwinden von selbst.</p>
-    <form class="form" id="cpForm">
-     <div class="row"><label>Markt<select id="cpStore">${sopts}</select></label><label>Programm<select id="cpProg">${popts}</select></label></div>
-     <label>Gilt für (Artikel oder Marke)<input id="cpKw" required placeholder="z. B. Kaffee, Jacobs, Katzenfutter" autocomplete="off"></label>
-     <div class="row"><label>Art<select id="cpType">${topts}</select></label><label>Wert<input id="cpVal" required inputmode="decimal" placeholder="z. B. 1,00 oder 20"></label></div>
-     <div class="row"><label>Gültig bis<input id="cpTo" type="date" value="${d}"></label><label style="align-self:end"><button class="btn" type="submit">${IC.plus}Coupon speichern</button></label></div>
-    </form>
+  return `${cbDueHTML()}${cbEarnedHTML()}${cpHowHTML()}<section class="panel"><h3>🎟️ Meine Coupons</h3>
+    <div class="cpsteps"><b>Coupon eintragen – so geht's:</b><ol><li>Bei den Angeboten den Artikel antippen.</li><li><b>„🎟️ Ich habe einen Coupon dafür“</b> antippen.</li><li>Wert antippen, z. B. <b>−1 €</b> oder <b>−20 %</b> – fertig.</li></ol><small>SparRadar rechnet den Coupon dann im Angebot und auf dem Einkaufszettel ein. Abgelaufene Coupons verschwinden von selbst.</small></div>
+    ${act.length?"":'<div class="empty" style="padding:14px"><b>Noch keine Coupons</b>Wenn du einen einträgst, steht er hier.</div>'}
     ${act.length?`<div class="rows">${act.map(({c,i})=>{const n=wo.filter(o=>couponsFor(o).includes(c)).length;
       return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#2B3034"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#2B3034">%</span>`:sb(c.s,true)}</div>
        <div class="t">${esc(c.cb&&c.n?c.n:c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?(c.cb?"Bon einsenden bis ":"bis ")+fmtDate(c.to):"ohne Ende"}</small>
         ${c.cb&&c.url?`<div class="cpf-b cblink"><button class="btn sm" data-cbget="${esc(c.id)}">💸 Geld holen</button><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div>`:""}
         <div class="pills"><span class="pill ${n?"cb":""}">${n?`passt zu ${n} Angebot${n===1?"":"en"}`:"gerade kein passendes Angebot"}</span></div></div>
-       <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`
-      :'<div class="empty" style="padding:16px"><b>Noch keine Coupons</b>Trag oben deinen ersten aktivierten Coupon ein.</div>'}
+       <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`:""}
+    <details class="cpmore"><summary>Coupon für eine ganze Marke eintragen (ohne bestimmtes Angebot)</summary>
+    <form class="form" id="cpForm">
+     <div class="row"><label>Markt<select id="cpStore">${sopts}</select></label><label>Programm<select id="cpProg">${popts}</select></label></div>
+     <label>Gilt für (Artikel oder Marke)<input id="cpKw" required placeholder="z. B. Kaffee, Jacobs, Katzenfutter" autocomplete="off"></label>
+     <div class="row"><label>Art<select id="cpType">${topts}</select></label><label>Wert<input id="cpVal" required inputmode="decimal" placeholder="z. B. 1,00 oder 20"></label></div>
+     <div class="row"><label>Gültig bis<input id="cpTo" type="date" value="${d}"></label><label style="align-self:end"><button class="btn" type="submit">${IC.plus}Coupon speichern</button></label></div>
+    </form></details>
     ${S.useApp?"":`<p style="color:var(--alert)">„Apps &amp; Coupons einrechnen“ ist ausgeschaltet. Coupons werden gerade nicht berücksichtigt.</p>`}
    </section>`}
 
