@@ -4,7 +4,7 @@ name: Aldi-Dauerpreise holen
 # -> docs/data/dauerpreise.json. Die App zeigt damit auch für Artikel ohne Angebot einen echten Preis.
 on:
   schedule:
-    - cron: "17 3 * * 0"   # sonntags ca. 4:17 / 5:17 Uhr deutscher Zeit
+    - cron: "47 4 * * 0"   # sonntags ca. 5:47 / 6:47 Uhr deutscher Zeit (nach dem Angebots-Abruf um 3:10 UTC)
   workflow_dispatch: {}
 
 permissions:

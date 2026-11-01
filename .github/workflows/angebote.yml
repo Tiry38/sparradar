@@ -2,7 +2,7 @@ name: Angebote abrufen
 
 on:
   schedule:
-    - cron: "15 4 * * *"   # jeden Tag ca. 5:15 / 6:15 Uhr deutscher Zeit
+    - cron: "15 3 * * *"   # Reserve (Taktgeber startet 3:10 UTC): jeden Tag ca. 4:15 / 5:15 Uhr deutscher Zeit
     - cron: "15 17 * * 5,6,0"  # zusätzlich Fr, Sa, So ca. 18:15 / 19:15 Uhr: Prospekte der nächsten Woche, sobald die Märkte sie veröffentlichen
   workflow_dispatch: {}      # von Hand starten über "Run workflow"
 

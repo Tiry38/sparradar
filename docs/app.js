@@ -871,6 +871,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  124:["🌅 Neue Angebote kommen jetzt jeden Morgen eine Stunde früher: fertig gegen 5 Uhr (im Sommer gegen 6 Uhr). So kannst du auch vor einem frühen Einkauf noch reinschauen."],
   123:["🏷️ Zettel: Bei „Butter“, „Waschmittel“, „Eis“ & Co. zeigt der Aldi-Hinweis jetzt den wirklich günstigsten Artikel (z. B. Markenbutter 1,15 € statt Irische Butter)."],
   122:["⚡ Viel schneller: Kacheln, Filter und Märkte reagieren jetzt sofort beim Antippen – kein Hängen mehr.","🧹 Die Kachel „neue Angebote“ ist weg. Neue Angebote erkennst du weiter am grünen „Neu“ auf dem Bild."],
   121:["🏷️ Zettel: Hat Aldi einen Artikel sonst sowieso billiger als das Angebot (z. B. Mehl), steht das jetzt darunter.","🥚 Treffsicherer: „Eier“ findet keine Make-up-Eier oder laktosefreien Joghurt mehr, „Eis“ keinen Reis."],
@@ -1802,7 +1803,7 @@ function renderSettings(){
    <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
    <section class="panel"><h3>SparRadar als App</h3><p><b>Am einfachsten:</b> SparRadar in Chrome öffnen → Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. Ohne Warnungen, aktualisiert sich selbst.</p><p>Alternativ als Datei: Android-App (APK, Android fragt dabei nach Erlaubnis) oder Windows-Setup. Beide aktualisieren sich danach ebenfalls selbst.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
-   <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen gegen 5:15 Uhr neu abgerufen${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
+   <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen ab ca. 4 Uhr neu abgerufen (im Sommer ab 5 Uhr)${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
     <div class="links"><button class="btn ghost sm" id="reloadApp">App neu laden</button>${window.SparRadarApp?'<button class="btn ghost sm" id="appUpdNow">Nach App-Update suchen</button>':""}</div></section>
    <div class="verline">${versionText()} · <span id="verState">wird geprüft …</span></div>
   </div>`}

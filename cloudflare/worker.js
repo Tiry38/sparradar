@@ -84,7 +84,10 @@ export default {
     // (Cron „*/5“, je Durchgang nur 6 Seitenaufrufe). Die großen Abrufe laufen weiter nur einmal pro Stunde (Takt :10).
     const full = m >= 10 && m < 15;
     if (full) {
-      if (h === 4) due.push("angebote.yml", "cashback.yml");                       // jeden Morgen ca. 5:10/6:10 Uhr
+      // Kevins Wunsch (01.11.): wer um 7 Uhr einkaufen geht, soll vorher reinschauen können -> Abruf 3:10 UTC
+      // (Winter 4:10 Uhr, fertig ca. 4:45; Sommer 5:10 Uhr, fertig ca. 5:45). Geld-zurück danach um 4 UTC.
+      if (h === 3) due.push("angebote.yml");
+      if (h === 4) due.push("cashback.yml");
       if (h === 17 && [5, 6, 0].includes(wd)) due.push("angebote.yml");             // Fr, Sa, So abends
       if (h === 2 && wd === 0) due.push("artikelstamm.yml");                        // sonntags nachts
       if ([6, 12, 18].includes(h)) due.push("bilder.yml");                         // Bilder-Wächter 3× am Tag
