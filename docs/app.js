@@ -193,12 +193,17 @@ const Sync = {
   fail(e){this.status="Abgleich fehlgeschlagen: "+e.message;const el=document.getElementById("syncState");if(el)el.textContent=this.status}
 };
 
-function histOf(o){const rows=HIST[o.s+"|"+norm(o.n).slice(0,40)]||[];return rows.filter(r=>r[0]<(o.from||TODAY)).map(r=>r[1])}
+// Preisverlauf nur für genau diesen Artikel: gleiche Marke und gleiche Menge (Zeile = [Tag, Preis, Marke, Menge]).
+// Alte Zeilen ohne Marke/Menge werden nicht verglichen – „Shampoo“ oder „Lachsfilet“ gibt es in vielen Marken und Größen.
+const histTag = o => [norm(o.b||"").slice(0,20),o.gp&&o.gp.v>0&&o.p?Math.round(o.p/o.gp.v*1000)/1000:null];
+function histRows(o){const [bk,q]=histTag(o);
+  return (HIST[o.s+"|"+norm(o.n).slice(0,40)]||[]).filter(r=>r.length>=4&&r[2]===bk&&(r[3]==null||q==null?r[1]>o.p/2&&r[1]<o.p*2:Math.abs(r[3]-q)/q<.05))}
+function histOf(o){return histRows(o).filter(r=>r[0]<(o.from||TODAY)).map(r=>r[1])}
 // Referenzpreis für "Ersparnis": statt-Preis, sonst Durchschnitt aus dem Verlauf, sonst Angebotspreis
 // Preis-Alarm: so günstig wie seit Wochen nicht (aus dem SparRadar-Preisverlauf desselben Markts).
 // Zählt erst, wenn der Verlauf mind. 3 Wochen zurückreicht – sonst wäre „Tiefstpreis“ nach 2 Tagen Beobachtung wertlos.
 function lowSince(o){if(!o.p||o.bo)return null;const k=o.s+"|"+norm(o.n).slice(0,40),from=o.from||TODAY;
-  const rows=(HIST[k]||[]).filter(r=>r[0]<from);if(rows.length<3)return null;
+  const rows=histRows(o).filter(r=>r[0]<from);if(rows.length<3)return null;
   const cheaper=rows.filter(r=>r[1]<=o.p+.004).map(r=>r[0]).sort().pop();
   const start=cheaper?rows.filter(r=>r[0]>cheaper).map(r=>r[0]).sort()[0]:rows.map(r=>r[0]).sort()[0];
   if(!start)return null;const days=Math.round((new Date(from+"T12:00:00")-new Date(start+"T12:00:00"))/864e5);
@@ -281,12 +286,27 @@ const TOMORROW=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}
 const validTxt = o => o.from && o.from>SHOP ? "ab "+fmtDate(shopDay(o.from)) : o.to===TODAY ? "nur noch heute" : o.to===TOMORROW ? "nur noch bis morgen" : o.to ? "bis "+fmtDate(o.to) : "";
 const tagHTML = v => {v=Math.round(Math.max(v,0)*100);const e=Math.floor(v/100),c=v%100;return `<span class="eu">${e}</span><span class="ct">.${String(c).padStart(2,"0")}</span>`};
 const comboLabels = o => steps(o).filter(s=>s.t!=="base"&&s.t!=="of").map(s=>s.l);
-function verdict(o){const h=histOf(o);
-  if(h.length<3)return{t:"ok",l:"Preisvergleich startet: SparRadar merkt sich ab jetzt jeden Tag den Preis. Nach ein paar Tagen siehst du hier, ob es ein echter Tiefpreis ist oder ein Schein-Rabatt.",s:"Preis wird beobachtet",fresh:true};
-  const avg=h.reduce((a,b)=>a+b,0)/h.length,min=Math.min(...h);
-  if(o.o&&avg<=o.p*1.05)return{t:"fake",l:`Rabatt fraglich: kostete zuletzt meist ${eur(avg)}`,s:"Rabatt fraglich"};
-  if(o.p<min-.001)return{t:"low",l:`Tiefstpreis seit ${h.length} Abrufen`,s:"Tiefstpreis"};
-  return{t:"ok",l:`Gab es zuletzt schon für ${eur(min)}`,s:"Übliches Angebot"}}
+// Preisverlauf als Zeiträume (Kevin 01.11.: „Preisverlauf nützlicher“): tägliche Einträge mit gleichem Preis = ein Zeitraum.
+// Lücke > 3 Tage = neues Angebot. Damit sagt die Karte konkret „zuletzt 1,29 € (bis 31.10.)“ statt nur „wird beobachtet“.
+function histPeriods(o,withNow){const rows=histRows(o).filter(r=>withNow||r[0]<(o.from||TODAY)).slice().sort((a,b)=>a[0].localeCompare(b[0]));
+  const out=[];for(const [d,p] of rows){const l=out[out.length-1];
+    if(l&&Math.abs(l.p-p)<.005&&(new Date(d+"T12:00:00")-new Date(l.to+"T12:00:00"))/864e5<=3)l.to=d;else out.push({from:d,to:d,p})}
+  return out}
+const dShort = d => new Date(d+"T12:00:00").toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit"});
+function verdict(o){const ps=histPeriods(o),cur=fin(o)||o.p;
+  if(!ps.length)return{t:"ok",l:"SparRadar merkt sich ab heute den Preis. Kommt der Artikel wieder ins Angebot, siehst du hier, ob er billiger oder teurer ist.",s:"Preis wird beobachtet",fresh:true};
+  const h=ps.map(x=>x.p),avg=h.reduce((a,b)=>a+b,0)/h.length,min=Math.min(...h),last=ps[ps.length-1],first=ps[0].from;
+  if(o.o&&ps.length>=2&&avg<=o.p*1.05)return{t:"fake",l:`Vorsicht: Bei ${sname(o.s)} kostete das vorher meistens auch nur ${eur(avg)}. Der Rabatt ist also nicht echt.`,s:"Rabatt fraglich"};
+  if(o.p<min-.004&&ps.length>=2)return{t:"low",l:`So billig gab es das bei ${sname(o.s)} noch nie, seit SparRadar mitschreibt (${dShort(first)}). Vorher kostete es mindestens ${eur(min)}.`,s:`So billig wie noch nie`};
+  if(last.p>o.p+.004)return{t:"down",l:`Beim letzten Mal (${dShort(last.from)}–${dShort(last.to)}) kostete das bei ${sname(o.s)} ${eur(last.p)}. Jetzt ist es ${Math.round((1-o.p/last.p)*100)} % billiger.`,s:`Letztes Mal ${eur(last.p)}`};
+  if(last.p<o.p-.004)return{t:"up",l:`Beim letzten Mal (${dShort(last.from)}–${dShort(last.to)}) war das bei ${sname(o.s)} billiger: ${eur(last.p)}. Vielleicht lohnt sich Warten.`,s:`Letztes Mal billiger: ${eur(last.p)}`};
+  return{t:"ok",l:`Beim letzten Mal (${dShort(last.from)}–${dShort(last.to)}) kostete das bei ${sname(o.s)} genauso viel${min<o.p-.004?`. Am billigsten war es schon für ${eur(min)}.`:"."}`,s:`Gleicher Preis wie letztes Mal`}}
+// Kurz-Statistik für die Detailansicht: günstigster/teuerster Preis, wie oft im Angebot, Rhythmus
+function histStats(o){const ps=histPeriods(o,true);if(ps.length<2)return"";
+  const mn=ps.reduce((a,b)=>b.p<a.p?b:a),mx=ps.reduce((a,b)=>b.p>a.p?b:a),st=ps.map(x=>x.from);
+  const gaps=st.slice(1).map((d,i)=>(new Date(d+"T12:00:00")-new Date(st[i]+"T12:00:00"))/864e5),avg=gaps.reduce((a,b)=>a+b,0)/gaps.length;
+  return [`Am billigsten: <b>${eur(mn.p)}</b> (${dShort(mn.from)})`,mx.p>mn.p+.004?`Am teuersten: <b>${eur(mx.p)}</b> (${dShort(mx.from)})`:"",
+    `${ps.length}-mal gesehen seit ${dShort(ps[0].from)}`,ps.length>=3&&avg>=6?`kommt ungefähr alle ${Math.round(avg/7)||1} Wochen wieder`:""].filter(Boolean).join(" · ")}
 function spark(o,w=64,h=20){const pts=[...histOf(o).slice(-10),o.p];if(pts.length<2)return"";
   const mx=Math.max(...pts),mn=Math.min(...pts)*0.95,sx=w/(pts.length-1),y=v=>h-2-(v-mn)/(mx-mn||1)*(h-4);
   return `<svg width="${w}" height="${h}" viewBox="-3 -3 ${w+6} ${h+6}" aria-hidden="true"><polyline points="${pts.map((v,i)=>`${(i*sx).toFixed(1)},${y(v).toFixed(1)}`).join(" ")}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" opacity=".55"/><circle cx="${w}" cy="${y(o.p).toFixed(1)}" r="3" fill="currentColor"/></svg>`}
@@ -728,7 +748,7 @@ const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>sa
 function renderDetail(){
   const o=byId(S.detail);if(!o)return `<div class="sheet"><div class="sheet-h"><h2>Artikel</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div><div class="empty"><b>Nicht mehr im Angebot</b></div></div>`;
   const ims=dImages(o),cur=ims[Math.min(S.dImg||0,ims.length-1)],inL=S.list.includes(o.id),fav=S.watch.some(w=>norm(w.k)===norm(o.n)),vd=verdict(o),st=steps(o);
-  const hist=(HIST[o.s+"|"+norm(o.n).slice(0,40)]||[]).slice(-8).reverse();
+  const hist=histPeriods(o,true).slice(-8).reverse(),hst=histStats(o);
   const share=`${o.n}${o.b?" ("+o.b+")":""} bei ${sname(o.s)}: ${o.bo?eur(o.bo)+" Bonus":eur(fin(o))}${offPct(o)?` (−${offPct(o)} %)`:""}${validTxt(o)?", "+validTxt(o):""}\n\nGefunden mit SparRadar: ${APP_URL}`;
   return `<div class="sheet detail" role="dialog" aria-modal="true" aria-label="${esc(o.n)}">
    <div class="sheet-h">${sb(o.s,true)}<h2>${esc(sname(o.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
@@ -758,7 +778,7 @@ function renderDetail(){
     ${o.inf?`<div class="dtext"><h4>Beschreibung</h4><p>${esc(o.inf)}</p></div>`:""}
     ${lowSince(o)?`<div class="alarm big">📉 <span><b>Preis-Alarm:</b> ${esc(lowSince(o).l)}</span></div>`:""}
     <div class="verdict ${vd.t}">${spark(o,90,24)}<span>${esc(vd.l)}</span></div>
-    ${hist.length?`<div class="dtext"><h4>Preisverlauf</h4><ul class="dhist">${hist.map(([d,p])=>`<li><span>${fmtDate(d)}</span><b>${eur(p)}</b></li>`).join("")}</ul></div>`:""}
+    ${hist.length?`<div class="dtext"><h4>So viel kostete es bei ${esc(sname(o.s))}</h4>${hst?`<p class="hstat">${hst}</p>`:""}<ul class="dhist">${hist.map(x=>`<li><span>${x.from===x.to?fmtDate(x.from):dShort(x.from)+" – "+dShort(x.to)}${x.to>=TODAY&&x.from<=TODAY?" · jetzt":""}</span><b>${eur(x.p)}</b></li>`).join("")}</ul></div>`:""}
     <div class="dactions">
      <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>${inL?qStep(o.id,true):""}
      <button class="btn ghost" data-fav="${esc(o.id)}">${IC.star}${fav?"Gemerkt":"Merken"}</button>
@@ -771,6 +791,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  116:["Auf jeder Karte steht jetzt, was der Artikel beim letzten Mal gekostet hat – z. B. „Letztes Mal 1,29 €“ oder „Letztes Mal billiger“. Tippst du den Artikel an, siehst du alle früheren Preise mit Datum."],
   115:["Jetzt hat fast jedes Angebot einen Vergleichspreis: Gibt es keinen „statt“-Preis, zeigt die Karte jetzt den Preis desselben Artikels bei einem anderen Markt (orange, wenn er dort günstiger ist)."],
   114:["Doppelte Karten desselben Artikels (z. B. Milch zweimal mit gleichem Preis) stehen jetzt nur noch einmal da. Fehlt im Prospekt der Preis pro Liter/Kilo, rechnet SparRadar ihn aus der Packungsgröße aus."],
   113:["Merkliste: Der Hinweis „Keine Treffer“ zeigt wieder einen normalen Text statt Zeichensalat."],

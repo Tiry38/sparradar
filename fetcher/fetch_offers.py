@@ -921,16 +921,38 @@ def drop_previews(offers):
     return out
 
 
+def hist_tag(o):
+    """Marke + Packungsgröße zum Preis speichern (Kevin 01.11.): „Shampoo“ oder „Lachsfilet“ gibt es in vielen Marken und
+    Größen – verglichen wird in der App nur dieselbe Marke und dieselbe Menge."""
+    bk = norm(o.get("b") or "")[:20]
+    gp = o.get("gp") or {}
+    q = round(o["p"] / gp["v"], 3) if gp.get("v") and o.get("p") else None
+    return bk, q
+
+
 def update_history(offers, today):
     hist = load("history.json", {})
+    # Alte Zeilen ohne Marke/Menge ([Tag, Preis]) nachträglich zuordnen, wenn genau ein Angebot mit diesem Preis passt
+    tags = {}
+    for o in offers:
+        tags.setdefault((f"{o['s']}|{norm(o['n'])[:40]}", round(o["p"], 2)), set()).add(hist_tag(o))
+    for k, rows in hist.items():
+        for r in rows:
+            if len(r) == 2:
+                t = tags.get((k, round(r[1], 2)))
+                if t and len(t) == 1:
+                    r.extend(next(iter(t)))
     for o in offers:
         k = f"{o['s']}|{norm(o['n'])[:40]}"
         rows = hist.setdefault(k, [])
-        if rows and rows[-1][0] == today:
-            rows[-1][1] = min(rows[-1][1], o["p"])
+        bk, q = hist_tag(o)
+        same = next((r for r in rows if r[0] == today and len(r) >= 4 and r[2] == bk and r[3] == q), None)
+        if same:
+            same[1] = min(same[1], o["p"])
         else:
-            rows.append([today, o["p"]])
-        del rows[:-90]
+            rows.append([today, o["p"], bk, q])
+        rows.sort(key=lambda r: r[0])
+        del rows[:-150]
     # Einträge, die seit 120 Tagen nicht mehr auftauchen, löschen
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=120)).isoformat()
     hist = {k: v for k, v in hist.items() if v and v[-1][0] >= cutoff}

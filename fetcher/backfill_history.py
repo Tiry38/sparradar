@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fetch_offers as f  # noqa: E402
 
 FROM, TO = os.environ.get("SR_BF_FROM", "20260901"), os.environ.get("SR_BF_TO", "20261031")
-MAX_MIN = float(os.environ.get("SR_BF_MINUTES", "320"))
+MAX_MIN = float(os.environ.get("SR_BF_MINUTES", "40"))  # kurze Etappen: alle ~45 min landet etwas in der App
 PAUSE = 2.0  # Sekunden zwischen zwei Abrufen beim Internet-Archiv
 STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backfill-state.json")
 PATTERNS = [
@@ -151,9 +151,11 @@ def collect(path):
         for o in offs:
             k = f"{o['s']}|{f.norm(o['n'])[:40]}"
             d = day_of(o, ts)
+            bk, q = f.hist_tag(o)
+            dk = json.dumps([d, bk, q])  # Tag + Marke + Menge (gleicher Artikel)
             cur = rows.setdefault(k, {})
-            if d not in cur or o["p"] < cur[d]:
-                cur[d] = o["p"]; n_new += 1
+            if dk not in cur or o["p"] < cur[dk]:
+                cur[dk] = o["p"]; n_new += 1
         done.add(f"{ts}|{url}")
         if i % 100 == 99:
             st["done"] = sorted(done); json.dump(st, open(STATE, "w")); json.dump(rows, open(path, "w"))
@@ -171,13 +173,15 @@ def merge(path):
     hist = f.load("history.json", {})
     added = 0
     for k, days in rows.items():
-        cur = {d: p for d, p in hist.get(k, [])}
-        for d, p in days.items():
-            if d not in cur:
-                cur[d] = p; added += 1
-            elif p < cur[d]:
-                cur[d] = p
-        hist[k] = [[d, cur[d]] for d in sorted(cur)][-90:]
+        cur = {json.dumps([r[0], r[2], r[3]]): r[1] for r in hist.get(k, []) if len(r) >= 4}  # alte Zeilen ohne Marke/Menge fallen weg
+        for dk, p in days.items():
+            if not dk.startswith("["):
+                continue
+            if dk not in cur:
+                cur[dk] = p; added += 1
+            elif p < cur[dk]:
+                cur[dk] = p
+        hist[k] = sorted(([*json.loads(dk)[:1], p, *json.loads(dk)[1:]] for dk, p in cur.items()), key=lambda r: r[0])[-150:]
     f.save("history.json", hist)
     log(f"history.json: {added} Preise nachgetragen, {len(hist)} Artikel")
 

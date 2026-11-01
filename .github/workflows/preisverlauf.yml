@@ -1,6 +1,6 @@
 name: Preisverlauf nachtragen
 # Nur von Hand: alte Angebotspreise (ab Sept.) aus dem Internet-Archiv in docs/data/history.json eintragen.
-# Läuft in Etappen (max. ~5,5 h je Lauf) und startet sich selbst neu, bis alles gelesen ist.
+# Läuft in Etappen (Etappen von ca. 45 min, jede speichert sofort) und startet sich selbst neu, bis alles gelesen ist.
 on:
   workflow_dispatch: {}
 permissions:
@@ -12,7 +12,7 @@ concurrency:
 jobs:
   nachtragen:
     runs-on: ubuntu-latest
-    timeout-minutes: 345
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6

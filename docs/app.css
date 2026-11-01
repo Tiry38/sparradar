@@ -587,3 +587,11 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .cmpp.hi{color:#C2410C}
 @media (prefers-color-scheme:dark){.cmpp.hi{color:#FDBA74}}
 :root[data-theme="dark"] .cmpp.hi{color:#FDBA74}
+/* v116: Preisverlauf */
+.hist.up,.verdict.up{color:#C2410C}
+@media (prefers-color-scheme:dark){.hist.up,.verdict.up{color:#FDBA74}}
+:root[data-theme="dark"] .hist.up,:root[data-theme="dark"] .verdict.up{color:#FDBA74}
+.hstat{margin:4px 0 8px;font-size:.84rem;color:var(--muted);line-height:1.45}
+.hist.down{color:var(--save)}
+.verdict.down{background:var(--save-bg);color:var(--save)}
+.verdict.up{background:color-mix(in oklab,#F08A24 14%,var(--surface))}
