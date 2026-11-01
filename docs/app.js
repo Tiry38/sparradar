@@ -871,6 +871,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  123:["🏷️ Zettel: Bei „Butter“, „Waschmittel“, „Eis“ & Co. zeigt der Aldi-Hinweis jetzt den wirklich günstigsten Artikel (z. B. Markenbutter 1,15 € statt Irische Butter)."],
   122:["⚡ Viel schneller: Kacheln, Filter und Märkte reagieren jetzt sofort beim Antippen – kein Hängen mehr.","🧹 Die Kachel „neue Angebote“ ist weg. Neue Angebote erkennst du weiter am grünen „Neu“ auf dem Bild."],
   121:["🏷️ Zettel: Hat Aldi einen Artikel sonst sowieso billiger als das Angebot (z. B. Mehl), steht das jetzt darunter.","🥚 Treffsicherer: „Eier“ findet keine Make-up-Eier oder laktosefreien Joghurt mehr, „Eis“ keinen Reis."],
   120:["💡 Zettel versteht einfache Wörter: Schreibst du „Milch“, zeigt SparRadar darunter das beste Angebot – mit „Nehmen“ tauschst du es ein. Nichts passiert von selbst.","🏷️ Gibt es keinen Rabatt, steht der Aldi-Normalpreis dabei – mit einem Tipp eingetragen.","🧮 Spar-Check auf dem Zettel: zeigt, was du sparen kannst, und übernimmt alle Tipps mit einem Knopf.","⏰ Auf dem Zettel steht, welches Angebot heute oder morgen endet.","🧾 Kassen-Kontrolle: Liest du den Kassenbon ein, merkt SparRadar, wenn du mehr bezahlt hast als im Angebot.","📦 Vorrats-Tipps: haltbare Artikel, die gerade besonders günstig sind – mit „2 Stück“ oder „3 Stück“ gleich auf den Zettel.","👓 Einfache Ansicht (Einstellungen): weniger Knöpfe, größere Schrift, oben „Für dich im Angebot“.","👪 Für jemand anderen einrichten (Einstellungen): ein WhatsApp-Link – installieren, „Verbinden“, und ihr habt denselben Einkaufszettel."],
@@ -1303,9 +1304,10 @@ function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>
 const exWords=s=>String(s||"").split(/[\s\/,&+()]+/).flatMap(t=>{const p=t.split("-");return [norm(t),norm(p[p.length-1])]}).filter(Boolean);
 const exEq=(w,k)=>w===k||["n","e","en","s","er","es"].some(e=>w===k+e||k===w+e);
 // Hauptwort = letztes großgeschriebenes Wort vor „,/mit/oder …“: „Milch Mäuse“ -> Mäuse, „Haltbare fettarme Milch“ -> Milch (Stufe 4)
-const exHead=n=>{const seg=String(n||"").split(/,|\/|\(|(?:^|\s)(?:mit|oder|und|in|aus|für)\s/)[0],ws=seg.split(/\s+/).filter(w=>/^[A-ZÄÖÜ][a-zäöüß]|-[A-ZÄÖÜ][a-zäöüß]/.test(w));return ws.length?exWords(ws[ws.length-1]):[]};
+const exHead=n=>{const seg=String(n||"").split(/,|\/|\(|(?:^|\s)(?:mit|oder|und|in|aus|für)\s/)[0],ws=seg.split(/\s+/).filter(w=>/^[A-ZÄÖÜ][a-zäöüß]|-[A-ZÄÖÜ][a-zäöüß]/.test(w)&&!/^(Typ|Type|Klasse|Größe|Gr|Sorte|\w*[Ff]ettstufe|\w*[Rr]ahmstufe|Magerstufe)\.?$/.test(w));return ws.length?exWords(ws[ws.length-1]):[]};
 function exRank(hs,name,gk=o=>o.c||o.grp||""){const kw=exWords(name);if(!hs.length||!kw.length)return hs;const last=kw[kw.length-1];
-  const tier=o=>{const ws=exWords(o.n);return kw.every(k=>ws.some(w=>exEq(w,k)))?(exHead(o.n).some(w=>exEq(w,last))?4:3):kw.every(k=>ws.some(w=>exEq(w,k)||w.endsWith(k)))?2:1};
+  // Aldi-Warengruppe mit dem Wort im Namen (★): „Markenbutter“ zählt bei „Butter“ wie „Irische Butter“ (v122, sonst gewann die teurere)
+  const tier=o=>{const ws=exWords(o.n);if(gk(o)==="★"&&new Set(kw).size===1&&exHead(o.n).some(w=>w.length-last.length>=3&&w.endsWith(last)))return 4;return kw.every(k=>ws.some(w=>exEq(w,k)))?(exHead(o.n).some(w=>exEq(w,last))?4:3):kw.every(k=>ws.some(w=>exEq(w,k)||w.endsWith(k)))?2:1};
   const t=hs.map(o=>({o,t:tier(o)})),c={};t.forEach(r=>{const g=gk(r.o);c[g]=(c[g]||0)+r.t});
   const g=c["★"]!=null?"★":Object.keys(c).sort((a,b)=>c[b]-c[a])[0],in_=t.filter(r=>gk(r.o)===g),top=Math.max(...in_.map(r=>r.t));
   return in_.filter(r=>r.t===top).map(r=>r.o)}
