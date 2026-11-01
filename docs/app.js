@@ -211,8 +211,8 @@ function cpValue(c,cur){
   if(c.t==="pct")return Math.round(cur*c.v)/100;
   if(c.t==="preis")return Math.max(0,cur-c.v);
   if(c.t==="punkte")return c.v/100; // 1 Payback-Punkt = 1 Cent
-  return 0}
-function cpValueTxt(c){return c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
+  return 0} // t:"app" (vom Coupon-Sucher) = App-Preis/Bonus steht schon im Angebot -> nicht doppelt abziehen
+function cpValueTxt(c){return c.t==="app"?"−"+eur(c.v)+" mit App":c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
 const cpLabel = c => `${c.prog} ${cpValueTxt(c)}`;
 const fin = o => Math.round(steps(o).reduce((a,s)=>a+s.v,0)*100)/100;
 const offPct = o => {const r=ref(o);return r>0?Math.max(0,Math.round((1-fin(o)/r)*100)):0};
@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  81:["Neu im Tab „Coupons“: Knopf „🔍 Coupon suchen“. Zeigt alle App- und Bonus-Vorteile der Woche (Lidl Plus, Edeka-/Netto-App, Rewe Bonus), die größten zuerst – einfach „Einfügen“ oder „Nein“."],
   80:["Kracher: höchstens 2 Angebote pro Markt je Abschnitt – nicht mehr fast nur Edeka mit App-Preis."],
   79:["Angebote nach Ersparnis: erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tierbedarf und zum Schluss Technik, Kleidung & Co. – innerhalb jeder Gruppe weiter nach dem höchsten Rabatt."],
   78:["Kracher: Jeder Markt mit einem belegten Rabatt bekommt einen Platz. Fehlt ein Markt (oft Rewe, der selten „statt“-Preise druckt), steht kurz dabei, warum."],
@@ -1040,6 +1041,35 @@ function cpqSave(id,t,v){const o=byId(id);if(!o||!v)return;
   S.coupons.push({s:o.s,prog:defaultProg(o.s),k:k.replace(/\s+/g," ").trim(),t,v,to:o.to||null});S.cpq=null;save();
   toast(S.useApp?`Coupon gespeichert – du zahlst jetzt ${eur(fin(o))}`:"Coupon gespeichert. „Apps & Coupons einrechnen“ ist ausgeschaltet – in den Einstellungen einschalten.");render()}
 
+// ---------- Coupon-Sucher (Kevins Wunsch 01.11.) ----------
+// Sucht in den aktuellen Prospekten nach Vorteilen, die nur mit App/Bonus gelten (Lidl Plus, Edeka-/Netto-App, Rewe Bonus).
+// Nur echte Händlerangaben, nichts erfunden. Persönliche App-Coupons sieht SparRadar nicht (Login, keine Schnittstelle).
+const cpProgOf=o=>o.s==="rewe"?"Rewe Bonus":o.s==="lidl"?"Lidl Plus":o.s==="edeka"?"Edeka App":o.s==="netto"?"Netto App":o.s==="dm"?"dm App":"Sonstiges";
+function cpGain(o){if(!o.p)return null;
+  if(o.ap&&o.ap<o.p){if(o.ap<o.p*.45)return null; // unplausibel (z. B. 16,90 -> 6,99) -> lieber weglassen
+    return{d:o.p-o.ap,how:"App-Preis "+eur(o.ap)+" statt "+eur(o.p)}}
+  const b=(o.x||[]).filter(x=>x[0]==="bonus").reduce((a,x)=>a+x[2],0);
+  if(b>0)return{d:b,how:eur(b)+" Bonus-Guthaben"};
+  if(o.ao&&o.o&&o.o>o.p)return{d:o.o-o.p,how:"nur mit "+o.ao+": "+eur(o.p)+" statt "+eur(o.o)};
+  return null}
+const cpKey=o=>((o.b&&!norm(o.n).includes(norm(o.b))?o.b+" ":"")+o.n).replace(/\s+/g," ").trim();
+function cpFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c.oid).filter(Boolean));
+  return weekOffers().map(o=>({o,g:cpGain(o)})).filter(({o,g})=>g&&!no.includes(o.id)&&!have.has(o.id)&&(g.d>=.3||g.d/o.p>=.15))
+    .map(x=>({...x,pc:Math.round(x.g.d/(x.o.p+(x.o.ap?0:x.g.d))*100)})).sort((a,b)=>b.g.d-a.g.d||b.pc-a.pc).slice(0,40)}
+function cpFindHTML(){if(!S.cpFind)return `<button class="btn cpfind" id="cpFind">🔍 Coupon suchen</button>`;
+  const f=cpFinds(),tot=f.reduce((a,x)=>a+x.g.d,0);
+  return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Bericht</h3><button class="ibtn" id="cpFindX" aria-label="Bericht schließen">${IC.x}</button></div>
+    ${f.length?`<p><b>${f.length} App- &amp; Bonus-Vorteile gefunden – zusammen bis zu ${eur(tot)}.</b> Die größten zuerst. „Einfügen“ legt den Coupon bei dir ab und setzt den Artikel auf den Einkaufszettel.</p>
+    <div class="rows">${f.map(({o,g,pc})=>`<div class="drow cpf-r"><button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>
+      <div class="t">${esc(cpKey(o))}<small>${sb(o.s)} ${esc(sname(o.s))} · ${esc(g.how)}${o.to?" · bis "+fmtDate(o.to):""}</small></div>
+      <div class="pr"><b>−${eur(g.d)}</b><small>${pc} %</small></div><div class="cpf-b"><button class="btn sm" data-cpfadd="${esc(o.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="${esc(o.id)}">Nein</button></div></div>`).join("")}</div>
+    ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}`
+    :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues</b>Alle App- und Bonus-Vorteile dieser Woche hast du schon eingefügt oder abgelehnt.</div>`}
+    <p class="cpf-n">Quelle: die aktuellen Prospekte (App-Preise, Rewe Bonus). Persönliche Coupons in Lidl Plus, Payback &amp; Co. sieht nur deine App – dafür braucht es dein Login, das SparRadar bewusst nicht nutzt. Wichtig: Den Coupon vor dem Einkauf in der App aktivieren.</p></section>`}
+function cpfAdd(id,quiet){const o=byId(id),g=o&&cpGain(o);if(!g)return 0;
+  S.coupons.push({s:o.s,prog:cpProgOf(o),k:cpKey(o),t:"app",v:Math.round(g.d*100)/100,to:o.to||null,oid:o.id});
+  if(!S.list.includes(o.id))S.list.push(o.id);if(!quiet){save();toast(`Eingefügt: ${cpKey(o)} – vor dem Einkauf in der ${cpProgOf(o)} aktivieren`)}return 1}
+
 function renderCoupons(){
   const act=S.coupons.map((c,i)=>({c,i})).filter(x=>cpActive(x.c));
   const wo=weekOffers();
@@ -1047,7 +1077,7 @@ function renderCoupons(){
   const popts=PROGS.map(p=>`<option ${p==="Rewe Bonus"?"selected":""}>${p}</option>`).join("");
   const topts=Object.entries(CP_TYPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
   const plus=7;const d=new Date(Date.now()+plus*864e5).toISOString().slice(0,10);
-  return `<section class="panel"><h3>Meine Coupons</h3>
+  return `${cpFindHTML()}<section class="panel"><h3>Meine Coupons</h3>
     <p>Coupon in Lidl Plus, der Rewe-App, bei Payback oder in einer Cashback-App aktiviert? Kurz hier eintragen. SparRadar rechnet ihn dann in alle passenden Angebote, den Kracher und den Einkaufszettel ein. Abgelaufene Coupons verschwinden von selbst.</p>
     <form class="form" id="cpForm">
      <div class="row"><label>Markt<select id="cpStore">${sopts}</select></label><label>Programm<select id="cpProg">${popts}</select></label></div>
@@ -1321,6 +1351,11 @@ document.addEventListener("click",e=>{
   if(b.dataset.cpq!=null){S.cpq=b.dataset.cpq||null;render();return}
   if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
+  if(b.id==="cpFind"){S.cpFind=true;render();return}
+  if(b.id==="cpFindX"){S.cpFind=false;render();return}
+  if(b.dataset.cpfadd){cpfAdd(b.dataset.cpfadd);render();return}
+  if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set(OFFERS.map(o=>o.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
+  if(b.id==="cpFindAll"){const n=cpFinds().reduce((a,x)=>a+cpfAdd(x.o.id,true),0);save();toast(`${n} Coupons eingefügt und auf den Zettel gesetzt – vor dem Einkauf in den Apps aktivieren`);render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}

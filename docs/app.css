@@ -401,3 +401,13 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 @media (min-width:721px){.pinbar.pinned{position:fixed;top:0;z-index:20;padding:8px 0 10px;background:var(--bg);box-shadow:0 10px 24px -12px rgba(0,0,0,.45)}
   .pinbar.pinned::before{content:"";position:absolute;inset:0 -16px;background:var(--bg);z-index:-1}}
 .kr-note{font-size:.8rem;color:var(--muted);margin:10px 2px 0}
+/* Coupon-Sucher */
+.btn.cpfind{width:100%;justify-content:center;font-size:1.05rem;padding:14px;margin-bottom:14px}
+.cpf-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.cpf-r .mini{border:0;padding:0;cursor:pointer}
+.cpf-r .pr small{display:block;color:var(--muted)}
+.cpf-b{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cpf-b .btn{justify-content:center}
+@media(min-width:560px){.drow.cpf-r{grid-template-columns:auto minmax(0,1fr) auto auto}.cpf-b{grid-column:auto;display:flex;align-self:center}}
+.cpf-n{font-size:.8rem;color:var(--muted)}
+#cpFindAll{margin-top:10px}
