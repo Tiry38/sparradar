@@ -1,0 +1,25 @@
+name: Geld-zurück-Aktionen
+# Einmal am Tag eine öffentliche Übersichtsseite lesen (robots.txt erlaubt sie) -> docs/data/cashback.json
+on:
+  schedule:
+    - cron: "41 4 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  holen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python fetcher/fetch_cashback.py
+      - name: Speichern
+        run: |
+          git config user.name "SparRadar Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data/cashback.json 2>/dev/null || true
+          git diff --cached --quiet || git commit -m "Geld-zurück-Aktionen $(date +%F)"
+          git pull --rebase -X theirs --autostash
+          git push
