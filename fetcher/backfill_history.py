@@ -10,6 +10,7 @@ Ablauf (Workflow „Preisverlauf nachtragen“, nur von Hand):
   python backfill_history.py --collect rows.json   # Schnappschüsse lesen (setzt nach Abbruch fort, Stand in backfill-state.json)
   python backfill_history.py --merge rows.json     # Zeilen in docs/data/history.json einsortieren
 """
+import gzip
 import json
 import os
 import re
@@ -41,22 +42,43 @@ def log(*a):
     print(*a, file=sys.stderr, flush=True)
 
 
-def get(u, tries=4):
+def get(u, tries=2, timeout=25):
+    """Kurze Wartezeit, wenige Versuche: Das Archiv antwortet entweder in Sekunden oder gar nicht (dann nächste Seite)."""
     for i in range(tries):
         try:
             req = urllib.request.Request(u, headers={"User-Agent": f.UA})
-            with urllib.request.urlopen(req, timeout=90) as r:
-                return r.read().decode("utf-8", "replace")
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                raw = r.read()
+            if raw[:2] == b"\x1f\x8b":  # Archiv liefert die Seite so, wie kaufDA sie damals gepackt geschickt hat
+                raw = gzip.decompress(raw)
+            return raw.decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 return None
-            wait = 60 if e.code == 429 else 10 * (i + 1)
+            wait = 60 if e.code == 429 else 5
             log("   ! HTTP", e.code, "warte", wait, "s")
             time.sleep(wait)
-        except Exception as e:  # Zeitüberschreitung, Verbindungsabbruch
+        except Exception as e:  # Zeitüberschreitung, Verbindungsabbruch, kaputte Daten
             log("   !", str(e)[:80])
-            time.sleep(10 * (i + 1))
+            time.sleep(3)
     return None
+
+
+def thin(snaps):
+    """Übersichtsseiten (ohne Angebote) weg; je Seite höchstens ein Schnappschuss pro Halbwoche (Mo–Mi, Do–So),
+    das reicht: Prospektpreise wechseln montags und donnerstags."""
+    seen, out = set(), []
+    for kind, ts, url in sorted(snaps, key=lambda s: (s[2], s[1])):
+        if kind == "kd" and re.search(r"/Sortiment/?$", url.split("?")[0]):
+            continue
+        d = time.strptime(ts[:8], "%Y%m%d")
+        half = f"{time.strftime('%G-%V', d)}-{0 if d.tm_wday < 3 else 1}"
+        key = (url.split("?")[0].rstrip("/").lower(), half)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append([kind, ts, url])
+    return out
 
 
 def cdx(pattern):
@@ -128,6 +150,8 @@ def day_of(o, snap):
 def collect(path):
     t0 = time.time()
     st = json.load(open(STATE)) if os.path.exists(STATE) else {"done": [], "snaps": None}
+    if st.get("v") != 2:  # alte Liste (mit Übersichtsseiten, ungepackt gelesen = 0 Preise) neu aufbauen
+        st = {"v": 2, "done": [], "snaps": None}
     done = set(st["done"])
     rows = json.load(open(path)) if os.path.exists(path) else {}
     if st.get("snaps") is None:
@@ -136,7 +160,8 @@ def collect(path):
             got = cdx(pat)
             log(f"{pat}: {len(got)} Schnappschüsse")
             snaps += [[kind, r[0], r[1]] for r in got]
-        st["snaps"] = snaps
+        st["snaps"] = thin(snaps)
+        log(f"Davon nötig (ohne Übersichtsseiten, je Seite 2× pro Woche): {len(st['snaps'])}")
         json.dump(st, open(STATE, "w"))
     todo = [s for s in st["snaps"] if f"{s[1]}|{s[2]}" not in done]
     log(f"Offen: {len(todo)} von {len(st['snaps'])} Schnappschüssen")
