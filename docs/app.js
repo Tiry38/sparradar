@@ -759,6 +759,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  113:["Merkliste: Der Hinweis „Keine Treffer“ zeigt wieder einen normalen Text statt Zeichensalat."],
   112:["Der Knopf für die Woche danach zeigt jetzt das Datum, z. B. „Ab 09.11.“ – so ist klar, ab wann diese Angebote gelten."],
   111:["Die Zahlen an den Märkten oben gelten jetzt für die gewählte Woche. Hat ein Markt für nächste Woche noch keinen Prospekt, steht dort „noch nichts“."],
   110:["„Diese Woche“ zeigt jetzt alle Angebote bis Samstag – auch die, die erst ab Donnerstag gelten (mit „ab Do“ auf der Karte). So planst du deinen Einkauf ohne Umschalten. „Nächste Woche“ zeigt alles ab Montag."],
@@ -956,7 +957,7 @@ function renderWatch(){
       return `<div class="witem${n?" hit":""}${on?" on":""}"><button class="wmain" data-wsel="${i}" aria-pressed="${on}" title="${esc(w.k)}">${safeUrl(im)?`<img src="${esc(sharp(im))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<span class="wph">${IC.bell}</span>`}<span class="wtx"><b>${esc(w.k)}</b><small>${n?`${n} ${n===1?"Treffer":"Treffer"} im Angebot`:"gerade nicht im Angebot"}${w.max?` · bis ${eur(w.max)}/kg`:""}</small></span></button><button class="wdel" data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></div>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
    </section>
    <div class="meta"><h2>${S.wsel!=null?`Treffer für „${esc(S.watch[S.wsel].k)}“`:"Deine Treffer"}</h2><span>${S.wsel!=null?`<button class="linkbtn" data-wsel="${S.wsel}">Alle zeigen</button> · `:""}${hits.length} Angebote</span></div>
-   ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:'<div class="empty"><b>Keine Treffer</b>${S.wsel!=null?"Dieser Artikel ist gerade nicht im Angebot. SparRadar schaut bei jedem Abruf nach.":"Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis."}</div>'}`}
+   ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:`<div class="empty"><b>Keine Treffer</b>${S.wsel!=null?"Dieser Artikel ist gerade nicht im Angebot. SparRadar schaut bei jedem Abruf nach.":"Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis."}</div>`}`}
 
 // Ersparnis-Zähler: was auf dem Zettel abgehakt wird, zählt als gekauft
 const savedOn=()=>S.saved.filter(x=>!x.off);
