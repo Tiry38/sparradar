@@ -1,5 +1,5 @@
 // SparRadar Service Worker: App offline verfügbar, Angebote immer frisch (Netz zuerst, sonst Cache)
-const CACHE = "sparradar-v4";
+const CACHE = "sparradar-v5";
 const SHARE = "sr-share"; // geteilter Kassenbon (Teilen-Menü einer anderen App -> SparRadar), nur kurz auf dem Gerät
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg"];
 

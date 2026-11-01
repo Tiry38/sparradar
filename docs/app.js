@@ -296,7 +296,8 @@ const comboLabels = o => steps(o).filter(s=>s.t!=="base"&&s.t!=="of").map(s=>s.l
 // Lücke > 3 Tage = neues Angebot. Damit sagt die Karte konkret „zuletzt 1,29 € (bis 31.10.)“ statt nur „wird beobachtet“.
 // Zwischenspeicher (v122, Kevin: Antippen der Kacheln ruckelte 1–3 s): Preisverlauf hängt nur am Angebot und an history.json,
 // verdict/score zusätzlich an Zettel/Coupons/App-Schalter -> werden bei jedem render() und save() neu berechnet.
-function memoReset(){VDC=new WeakMap();SCC=new WeakMap()}
+let PRC=new WeakMap(); // 💪 protInfo (hängt an fin = App-Schalter/Coupons)
+function memoReset(){VDC=new WeakMap();SCC=new WeakMap();PRC=new WeakMap()}
 function histPeriods(o,withNow){const c=HPC.get(o)||{};if(!HPC.has(o))HPC.set(o,c);const k=withNow?1:0;return c[k]||(c[k]=histPeriodsRaw(o,withNow))}
 function histPeriodsRaw(o,withNow){const rows=histRows(o).filter(r=>withNow||r[0]<(o.from||TODAY)).slice().sort((a,b)=>a[0].localeCompare(b[0]));
   const out=[];for(const [d,p] of rows){const l=out[out.length-1];
@@ -473,6 +474,7 @@ function filtered(){
     if(S.cats.size){const rc=r.filter(o=>S.cats.has(o.c));if(rc.length||!r.length)r=rc;else S._catOff=true}}
   else if(S.cats.size)r=r.filter(o=>S.cats.has(o.c));
   r=r.filter(fltOk);
+  if(S.flt.pro)return r.sort((a,b)=>protInfo(a).v-protInfo(b).v); // 💪 günstigstes Eiweiß zuerst
   // Sortierung „Ersparnis“ (Kevins Wunsch 01.11.): erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tier, dann der Rest – innerhalb jeder Gruppe nach % Rabatt
   const f0={off:(a,b)=>catGrp(a)-catGrp(b)||sortPct(b)-sortPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
   // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
@@ -493,9 +495,10 @@ const fltOk=o=>{const F=S.flt;
   if(F.low&&verdict(o).t!=="low"&&!lowSince(o))return false;
   if(F.cb&&!cbFor(o))return false;
   if(F.vr&&!vorrat(o))return false;
+  if(F.pro&&!protInfo(o))return false;
   return true};
 const fltCount=()=>Object.values(S.flt).filter(Boolean).length;
-const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis",cb:"💸 Geld zurück",vr:"📦 Vorrats-Tipps"};
+const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis",cb:"💸 Geld zurück",vr:"📦 Vorrats-Tipps",pro:"💪 Eiweiß pro €"};
 // App-Angebot? (Preis nur mit App = ao, oder extra App-Preis = ap) -> Name der App fürs Abzeichen
 const appName = o => (o.ao||"").replace(/-App$/," App")||(o.ap&&o.ap<o.p?(o.s==="lidl"?"Lidl Plus":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App":"App")):"");
 const fltSummary=()=>[].concat(S.flt.min?[`ab ${S.flt.min} %`]:[],S.flt.max?[`bis ${eur(S.flt.max)}`]:[],Object.keys(FLT_LABEL).filter(k=>S.flt[k]).map(k=>FLT_LABEL[k]));
@@ -565,13 +568,18 @@ async function load(){
   }
   OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});
   const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
-  render();  if(OFFERS.length)checkNews();
+  const go=goParam(); // Schnellstart vom App-Symbol (lange drücken): Zettel, Scannen, Merkliste (dann kein Merklisten-Fenster davor)
+  render();  if(OFFERS.length&&!go)checkNews();
   checkWhatsNew(); // nur wenn kein anderes Fenster offen ist, sonst beim nächsten Öffnen
   bonFromShare(); // Kassenbon über „Teilen“ aus einer anderen App
   Sync.srv().then(()=>connectInvite()); // Einladung „Für jemand anderen eingerichtet“: gemeinsamen Zettel verbinden?
   Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
   Sync.srv().then(u=>{if(u&&S.sheet==="settings"&&!Sync.ready())render()}); // „Familien-Code erstellen“ nur zeigen, wenn der Speicher eingerichtet ist
 }
+// ⚡ Schnellstart (v126, manifest „shortcuts“): App-Symbol lange drücken -> ./?go=list|scan|watch
+function goParam(){const m=location.search.match(/[?&]go=(list|scan|watch)\b/);if(!m)return false;history.replaceState(null,"",location.pathname);
+  S.tab=m[1]==="watch"?"watch":"list";
+  if(m[1]==="scan"){Object.assign(Scan,{mode:"list",last:"",res:"",added:[],unknown:"",cart:null,msgT:""});S.sheet="scan"}return true}
 // Wie aktuell sind die Prospekte? Häufigster Zeitraum je Markt, dazu wann die nächsten starten
 function flyerInfo(){
   const mode=a=>{const c={};a.forEach(x=>{if(x)c[x]=(c[x]||0)+1});return Object.entries(c).sort((x,y)=>y[1]-x[1])[0]?.[0]};
@@ -663,8 +671,8 @@ const APP_URL="https://tiry38.github.io/sparradar/",APK_URL="https://github.com/
 const waLink = t => "https://wa.me/?text="+encodeURIComponent(t);
 const SHARE_TXT = `Schau mal: SparRadar zeigt alle Angebote rund um Wörth am Rhein (Lidl, Aldi, Rewe, Netto, Edeka, dm) 🛒\n${APP_URL}\n\nAls Android-App zum Installieren:\n${APK_URL}`;
 function listText(){const items=S.list.map(byId).filter(Boolean),g={};items.forEach(o=>(g[o.s]=g[o.s]||[]).push(o));
-  const ex=S.extra.length?"\n\nSONSTIGES\n"+S.extra.map(x=>"- "+(qty(x.id)>1?qty(x.id)+"× ":"")+x.n+(x.p?" "+eur(x.p*qty(x.id)):"")).join("\n"):"";
-  return "🛒 Einkaufszettel\n\n"+Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${qty(o.id)>1?qty(o.id)+"× ":""}${o.n}${o.d?" ("+o.d+")":""} ${eur(lineP(o))}${needAct(o)&&!isAct(o)?` (mit ${appName(o)||"App"}: ${eur(r2(finTill(o,true)*qty(o.id)))})`:""}`).join("\n")).join("\n\n")+ex}
+  const ex=S.extra.length?"\n\nSONSTIGES\n"+S.extra.map(x=>"- "+(qty(x.id)>1?qty(x.id)+"× ":"")+x.n+(x.p?" "+eur(x.p*qty(x.id)):paidOf(x)?" ca. "+eur(extraT(x)):"")).join("\n"):"";
+  return "🛒 Einkaufszettel\n\n"+Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${qty(o.id)>1?qty(o.id)+"× ":""}${o.n}${o.d?" ("+o.d+")":""} ${eur(lineP(o))}${pf(o)?` + ${eur(linePf(o))} Pfand`:""}${needAct(o)&&!isAct(o)?` (mit ${appName(o)||"App"}: ${eur(r2(finTill(o,true)*qty(o.id)))})`:""}`).join("\n")).join("\n\n")+ex}
 const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
 
 // ---------- Ansichten ----------
@@ -680,7 +688,7 @@ function card(o,bestIds){
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
      <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:cmpPrice(o)?`<span class="cmpp${cmpPrice(o).hi?" hi":""}" title="${esc(cmpPrice(o).l)}">${esc(cmpPrice(o).s)}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
-   ${ch?`<div class="alarm cheap" title="${esc(cheapTxt(ch,o))}">⚠️ Bei ${esc(sshort(ch.x.s))} ${eur(ch.d)} billiger</div>`:ls?`<div class="alarm" title="${esc(ls.l)}">📉 ${esc(ls.s)}</div>`:`<div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>`}
+   ${S.flt.pro&&protInfo(o)?`<div class="alarm pro" title="Richtwert: ca. ${String(protInfo(o).g).replace(".",",")} g Eiweiß ${protInfo(o).egg?"je Ei":"je 100 g"}">💪 100 g Eiweiß ≈ ${eur(protInfo(o).v)}</div>`:ch?`<div class="alarm cheap" title="${esc(cheapTxt(ch,o))}">⚠️ Bei ${esc(sshort(ch.x.s))} ${eur(ch.d)} billiger</div>`:ls?`<div class="alarm" title="${esc(ls.l)}">📉 ${esc(ls.s)}</div>`:`<div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>`}
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}${o.from&&o.from>SHOP?" soon":""}">${validTxt(o)}</span>
      <button class="ibtn" data-fav="${esc(o.id)}" aria-pressed="${fav}" aria-label="${fav?"Von Merkliste entfernen":"Auf Merkliste setzen"}" title="Merken">${IC.star}</button>
@@ -695,7 +703,7 @@ function weekHTML(hitCount){const t=[];
   if(due)t.push(`<button class="wk wk-c" data-go="tips"><i>💸</i><b>${due} ${due===1?"Bon":"Bons"} einreichen</b><small>Geld zurück vom Hersteller holen</small></button>`);
   const items=S.list.map(byId).filter(Boolean).filter(o=>!S.checked.includes(o.id)),nx=S.extra.filter(x=>!S.checked.includes(x.id)).length;
   if(items.length+nx){const pl=planOf(items),sv=pl?pl.save:0;
-    t.push(`<button class="wk wk-l" data-go="list"><i>🛒</i><b>${items.length+nx} Artikel auf dem Zettel</b><small>${eur(items.reduce((a,o)=>a+lineP(o),0))}${sv>=.5?` · ${eur(sv)} günstiger möglich`:""}</small></button>`)}
+    t.push(`<button class="wk wk-l" data-go="list"><i>🛒</i><b>${items.length+nx} Artikel auf dem Zettel</b><small>${eur(items.reduce((a,o)=>a+lineT(o),0))}${sv>=.5?` · ${eur(sv)} günstiger möglich`:""}</small></button>`)}
   const wo=weekOffers().filter(o=>!S.stores.size||S.stores.has(o.s)),bei=S.stores.size===1?" bei "+sname([...S.stores][0]):"";
   const low=wo.filter(o=>lowSince(o)).length;
   const ON='<small class="wkon">✓ Filter an – nochmal antippen = aus</small>';
@@ -728,7 +736,7 @@ function renderOffers(){
   const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
   const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+nextShort():WEEKEND?"Angebote ab Montag":"Angebote dieser Woche");
   const shown=r.slice(0,S.limit);
-  return `${kracherBtn()}${forYouHTML()}
+  return `${holiHTML()}${kracherBtn()}${forYouHTML()}
    ${S.q.trim()||S.cats.size?(hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""):weekHTML(hitCount)}
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${missingHTML()}
@@ -884,6 +892,42 @@ function zResHTML(){
     return `<div class="zrow${i?"":" new"}"><span class="zn"><b>✓ ${esc(a.n)}</b><small>${esc(what)}${q>1?` · ${q}×`:""}</small></span><span class="zbtns"><button class="btn sm ghost" data-zq="${esc(a.id)}" aria-label="eins mehr">+1</button><button class="btn sm ghost" data-zundo="${esc(a.id)}">Rückgängig</button></span>
       ${alt&&alt.length?`<span class="zalt">💡 Im Angebot: ${alt.map(y=>`<button class="chip plain" data-ztake="${esc(a.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))} nehmen</button>`).join("")}</span>`:""}</div>`}).join("")}
 function zPaint(){const b=document.getElementById("scanRes");if(b&&Scan.mode==="list")b.innerHTML=zResHTML()}
+// 🎤 Zettel per Sprache (v126, Kevins Wunsch 01.11.): „Milch, Butter und drei Eier“ -> 3 eigene Einträge (Angebote nur als Hinweis + Knopf, wie getippt).
+// Nutzt die Spracherkennung des Browsers (Chrome schickt die Aufnahme an Google) -> beim ersten Mal fragen. Nicht in der Windows-App/alten Android-App.
+const VNUM={ein:1,eine:1,einen:1,einer:1,zwei:2,drei:3,vier:4,"fünf":5,sechs:6,sieben:7,acht:8,neun:9,zehn:10,elf:11,"zwölf":12};
+const VMEAS={gramm:"g",g:"g",kilo:"kg",kilogramm:"kg",kg:"kg",liter:"l",l:"l",milliliter:"ml",ml:"ml"};
+const VADJ=/^(bio|rot|grün|gelb|weiß|schwarz|frisch|gerieben|gemischt|gehackt|klein|groß|griechisch|saur|süß|fettarm|laktosefrei|braun|hell|dunkl|italienisch|jung|geräuchert|roh|gekocht|gefüllt|tiefgekühlt|ganz|halb|mager|zart|scharf|mild|weich|hart|rein|vegan|frei)(e|er|es|en|em)?$/i; // „Rote Linsen“ bleibt ein Artikel
+const VPACK=/^(packungen?|päckchen|pakete?|stück|stck|flaschen?|dosen?|becher|gläser|glas|tüten?|beutel|netze?|kisten?|kasten|tafeln?|schalen?|bund|rollen?|mal|x)\s+/i;
+function voiceItems(t){const brands=new Set(OFFERS.map(o=>norm(o.b)).filter(b=>b.length>3));
+  const parts=t.replace(/\s+(und|sowie|dann|außerdem|plus)\s+/gi,",").split(/[,;.]+/).map(s=>s.trim()).filter(Boolean),out=[];
+  parts.forEach(p=>{const w=p.split(/\s+/);let cur=[];const flush=()=>{if(cur.length)out.push(cur.join(" "));cur=[]};
+    // ohne Komma gesprochen („Milch Butter“): zwei großgeschriebene Wörter hintereinander = zwei Artikel (außer Marken wie „Coca Cola“)
+    w.forEach(x=>{const last=cur[cur.length-1];if(last&&/^[A-ZÄÖÜ]/.test(x)&&/^[A-ZÄÖÜ]/.test(last)&&!brands.has(norm(last+x))&&!/^\d/.test(last)&&!VADJ.test(last)&&!VPACK.test(last+" ")&&!VMEAS[last.toLowerCase()])flush();cur.push(x)});flush()});
+  return out.map(s=>{s=s.replace(/^(bitte|noch|ich brauche|wir brauchen|kaufen?)\s+/i,"").trim();let q=1;
+    const m=s.match(/^(\d{1,4}|ein|eine|einen|einer|zwei|drei|vier|fünf|sechs|sieben|acht|neun|zehn|elf|zwölf)\s+(.+)$/i);
+    if(m){const n=/^\d/.test(m[1])?+m[1]:VNUM[m[1].toLowerCase()],u=m[2].match(/^(\S+)\s+(.+)$/),me=u&&VMEAS[u[1].toLowerCase()];
+      if(me)s=`${u[2]} ${n} ${me}`;else if(n>=1&&n<50){q=n;s=m[2].replace(VPACK,"").trim()}}
+    return {n:s.charAt(0).toUpperCase()+s.slice(1),q}}).filter(x=>x.n.length>=2)}
+function voiceAdd(txt){const its=voiceItems(txt);if(!its.length){toast("Nichts verstanden – bitte nochmal versuchen.");return}
+  its.forEach((x,i)=>{const ex=S.extra.find(e=>norm(e.n)===norm(x.n));if(ex){S.qty[ex.id]=Math.min(49,qty(ex.id)+x.q);return}
+    const id="x-"+Date.now()+"-"+i;S.extra.push({id,n:x.n});if(x.q>1)S.qty[id]=x.q});
+  save();render();toast("🎤 Dazu: "+its.map(x=>(x.q>1?x.q+"× ":"")+x.n).join(", "))}
+const Voice={rec:null,on:false,err:"",
+  ok(){return !!(window.SpeechRecognition||window.webkitSpeechRecognition)&&!window.__SR_DESKTOP__},
+  start(){if(this.on){this.stop();return}
+    if(!store.get("voiceOk",false)){if(!confirm("Spracheingabe: Chrome schickt deine Aufnahme dafür an die Spracherkennung von Google. SparRadar speichert davon nichts.\n\nJetzt sprechen?"))return;store.set("voiceOk",true)}
+    const R=window.SpeechRecognition||window.webkitSpeechRecognition;let r,fin="";
+    try{r=new R()}catch(e){toast("Spracheingabe geht hier leider nicht. Tipp: das Mikrofon auf der Tastatur nutzen.");return}
+    this.rec=r;this.err="";r.lang="de-DE";r.interimResults=true;r.maxAlternatives=1;r.continuous=false;
+    r.onresult=e=>{let t="";for(let i=e.resultIndex;i<e.results.length;i++){const x=e.results[i];if(x.isFinal)fin+=x[0].transcript+" ";else t+=x[0].transcript}
+      const inp=document.getElementById("extraIn");if(inp)inp.value=(fin+t).trim()};
+    r.onerror=e=>{this.err=e.error||"x"};
+    r.onend=()=>{this.on=false;this.rec=null;this.paint();const inp=document.getElementById("extraIn");if(inp)inp.value="";const txt=fin.trim();
+      if(txt)voiceAdd(txt);else if(this.err&&this.err!=="aborted")toast(/not-allowed|service-not-allowed/.test(this.err)?"Kein Zugriff aufs Mikrofon – bitte in den Einstellungen des Handys erlauben.":this.err==="no-speech"?"Nichts gehört – bitte nochmal versuchen.":this.err==="network"?"Spracheingabe braucht Internet – bitte später nochmal.":"Spracheingabe geht hier leider nicht. Tipp: das Mikrofon auf der Tastatur nutzen.");
+      else if(!txt)toast("Nichts gehört – bitte nochmal versuchen.");this.err=""};
+    try{r.start();this.on=true;this.paint()}catch(e){toast("Spracheingabe geht hier leider nicht. Tipp: das Mikrofon auf der Tastatur nutzen.")}},
+  stop(){try{this.rec&&this.rec.stop()}catch(e){}},
+  paint(){const b=document.getElementById("zMic");if(b){b.classList.toggle("on",this.on);b.setAttribute("aria-pressed",this.on);b.innerHTML=this.on?"🎤 Ich höre zu …":"🎤 Sprechen"}}};
 
 // ---------- Detailansicht eines Artikels ----------
 const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
@@ -902,7 +946,7 @@ function renderDetail(){
     ${o.d?`<p class="dsub">${esc(o.d)}</p>`:""}
     ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
-     <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:cmpPrice(o)?`<div class="cmpp${cmpPrice(o).hi?" hi":""}">${esc(cmpPrice(o).l)}</div>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
+     <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:cmpPrice(o)?`<div class="cmpp${cmpPrice(o).hi?" hi":""}">${esc(cmpPrice(o).l)}</div>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}${pf(o)?`<div class="gp">zzgl. ${eur(pf(o))} Pfand</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
     ${cheaper(o)?`<div class="alarm big cheap">⚠️ <span><b>Achtung:</b> ${esc(cheapTxt(cheaper(o),o))} <button class="btn ghost sm" data-detail="${esc(cheaper(o).x.id)}">Ansehen</button></span></div>`:""}
     ${cbDetail(o)}${cpQuick(o)}
@@ -920,7 +964,7 @@ function renderDetail(){
     </dl>
     ${o.inf?`<div class="dtext"><h4>Beschreibung</h4><p>${esc(o.inf)}</p></div>`:""}
     ${lowSince(o)?`<div class="alarm big">📉 <span><b>Preis-Alarm:</b> ${esc(lowSince(o).l)}</span></div>`:""}
-    ${vrBoxHTML(o)}
+    ${vrBoxHTML(o)}${protBoxHTML(o)}
     <div class="verdict ${vd.t}">${spark(o,90,24)}<span>${esc(vd.l)}</span></div>
     ${hist.length?`<div class="dtext"><h4>So viel kostete es bei ${esc(sname(o.s))}</h4>${hst?`<p class="hstat">${hst}</p>`:""}<ul class="dhist">${hist.map(x=>`<li><span>${x.from===x.to?fmtDate(x.from):dShort(x.from)+" – "+dShort(x.to)}${x.to>=TODAY&&x.from<=TODAY?" · jetzt":""}</span><b>${eur(x.p)}</b></li>`).join("")}</ul></div>`:""}
     <div class="dactions">
@@ -937,6 +981,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  126:["🍾 Einkaufszettel: Pfand wird jetzt mitgerechnet (bei Getränken mit „zzgl. Pfand“). Die Summe stimmt also mit der Kasse überein.","🧾 Hast du schon Kassenbons eingetragen? Dann steht bei eigenen Einträgen wie „Brot“, was du zuletzt dafür bezahlt hast, und die Summe rechnet es mit „ca.“ ein.","💪 Neuer Filter „Eiweiß pro €“: zeigt, wo du Eiweiß am günstigsten bekommst (z. B. Quark, Hähnchen, Thunfisch, Eier).","🎌 Feiertage: Die App sagt dir vorher, wann die Märkte geschlossen haben, damit du rechtzeitig einkaufst.","🎤 Zettel: Neuer Knopf „Sprechen“. Sag z. B. „Milch, Butter und drei Eier“ – alles steht sofort drauf.","📲 App-Symbol lange drücken: direkt zum Einkaufszettel, zum Scanner oder zur Merkliste."],
   125:["📷 Einkaufszettel: Neuer Knopf „Scannen“. Im Laden einfach den Strichcode scannen – der Artikel kommt sofort auf den Zettel. Ist er im Angebot, steht er gleich mit Angebotspreis drauf. Während des Einkaufs liegt er direkt im Wagen."],
   124:["🌅 Neue Angebote kommen jetzt jeden Morgen eine Stunde früher: fertig gegen 5 Uhr (im Sommer gegen 6 Uhr). So kannst du auch vor einem frühen Einkauf noch reinschauen."],
   123:["🏷️ Zettel: Bei „Butter“, „Waschmittel“, „Eis“ & Co. zeigt der Aldi-Hinweis jetzt den wirklich günstigsten Artikel (z. B. Markenbutter 1,15 € statt Irische Butter)."],
@@ -1193,7 +1238,7 @@ function planHTML(items,extra,now){const p=planOf(items)||{free:[],freeV:0,extra
   const all=rs=>rs.map(r=>r.o.id+"|"+r.x.id).join(",");
   return `<section class="panel swaps plan"><h3>🧮 Spar-Check${oneV>=.01?`: ${eur(oneV)} sparen`:""}</h3>
    ${n1?`<p class="pcsum">${now!=null&&oneV>=.01?`Dein Zettel jetzt <b>${eur(now)}</b> → mit den Tipps <b class="sv">${eur(now-oneV)}</b>. `:""}${ex.length?`${ex.length} ${ex.length===1?"eigener Eintrag ist":"eigene Einträge sind"} gerade im Angebot (💡 beim Artikel). `:""}Ohne Umweg, nur bei Märkten, zu denen du sowieso gehst.</p>
-   <button class="btn big pcall" data-sparall="1">✓ Alle ${n1} ${n1===1?"Tipp":"Tipps"} übernehmen${oneV>=.01?` (${eur(oneV)} sparen)`:""}</button>`:""}
+   <button class="btn big pcall" data-sparall="1">✓ ${n1===1?"Tipp":`Alle ${n1} Tipps`} übernehmen${oneV>=.01?` (${eur(oneV)} sparen)`:""}</button>`:""}
    ${p.free.length?`<h4>Gleicher Artikel günstiger: ${eur(p.freeV)} sparen</h4><p class="ph">Derselbe Artikel in gleicher Menge kostet bei einem Markt, zu dem du sowieso gehst, weniger.</p><div class="rows">${p.free.map(row).join("")}</div>`:""}
    ${p.extra?`<h4>Mit Abstecher zu ${esc(sname(p.extra.s))}: noch ${eur(p.extra.v)} sparen</h4><p class="ph">Lohnt sich, wenn ${esc(sname(p.extra.s))} auf deinem Weg liegt.</p><div class="rows">${p.extra.rs.map(row).join("")}</div>${p.extra.rs.length>1?`<button class="btn ghost sm" data-swapall="${esc(all(p.extra.rs))}">Alle ${p.extra.rs.length} zu ${esc(sname(p.extra.s))} (${eur(p.extra.v)} sparen)</button>`:""}`:""}
   </section>`}
@@ -1224,6 +1269,25 @@ const tillUnknown=o=>needAct(o)&&!isAct(o)&&!!o.ao&&!o.o; // Preis gilt nur mit 
 const tillSteps=(o,on)=>{on=on??(!needAct(o)||isAct(o));return steps(o).filter(s=>!offTill(s)&&(on||!actStep(s))&&!(!on&&o.ao&&s.t==="of"))};
 const finTill=(o,on)=>r2(tillSteps(o,on).reduce((a,x)=>a+x.v,0));
 const lineP=o=>r2(finTill(o)*qty(o.id)),lineR=o=>r2(Math.max(ref(o),finTill(o))*qty(o.id)),extraP=x=>x.p?r2(x.p*qty(x.id)):0;
+// ♻️ Pfand (v126, Kevin 01.11.: Zettel = Kassenpreis): „zzgl. 0,25 Pfand“ / „zzgl. Pfand 3.10“ im Angebot -> zählt in der Summe mit
+const PF_RE=/zzgl\.?\s*(?:pfand\s*(?:von\s*)?(\d{1,2}[.,]\d{1,2})|(\d{1,2}[.,]\d{1,2})\s*(?:€|eur)?\s*pfand)/i;
+const pf=o=>{if(o._pf===undefined){const m=`${o.n||""} ${o.d||""}`.match(PF_RE);o._pf=m?r2(parseFloat((m[1]||m[2]).replace(",","."))):0}return o._pf};
+const linePf=o=>r2(pf(o)*qty(o.id)),lineT=o=>r2(lineP(o)+linePf(o));
+const pfLbl=o=>pf(o)?` <em class="rpf">+ ${eur(linePf(o))} Pfand</em>`:"";
+// 🧾 Preis-Gedächtnis (v126): eigener Eintrag ohne Preis -> was du zuletzt dafür bezahlt hast
+// (Kassenbons + selbst eingetragene Preise der letzten 180 Tage, nur auf dem Gerät). Zählt als „ca.“ in der Summe.
+let PAIDX=null,PAIDK="",PAIDM=new Map();
+function paidIdx(){const t0=S.trips[0],k=S.trips.length+"|"+(t0?t0.id+"|"+t0.items.length+"|"+t0.extra.length:"");if(PAIDX&&PAIDK===k)return PAIDX;PAIDK=k;PAIDM=new Map();
+  const old=new Date(Date.now()-180*864e5).toISOString().slice(0,10);PAIDX=[];
+  S.trips.forEach(t=>{if(!t.d||t.d<old)return;(t.bon?t.items:t.extra).forEach(x=>{const q=x.q||1;if(!(x.p>0)||/pfand|leergut|sonstiges|nicht erkannt|t[uü]te|tasche/i.test(x.n))return;
+    const s=t.bon?x.s||"":"";PAIDX.push({n:x.n,k:norm(x.n),u:r2(x.p/q),s,d:t.d,o:{n:x.n,b:"",d:"",c:"",s}})})});
+  PAIDX.sort((a,b)=>b.d.localeCompare(a.d));return PAIDX}
+// Bon-Namen sind oft abgekürzt („KRUSTENBR“, „BANANE“): ganzes Wort wie bei der Merkliste, sonst abgeschnittenes Wort (mind. 6 Buchstaben, höchstens 3 fehlen)
+const paidHit=(c,e)=>{if(c.k===norm(e))return true;const o=c.o;if(watchMatch(o,e))return true;
+  const t=wTokens(e),w=oWords(o);return t.length>0&&t.every(x=>w.some(v=>(v.length>=6&&x.startsWith(v)&&x.length-v.length<=3)||watchMatch(o,x)))};
+function paidOf(x){if(x.p)return null;const ix=paidIdx();if(PAIDM.has(x.n))return PAIDM.get(x.n);
+  const r=ix.find(c=>c.k===norm(x.n))||ix.find(c=>paidHit(c,x.n))||null;PAIDM.set(x.n,r);return r}
+const extraT=x=>x.p?extraP(x):(paidOf(x)?r2(paidOf(x).u*qty(x.id)):0);
 // „3x Joghurt“, „Brot 1,99“, „Kaffee 4,49 €“ -> Menge, Name, Preis
 function parseExtra(v){let q=1,n=v.trim(),p=0,m=n.match(/^(\d{1,2})\s*[x×*]\s*(.+)$/i)||n.match(/^(\d{1,2})\s+(.+)$/);
   if(m&&+m[1]>0&&+m[1]<50){q=+m[1];n=m[2]}
@@ -1236,9 +1300,10 @@ function finishTrip(ids,auto){
   const items=S.list.filter(id=>ids.includes(id)).map(byId).filter(Boolean),ex=S.extra.filter(x=>ids.includes(x.id));
   if(!items.length&&!ex.length)return;
   const t={id:"t"+Date.now(),d:TODAY,at:new Date().toISOString(),
-    items:items.map(o=>({id:o.id,n:o.n,b:o.b||"",s:o.s,q:qty(o.id),p:lineP(o),r:lineR(o)})),
+    items:items.map(o=>({id:o.id,n:o.n,b:o.b||"",s:o.s,q:qty(o.id),p:lineP(o),r:lineR(o),...(pf(o)?{pf:linePf(o)}:{})})),
     extra:ex.map(x=>({id:x.id,n:x.n,q:qty(x.id),p:extraP(x)}))};
-  t.paid=r2(t.items.reduce((a,x)=>a+x.p,0)+t.extra.reduce((a,x)=>a+x.p,0));t.saved=r2(t.items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
+  const pfs=r2(t.items.reduce((a,x)=>a+(x.pf||0),0));if(pfs)t.pf=pfs;
+  t.paid=r2(t.items.reduce((a,x)=>a+x.p,0)+t.extra.reduce((a,x)=>a+x.p,0)+pfs);t.saved=r2(t.items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
   S.trips.unshift(t);S.trips=S.trips.slice(0,400);
   tripCb(t,1).forEach(c=>{if(!c.buy)c.buy=t.d; // Geld-zurück: ab jetzt „Bon hochladen“ anzeigen
     const x=t.items.find(x=>(c.s==="all"||c.s===x.s)&&c.k.split(/\s+/).every(w=>norm(x.b+" "+x.n).includes(norm(w))));
@@ -1336,14 +1401,14 @@ function tripsHTML(){if(!S.trips.length)return "";
   </section>`}
 function renderTrip(){const t=S.trips.find(x=>x.id===S.tripId);if(!t)return renderKracher();
   const g={};t.items.forEach(x=>(g[x.s]=g[x.s]||[]).push(x));
-  const row=x=>`<div class="rline"><span>${x.q>1?x.q+"× ":""}${esc(x.n)}</span><span>${x.p?eur(x.p):""}${x.r>x.p+.004?`<small class="sv"> −${eur(x.r-x.p).replace("−","")}</small>`:""}</span></div>`;
+  const row=x=>`<div class="rline"><span>${x.q>1?x.q+"× ":""}${esc(x.n)}${x.pf?` <em class="rpf">+ ${eur(x.pf)} Pfand</em>`:""}</span><span>${x.p?eur(x.p):""}${x.r>x.p+.004?`<small class="sv"> −${eur(x.r-x.p).replace("−","")}</small>`:""}</span></div>`;
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Einkauf vom ${fmtDate(t.d)}">
    <div class="sheet-h"><span class="newsico">🧾</span><h2>Einkauf vom ${fmtDate(t.d)}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <div class="mrep-g"><div><span>Bezahlt</span><b>${eur(t.paid)}</b></div><div><span>Gespart</span><b class="sv">${eur(t.saved)}</b></div><div><span>Artikel</span><b>${t.items.length+t.extra.length}</b></div></div>
    ${chkHTML(t)}
    <div class="receipt">${Object.entries(g).map(([s,xs])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>${xs.map(row).join("")}</div>`).join("")}
     ${t.extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Eigene Einträge</div>${t.extra.map(row).join("")}</div>`:""}
-    <div class="rtot"><div class="big"><span>BEZAHLT</span><span>${eur(t.paid)}</span></div>${t.saved>0?`<div class="sv"><span>GESPART</span><span>${eur(t.saved)}</span></div>`:""}</div></div>
+    <div class="rtot"><div class="big"><span>BEZAHLT</span><span>${eur(t.paid)}</span></div>${t.pf?`<div><span>davon Pfand</span><span>${eur(t.pf)}</span></div>`:""}${t.saved>0?`<div class="sv"><span>GESPART</span><span>${eur(t.saved)}</span></div>`:""}</div></div>
    <p class="fhint">${t.bon?"Preise laut Kassenbon. „Gespart“ = Preisvorteile auf dem Bon und Angebote mit „statt“-Preis.":"Preise laut Angebot (mit eingerechneten Apps &amp; Coupons, wenn eingeschaltet). Eigene Einträge zählen nur, wenn du einen Preis dazugeschrieben hast, z. B. „Brot 1,99“."}</p>
    <div class="factions"><button class="btn ghost" data-tripdel="${t.id}">Löschen</button><button class="btn" data-triprestore="${t.id}">Zurück auf den Zettel</button></div>
   </div>`}
@@ -1358,8 +1423,8 @@ function readd(n){const k=norm(n),wo=weekOffers().filter(o=>norm(o.n)===k).sort(
   if(wo.length&&!S.list.includes(wo[0].id)){S.list.push(wo[0].id);toast(`${n}: im Angebot bei ${sname(wo[0].s)} für ${eur(fin(wo[0]))}`)}
   else{S.extra.push({id:"x-"+Date.now(),n});toast(`${n} auf den Zettel gesetzt`)}save();render()}
 function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>x.id)],inCart=all.filter(id=>S.checked.includes(id)).length;
-  const tot=r2(items.reduce((a,o)=>a+lineP(o),0)+extra.reduce((a,x)=>a+extraP(x),0));
-  const cart=r2(items.filter(o=>S.checked.includes(o.id)).reduce((a,o)=>a+lineP(o),0)+extra.filter(x=>S.checked.includes(x.id)).reduce((a,x)=>a+extraP(x),0));
+  const tot=r2(items.reduce((a,o)=>a+lineT(o),0)+extra.reduce((a,x)=>a+extraT(x),0));
+  const cart=r2(items.filter(o=>S.checked.includes(o.id)).reduce((a,o)=>a+lineT(o),0)+extra.filter(x=>S.checked.includes(x.id)).reduce((a,x)=>a+extraT(x),0));
   const pct=all.length?Math.round(inCart/all.length*100):0,b=S.budget,left=b?r2(b-tot):0;
   return `<div class="cart${inCart?" on":""}"><div class="cart-h"><span class="cart-i">🛒</span><b>${inCart?`Im Wagen: ${inCart} von ${all.length}`:`${all.length} Artikel auf dem Zettel`}</b><span class="cart-s">${inCart?`${eur(cart)} von ${eur(tot)}`:eur(tot)}</span></div>
    <div class="cart-bar"><i style="width:${pct}%"></i></div>
@@ -1404,15 +1469,39 @@ const dpHit=x=>{if(!DP||!DP.items.length||S.checked.includes(x.id)||norm(x.n).le
   let r=null;if(h.length){const c={};h.forEach(o=>{const u=o.gp?.u||"";c[u]=(c[u]||0)+1});const mu=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];
     r=h.filter(o=>(o.gp?.u||"")===mu).sort((a,b)=>(a.gp&&b.gp?a.gp.v-b.gp.v:a.p-b.p))[0]}
   DP_MEMO.set(x.n,r);return r};
-function exHintHTML(x){const h=exHits(x),d=dpHit(x);
+function exHintHTML(x){const h=exHits(x),d=dpHit(x),pd=paidOf(x);
+  const paidRow=pd&&!S.checked.includes(x.id)?`<div class="exhit paid"><span>🧾 Zuletzt bezahlt: <b>${eur(pd.u)}</b> <small>${[pd.s?sname(pd.s):"",fmtDate(pd.d),norm(pd.n)!==norm(x.n)?"„"+pd.n+"“":""].filter(Boolean).map(esc).join(" · ")}</small></span></div>`:"";
   const dpBox=(t,extra="")=>`<div class="exhit dp"><span>🏷️ ${t}: <b>${eur(d.p)}</b> <small>${esc((d.b?d.b+" ":"")+d.n)}${extra}</small></span><button class="btn ghost sm" data-exprice="${esc(x.id)}|${d.p}">Preis eintragen</button></div>`;
   if(h.length){const o=h[0];
     // Aldi hat den Artikel sonst sowieso billiger (gleiche Einheit, mind. 5 % pro kg/l/Stück) -> zusätzlich zeigen
     const cheaperDp=d&&d.gp&&o.gp&&unit(o)!=null&&d.gp.u===o.gp.u&&d.gp.v<unit(o)*.95;
-    return `<div class="exhit"><span>💡 Im Angebot: <b>${esc(sname(o.s))} ${eur(fin(o))}</b> <small>${esc((o.b?o.b+" ":"")+o.n)}${unitTxt(o)?" · "+esc(unitTxt(o)):""}</small></span><button class="btn sm" data-extake="${esc(x.id)}|${esc(o.id)}">Nehmen</button>${h.length>1?`<span class="exalt">Auch: ${h.slice(1,4).map(y=>`<button class="chip plain" data-extake="${esc(x.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))}</button>`).join("")}</span>`:""}</div>`
+    return paidRow+`<div class="exhit"><span>💡 Im Angebot: <b>${esc(sname(o.s))} ${eur(fin(o))}</b> <small>${esc((o.b?o.b+" ":"")+o.n)}${unitTxt(o)?" · "+esc(unitTxt(o)):""}</small></span><button class="btn sm" data-extake="${esc(x.id)}|${esc(o.id)}">Nehmen</button>${h.length>1?`<span class="exalt">Auch: ${h.slice(1,4).map(y=>`<button class="chip plain" data-extake="${esc(x.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))}</button>`).join("")}</span>`:""}</div>`
       +(cheaperDp?dpBox("Bei Aldi sonst immer billiger",` · 1 ${esc(d.gp.u)} = ${eur(d.gp.v)}`):"")}
-  if(x.p||!d)return "";
+  if(x.p)return "";if(pd)return paidRow;if(!d)return "";
   return dpBox("Aldi-Normalpreis")}
+// 🎌 Feiertage Rheinland-Pfalz (v126, Kevins Wunsch 01.11.): Märkte zu -> Hinweis heute/am Vortag oben bei Angeboten und auf dem Zettel
+const isoD=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+function easter(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,
+  i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),n=h+l-7*m+114;return new Date(y,Math.floor(n/31)-1,n%31+1)}
+const HOLI={};
+function holiday(ds){const y=+ds.slice(0,4);if(!HOLI[y]){const H={},e=easter(y),add=(d,n)=>{H[isoD(d)]=n},ea=k=>new Date(y,e.getMonth(),e.getDate()+k);
+  add(new Date(y,0,1),"Neujahr");add(ea(-2),"Karfreitag");add(ea(1),"Ostermontag");add(new Date(y,4,1),"Tag der Arbeit");add(ea(39),"Christi Himmelfahrt");
+  add(ea(50),"Pfingstmontag");add(ea(60),"Fronleichnam");add(new Date(y,9,3),"Tag der Deutschen Einheit");add(new Date(y,10,1),"Allerheiligen");
+  add(new Date(y,11,25),"1. Weihnachtstag");add(new Date(y,11,26),"2. Weihnachtstag");HOLI[y]=H}return HOLI[y][ds]||""}
+const dayAdd=(ds,k)=>{const d=new Date(ds+"T12:00:00");d.setDate(d.getDate()+k);return isoD(d)};
+const closedDay=ds=>new Date(ds+"T12:00:00").getDay()===0||!!holiday(ds);
+function holiHTML(){const t=TODAY,ht=holiday(t),wd=new Date(t+"T12:00:00").getDay();let msg="";
+  const reopen=from=>{let d=from;while(closedDay(d))d=dayAdd(d,1);return d};
+  if(ht)msg=`<b>Heute ist Feiertag (${esc(ht)})</b> – die Märkte haben geschlossen. Wieder offen: ${fmtDate(reopen(t))}`;
+  else if(wd!==0){let d=dayAdd(t,1);const hs=[];while(closedDay(d)){if(holiday(d))hs.push(`${holiday(d)} (${fmtDate(d)})`);d=dayAdd(d,1)}
+    if(hs.length){const tm=holiday(dayAdd(t,1));msg=`<b>${tm?`Morgen ist Feiertag (${esc(tm)})`:esc(hs[0])}</b> – die Märkte haben ${dayAdd(t,1)===dayAdd(d,-1)?"morgen":`ab morgen bis ${fmtDate(dayAdd(d,-1))}`} geschlossen. Wieder offen: ${fmtDate(d)} Am besten heute einkaufen.`}}
+  // Heiligabend: Läden in Rheinland-Pfalz an Werktagen höchstens bis 14 Uhr; Silvester schließen viele früher
+  const ev=(ds,early)=>new Date(ds+"T12:00:00").getDay()!==0&&!holiday(ds)?early:"";
+  const x=t.slice(5),tm=dayAdd(t,1).slice(5);
+  const late=x==="12-24"?ev(t,"Heute ist Heiligabend: Die Märkte haben höchstens bis 14 Uhr geöffnet."):x==="12-31"?ev(t,"Heute ist Silvester: Viele Märkte schließen früher als sonst."):
+    tm==="12-24"?ev(dayAdd(t,1),"Morgen ist Heiligabend: Die Märkte haben dann höchstens bis 14 Uhr geöffnet."):tm==="12-31"?ev(dayAdd(t,1),"Morgen ist Silvester: Viele Märkte schließen früher als sonst."):"";
+  if(!msg&&!late)return "";
+  return `<div class="holi" role="note">📅 <span>${late}${msg&&late?"<br>":""}${msg}</span></div>`}
 // ⏰ Angebot endet bald / gilt erst ab … (auf dem Zettel)
 const endLbl=o=>o.to===TODAY?` <em class="rend">⏰ nur noch heute</em>`:o.to===TOMORROW?` <em class="rend">⏰ endet morgen</em>`:o.from&&shopDay(o.from)>SHOP?` <em class="rsoon">ab ${fmtDate(shopDay(o.from))}</em>`:"";
 function endSoonHTML(items){const open=items.filter(o=>!S.checked.includes(o.id)),t=open.filter(o=>o.to===TODAY).length,m=open.filter(o=>o.to===TOMORROW).length;
@@ -1429,6 +1518,37 @@ function boughtSet(){const c={};S.trips.slice(0,60).forEach(t=>[...t.items,...t.
 function vrMine(os){const c=boughtSet();return os.filter(o=>vorrat(o)&&(S.list.includes(o.id)||S.watch.some(w=>hitW(o,w))||(c[norm(o.n)]||0)>=2))}
 const vrBoxHTML=o=>{const v=vorrat(o);if(!v)return "";const q=S.list.includes(o.id)?qty(o.id):0;
   return `<div class="vrbox">📦 <span><b>Vorrats-Tipp:</b> ${esc(v)}. Hält lange – gleich mehr mitnehmen lohnt sich.</span><span class="vrq">${[2,3].map(n=>`<button class="btn ${q===n?"":"ghost "}sm" data-vrq="${esc(o.id)}|${n}">${n} Stück</button>`).join("")}</span></div>`};
+// ---------- 💪 Eiweiß pro Euro (v126, Kevins Wunsch 01.11.) ----------
+// Richtwerte (g Eiweiß je 100 g) für typische Eiweiß-Lebensmittel. Erkannt NUR am Artikelnamen (Kevins Regel: Beschreibung
+// bestimmt keine Filter). Ausnahme Wert: Name enthält „Protein“ + Beschreibung nennt „x g Protein je 100 g“ = Herstellerangabe.
+const PROT_NO=/panier|panade|wiener art|nugget|crispy|cordon|kebab|döner|gyros|blätterteig|sauce|soße|gratin|spinat|fish|chips|backfisch|stäbchen|salat|creme|aufstrich|pizza|spätzle|\bauf\b|knusper|snack|riegel|drink|shake|pudding|mousse|dessert|katze|hund|geschmack|mortadella|salami|wurst|schoko|kakao|mäuse|schnitte|milchreis|frucht|vanille|genuss|kräuter|nudel|pasta|\beis\b/i;
+const PROT_NO_D=/panier|panade|fish|back-?teig|im teig|blätterteig|gratin|sauce|soße/i; // Beschreibung ohne Werbetext (dClean, wie Bio-/Vegan-Filter): paniert = kein Richtwert
+function protG(o){const n=String(o.n||"");if(PROT_NO.test(n)||PROT_NO_D.test(dClean(o)))return [0];const d=o.d||"",nd=n+" "+d;
+  if(/protein|eiweiß/i.test(n)){if(/whey|pulver|isolat/i.test(n))return [75];
+    const m=d.match(/(\d{1,2}(?:[.,]\d)?)\s*g\s*(?:protein|eiweiß)\s*(?:je|pro|auf|in)\s*100\s*(?:g|ml)/i);
+    return m&&!/bis zu\s*$/i.test(d.slice(0,m.index))?[parseFloat(m[1].replace(",",".")),1]:[0]}
+  if(/whey/i.test(n))return [75];
+  if(/(hähnchen|hühnchen|hühner|puten)[- ]?(brust|innen|mini|minuten|schnitzel|geschnetzelte|steak|oberkeulen)/i.test(n))return [/hauchfein|aufschnitt|buffet|gebraten|gebacken|gegart|gepökelt|geräuchert|mariniert|gewürzt|oberkeulen/i.test(nd)?20:23];
+  if(/hackfleisch\b|^(frisches?\s+)?(bio\s+)?(rinder|schweine|hähnchen|puten|geflügel)-?hack/i.test(n))return [/rind/i.test(n)&&!/schwein/i.test(n)?20:/schwein/i.test(n)&&!/rind/i.test(n)?17:/hähnchen|puten|geflügel/i.test(n)?19:18];
+  if(/thunfisch/i.test(n))return [25];
+  if(/seelachs|kabeljau|pangasius|zander|alaska/i.test(n))return [17];
+  if(/lachs|forelle/i.test(n))return [20];
+  if(/(speise|mager)quark|^(bio\s+)?quark\b/i.test(n))return [/mager/i.test(nd)?12:11];
+  if(/\bskyr\b/i.test(n))return [/^(bio\s+)?(isländischer\s+)?skyr(\s+natur)?$/i.test(n.trim())?11:9];
+  if(/hüttenkäse|körniger frischkäse/i.test(n))return [12];
+  if(/harzer|handkäse|mainzer käse|olmützer/i.test(n))return [27];
+  if(/\btofu\b/i.test(n))return [15];
+  if(/^(frische?\s+|haltbare\s+|die\s+frische\s+)?(bio\s+)?(fettarme\s+)?(h-?)?(land|voll|weide|alpen|heu)?-?milch\b/i.test(n))return [3.4];
+  if(/linsen\b/i.test(n)&&!/dose|glas|gekocht|gegart|suppe|eintopf/i.test(nd))return [23];
+  return [0]}
+function protInfo(o){if(PRC.has(o))return PRC.get(o);let r=null;const pn=/whey|protein|eiweiß/i.test(o.n||"");
+  if(o.p>0&&!o.bo&&!["katze","tier"].includes(o.c)&&(!NONFOOD_CATS.includes(o.c)&&o.c!=="drogerie"||pn)){
+    if(/(^|[\s-])eier\b/i.test(o.n)&&!PROT_NO.test(o.n)&&o.c!=="drogerie"){const m=`${o.n} ${o.d||""}`.match(/(\d{1,2})\s*(?:er\b|er-|stück|stk\.?|eier)/i),c=m?+m[1]:0;
+      if(c>=4&&c<=30)r={g:7,egg:1,v:r2(fin(o)/c/7*100)}}
+    else{const [g,mf]=protG(o);if(g&&o.gp&&(o.gp.u==="kg"||o.gp.u==="l")&&unit(o)>0)r={g,mf:!!mf,v:r2(unit(o)*10/g)}}}
+  PRC.set(o,r);return r}
+const protBoxHTML=o=>{const p=protInfo(o);if(!p)return "";
+  return `<div class="probox">💪 <span><b>Eiweiß:</b> ${p.mf?"":"ca. "}${String(p.g).replace(".",",")} g ${p.egg?"je Ei":"je 100 g"} – <b>100 g Eiweiß kosten hier ca. ${eur(p.v)}</b>.<small>${p.mf?"Angabe des Herstellers.":"Richtwert für diese Art Lebensmittel, nicht die Angabe auf der Packung."} Zum Vergleich im Filter „💪 Eiweiß pro €“.</small></span></div>`};
 // ---------- 🧾 Kassen-Kontrolle: Bon-Preis höher als das Angebot? ----------
 const BON_STOP=new Set(["stk","stueck","pfand","eur","gesamt","summe","und","mit","der","die","das","fuer","von","bio","kg"]);
 const bToks=s=>(String(s||"").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").match(/[a-z]{3,}/g)||[]);
@@ -1487,8 +1607,8 @@ function renderConnect(){const close=`<button class="ibtn" id="closeSheet" aria-
 
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;if(extra.length)loadDauer();
-  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
-  if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
+  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button>${Voice.ok()?`<button class="btn ghost zmic${Voice.on?" on":""}" type="button" id="zMic" aria-pressed="${Voice.on}" aria-label="Artikel sprechen, z. B. Milch, Butter und drei Eier" title="Artikel sprechen">${Voice.on?"🎤 Ich höre zu …":"🎤 Sprechen"}</button>`:""}</form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
+  if(!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const done=id=>S.checked.includes(id);
   const sortDone=a=>[...a.filter(x=>!done(x.id)),...a.filter(x=>done(x.id))];  // was im Wagen liegt, rutscht nach unten
@@ -1504,27 +1624,29 @@ function renderList(){
     const vr=vorrat(o);if(vr&&q<2)out.push(`<div class="ract vr"><span>📦 <b>Vorrats-Tipp:</b> ${esc(vr)} – hält lange, mehr mitnehmen lohnt sich.</span><button class="actbtn" data-qp="${esc(o.id)}" aria-label="eins mehr">+1</button></div>`);
     return out.join("")};
   const walkLines=os=>{let last=-1;const open=walk(os.filter(o=>!done(o.id)));
-    return open.map(o=>{const a=aisle(o),h=os.length>3&&a!==last?`<div class="raisle">${esc(AISLE_N[a])}</div>`:"";last=a;return h+line(o.id,o.n,(tillUnknown(o)?"ca. ":"")+eur(lineP(o)),endLbl(o))+actRow(o)}).join("")
-      +os.filter(o=>done(o.id)).map(o=>line(o.id,o.n,eur(lineP(o)))).join("")};
+    return open.map(o=>{const a=aisle(o),h=os.length>3&&a!==last?`<div class="raisle">${esc(AISLE_N[a])}</div>`:"";last=a;return h+line(o.id,o.n,(tillUnknown(o)?"ca. ":"")+eur(lineP(o)),pfLbl(o)+endLbl(o))+actRow(o)}).join("")
+      +os.filter(o=>done(o.id)).map(o=>line(o.id,o.n,eur(lineP(o)),pfLbl(o))).join("")};
   // Pro Markt oben: wie viele App-Vorteile noch nicht aktiviert sind und was sie sparen
   const actSum=os=>{const n=os.filter(o=>!done(o.id)&&needAct(o)&&!isAct(o));if(!n.length)return "";
     const sv=r2(n.reduce((a,o)=>a+(finTill(o,false)-finTill(o,true))*qty(o.id),0)),an=appName(n[0])||"Markt-App";
     return `<div class="ractsum">📱 <b>${n.length} ${n.length===1?"Vorteil":"Vorteile"} mit ${esc(an)}</b>${sv>.004?` (spart ${eur(sv)})`:""} – beim Artikel „Aktiviert ✓“ antippen, wenn du ${n.length===1?"ihn":"sie"} nutzt.</div>`};
-  const sum=items.reduce((a,o)=>a+lineP(o),0)+extra.reduce((a,x)=>a+extraP(x),0),reg=items.reduce((a,o)=>a+lineR(o),0)+extra.reduce((a,x)=>a+extraP(x),0);
-  const rest=items.filter(o=>!done(o.id)).reduce((a,o)=>a+lineP(o),0)+extra.filter(x=>!done(x.id)).reduce((a,x)=>a+extraP(x),0);
+  // Summe = Kasse: Artikel + Pfand + eigene Einträge (Preis aus der Eingabe oder „ca.“ vom letzten Kassenbon)
+  const pfSum=r2(items.reduce((a,o)=>a+linePf(o),0)),est=extra.some(x=>!done(x.id)&&!x.p&&paidOf(x));
+  const sum=items.reduce((a,o)=>a+lineT(o),0)+extra.reduce((a,x)=>a+extraT(x),0),reg=items.reduce((a,o)=>a+lineR(o)+linePf(o),0)+extra.reduce((a,x)=>a+extraT(x),0);
+  const rest=items.filter(o=>!done(o.id)).reduce((a,o)=>a+lineT(o),0)+extra.filter(x=>!done(x.id)).reduce((a,x)=>a+extraT(x),0);
   // 🎟️ je Artikel: im Laden Coupon mit einem Tipp nachtragen (öffnet den Artikel mit den Coupon-Knöpfen)
   const cpBtn=id=>{if(id.startsWith("x-")||done(id))return "";const o=byId(id);if(!o||!o.p)return "";const c=couponsFor(o)[0];
     return `<button class="cpbtn${c?" on":""}" data-cpqlist="${esc(id)}" aria-label="${c?"Coupon "+esc(cpValueTxt(c)):"Coupon eintragen"}" title="${c?"Coupon eingerechnet":"Ich habe einen Coupon dafür"}">🎟️${c?`<small>${esc(cpValueTxt(c))}</small>`:""}</button>`};
   const stepper=id=>done(id)?"":`<span class="qstep"><button data-qm="${esc(id)}" aria-label="weniger">−</button><b>${qty(id)}</b><button data-qp="${esc(id)}" aria-label="mehr">+</button></span>`;
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i><span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
-  const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
-  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${endSoonHTML(items)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items,extra,sum)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
+  const grpTot=os=>{const t=os.reduce((a,o)=>a+lineT(o),0),r=os.reduce((a,o)=>a+lineR(o)+linePf(o),0),p=r2(os.reduce((a,o)=>a+linePf(o),0));return `<div class="rsub"><span>Summe ${os.length} Artikel${p?` · inkl. ${eur(p)} Pfand`:""}${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
+  return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${endSoonHTML(items)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items,extra,sum)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
      ${actSum(os)}${walkLines(os)}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
-   ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"",x.dp?` <em class="rsoon">${esc(x.dp)}</em>`:"")+exHintHTML(x)).join("")}</div>`:""}
-   <div class="rtot"><div class="big"><span>SUMME</span><span>${items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
-   <div class="rnote">Die Summe ist dein Preis an der Kasse. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.</div></div>
+   ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):paidOf(x)?`<i class="rca" title="geschätzt: zuletzt bezahlt">ca. ${eur(extraT(x))}</i>`:"",x.dp?` <em class="rsoon">${esc(x.dp)}</em>`:"")+exHintHTML(x)).join("")}</div>`:""}
+   <div class="rtot"><div class="big"><span>SUMME</span><span>${est||items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${pfSum?`<div><span>davon Pfand</span><span>${eur(pfSum)}</span></div>`:""}${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
+   <div class="rnote">Die Summe ist dein Preis an der Kasse${pfSum?", mit Pfand (das bekommst du bei der Rückgabe der Flaschen zurück)":""}. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.${est?" „ca.“ bei eigenen Einträgen = so viel hast du zuletzt dafür bezahlt.":""}</div></div>
    <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
    ${bonBoxHTML()}${tripsHTML()}`}
 
@@ -1946,7 +2068,7 @@ function renderFilter(){
    <div class="fchips">${[0,1,2,5,10,20].map(v=>chip("data-fmax",v,v?`${v} €`:"Egal",S.flt.max===v," plain")).join("")}</div>
    <h3 class="fh">Nur zeigen</h3>
    <div class="fchips">${Object.entries(FLT_LABEL).map(([k,v])=>chip("data-fflag",k,v,!!S.flt[k]," plain")).join("")}</div>
-   <p class="fhint">„Nur echte Rabatte“: mit Händler-„statt“-Preis, den SparRadar nicht widerlegt hat. „Ohne App & Karte“: Preis gilt für alle, ohne Lidl Plus, Payback, Coupon o. Ä. „Tiefstpreis“: so günstig wie lange nicht laut Preisverlauf.</p>
+   <p class="fhint">„Nur echte Rabatte“: mit Händler-„statt“-Preis, den SparRadar nicht widerlegt hat. „Ohne App & Karte“: Preis gilt für alle, ohne Lidl Plus, Payback, Coupon o. Ä. „Tiefstpreis“: so günstig wie lange nicht laut Preisverlauf. „💪 Eiweiß pro €“: Fleisch, Fisch, Quark, Skyr, Eier, Milch & Co., sortiert nach dem Preis für 100 g Eiweiß (Richtwerte).</p>
    <div class="frow"><button class="switch" data-toggleapp="1" role="switch" aria-checked="${S.useApp}" aria-label="Apps und Coupons einrechnen"></button><span>Apps &amp; Coupons einrechnen</span></div>
    <div class="factions"><button class="btn ghost" data-freset="1">Zurücksetzen</button><button class="btn" data-fdone="1">${n} Angebote zeigen</button></div>
   </div>`}
@@ -2157,6 +2279,7 @@ document.addEventListener("click",e=>{
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
   if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
+  if(b.id==="zMic"){Voice.start();return}
   if(b.id==="scanBtn"||b.id==="zScan"){Object.assign(Scan,{mode:b.id==="zScan"?"list":"",last:"",res:"",added:[],unknown:"",cart:null,msgT:""});S.sheet="scan";render();return}
   if(b.dataset.zq){const id=b.dataset.zq;S.qty[id]=Math.min(49,qty(id)+1);save();zPaint();return}
   if(b.dataset.zundo){zUndo(b.dataset.zundo);return}

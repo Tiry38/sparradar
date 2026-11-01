@@ -94,7 +94,7 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .gearbtn{flex:none;width:36px;height:36px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--muted);display:grid;place-items:center;opacity:.7}
 .gearbtn:hover{opacity:1;background:var(--surface)}
 /* Einkaufszettel: abhaken und eigene Einträge */
-#extraForm{max-width:460px;width:100%;justify-self:center}
+#extraForm{max-width:620px;width:100%;justify-self:center}
 .rline .rcheck{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;min-width:0;width:auto;height:auto;color:var(--fg)}
 .rline .rcheck i{flex:none;width:18px;height:18px;border:2px solid var(--muted);border-radius:5px;display:grid;place-items:center}
 .rline.done .rcheck i{background:var(--save);border-color:var(--save)}
@@ -229,6 +229,7 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .swaps .swap{display:flex;gap:10px;align-items:center;justify-content:space-between}
 .swaps .swap span{min-width:0}
 .swaps .swap small{display:block;color:var(--muted);font-size:.8rem}
+.rsub>span:last-child{flex:none;white-space:nowrap}
 .rsub{display:flex;justify-content:space-between;gap:8px;font-size:.78rem;color:var(--muted);border-top:1px dashed var(--line);margin-top:4px;padding-top:4px}
 /* Barcode-Scanner */
 .scanbtn{border:0;background:transparent;color:var(--accent);display:grid;place-items:center;width:38px;height:38px;border-radius:12px;cursor:pointer;flex:none}
@@ -673,4 +674,20 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .zrow .zalt .chip{font-size:.78rem;padding:4px 9px;min-height:0}
 .zdone{width:100%;justify-content:center;margin-top:10px}
 .zask{margin:6px 0}
-@media(max-width:559px){#extraForm .zscan{flex:1 1 100%;justify-content:center}}
+@media(max-width:559px){#extraForm .zscan,#extraForm .zmic{flex:1 1 40%;justify-content:center}}
+/* v126: Pfand, zuletzt bezahlt, Eiweiß pro €, Feiertage, Sprechen */
+.rline em.rpf{font-style:normal;font-size:.72rem;color:var(--muted);white-space:nowrap}
+.rline i.rca{font-style:italic;color:var(--muted)}
+.receipt .exhit.paid{background:color-mix(in oklab,#1E9E5A 12%,transparent)}
+.probox{display:flex;align-items:flex-start;gap:8px;margin:0 0 8px;padding:10px 12px;border-radius:12px;background:color-mix(in oklab,#0EA5E9 12%,transparent);font-size:.88rem;line-height:1.4}
+.probox>span{flex:1;min-width:0}
+.probox small{display:block;color:var(--muted);font-size:.78rem;margin-top:3px}
+.alarm.pro{color:#0369A1;background:color-mix(in oklab,#0EA5E9 15%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .alarm.pro{color:#7DD3FC}}
+:root[data-theme="dark"] .alarm.pro{color:#7DD3FC}
+.holi{display:flex;align-items:flex-start;gap:8px;margin:0 0 12px;padding:10px 12px;border-radius:12px;border:1px solid color-mix(in oklab,#DC2626 35%,transparent);background:color-mix(in oklab,#DC2626 9%,var(--surface));font-size:.9rem;line-height:1.45}
+.holi>span{flex:1;min-width:0}
+.addrow .zmic{flex:none}
+.zmic.on{background:#DC2626;border-color:#DC2626;color:#fff;animation:zmic 1.2s ease-in-out infinite}
+@keyframes zmic{50%{box-shadow:0 0 0 6px rgba(220,38,38,.25)}}
+@media (prefers-reduced-motion:reduce){.zmic.on{animation:none}}

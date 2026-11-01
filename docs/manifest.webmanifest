@@ -56,5 +56,67 @@
         }
       ]
     }
-  }
+  },
+  "shortcuts": [
+    {
+      "name": "Einkaufszettel",
+      "short_name": "Zettel",
+      "description": "Einkaufszettel öffnen",
+      "url": "./?go=list",
+      "icons": [
+        {
+          "src": "sc-list.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        },
+        {
+          "src": "sc-list.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "maskable"
+        }
+      ]
+    },
+    {
+      "name": "Auf den Zettel scannen",
+      "short_name": "Scannen",
+      "description": "Artikel per Strichcode auf den Einkaufszettel setzen",
+      "url": "./?go=scan",
+      "icons": [
+        {
+          "src": "sc-scan.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        },
+        {
+          "src": "sc-scan.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "maskable"
+        }
+      ]
+    },
+    {
+      "name": "Merkliste",
+      "short_name": "Merkliste",
+      "description": "Merkliste mit Treffern öffnen",
+      "url": "./?go=watch",
+      "icons": [
+        {
+          "src": "sc-watch.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "any"
+        },
+        {
+          "src": "sc-watch.png",
+          "sizes": "192x192",
+          "type": "image/png",
+          "purpose": "maskable"
+        }
+      ]
+    }
+  ]
 }
