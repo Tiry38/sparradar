@@ -10,6 +10,7 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 - **Bei jeder neuen App-Version** (`app.js?v=` hochgezählt) in `CHANGES` in `docs/app.js` einen kurzen Eintrag in einfachem Deutsch ergänzen. Den zeigt das Fenster „SparRadar wurde aktualisiert“ nach dem Update.
 - Commit-Nachrichten auf Deutsch.
 - Fehler rückgängig machen: `git revert` des letzten Commits und auf `main` pushen.
+- **Kevins Wunsch (01.11.): immer `/compact`- oder `/clear`-Empfehlung geben** – nach jedem gepushten Block „⏸ Guter Zeitpunkt zum Compacten“ (Aufgabe noch offen, Zusammenfassung behält sie), wenn alles erledigt ist und ein neues Thema beginnt „✅ Guter Zeitpunkt zum /clear“.
 
 ## Aufbau
 - `docs/` – die App (statisches HTML/CSS/JS, kein Build-Schritt), läuft auf GitHub Pages. PWA mit `manifest.webmanifest` und `sw.js`.
