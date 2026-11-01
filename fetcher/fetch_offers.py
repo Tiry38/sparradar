@@ -793,7 +793,10 @@ def merge(offers):
 def drop_previews(offers):
     """Vorschau (pv) eines Markts komplett entfernen, sobald dessen echter Prospekt für dieselbe Woche da ist
     (Kevins Wunsch: echte Daten sofort rein, Vorschau weg). Echt = mind. 10 Angebote ohne pv, die in derselben
-    Woche starten wie die Vorschau."""
+    Woche starten wie die Vorschau.
+    01.11.: Die kaufDA-Händlerseite liefert nur 16 Angebote – damit flogen 400 Vorschau-Artikel von Rewe/Edeka raus,
+    obwohl der Rest erst später über die Sortiment-Seiten kommt. Jetzt: komplett weg erst, wenn die echten Angebote
+    mind. halb so viele sind wie die Vorschau. Vorher fliegen nur die Vorschau-Artikel raus, die es schon echt gibt."""
     out = offers
     for s in {o["s"] for o in offers if o.get("pv")}:
         froms = sorted(o["from"][:10] for o in offers if o["s"] == s and o.get("pv") and o.get("from"))
@@ -801,11 +804,15 @@ def drop_previews(offers):
             continue
         start = dt.date.fromisoformat(froms[0])
         lo, hi = (start - dt.timedelta(days=2)).isoformat(), (start + dt.timedelta(days=6)).isoformat()
-        real = sum(1 for o in offers if o["s"] == s and not o.get("pv") and lo <= (o.get("from") or "")[:10] <= hi)
-        if real >= 10:
-            n = sum(1 for o in out if o["s"] == s and o.get("pv"))
+        reals = [o for o in offers if o["s"] == s and not o.get("pv") and lo <= (o.get("from") or "")[:10] <= hi]
+        n = sum(1 for o in out if o["s"] == s and o.get("pv"))
+        if len(reals) >= max(10, n * 0.5):
             out = [o for o in out if not (o["s"] == s and o.get("pv"))]
-            log(f"  {s}: echter Prospekt ab {froms[0]} da ({real} Angebote) -> {n} Vorschau-Angebote entfernt")
+            log(f"  {s}: echter Prospekt ab {froms[0]} da ({len(reals)} Angebote) -> {n} Vorschau-Angebote entfernt")
+        elif reals:
+            have = {norm(o["n"]) for o in reals} | {k for k in map(name_key, reals) if k}
+            out = [o for o in out if not (o["s"] == s and o.get("pv") and (norm(o["n"]) in have or name_key(o) in have))]
+            log(f"  {s}: erst {len(reals)} echte Angebote -> Vorschau bleibt ({n - sum(1 for o in out if o['s'] == s and o.get('pv'))} Doppelte entfernt)")
     return out
 
 
