@@ -1,0 +1,30 @@
+name: Bilder-Wächter
+# Mehrmals am Tag: Jeder Artikel (Angebote, Namen, Artikelstamm) soll ein Bild haben.
+# Fehlende Bilder werden in eigenen Daten und bei Open Food Facts / Open Beauty Facts gesucht -> docs/data/img-extra.json
+on:
+  schedule:
+    - cron: "23 7,13,19 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: bilder
+  cancel-in-progress: false
+jobs:
+  bilder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python fetcher/fill_images.py
+      - name: Speichern
+        run: |
+          git config user.name "SparRadar Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data/img-extra.json docs/data/img-miss.json
+          git diff --cached --quiet || git commit -m "Bilder ergänzt $(date +%F)"
+          git pull --rebase -X theirs --autostash
+          git push

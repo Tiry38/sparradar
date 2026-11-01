@@ -78,6 +78,7 @@ export default {
     if (h === 4) due.push("angebote.yml", "cashback.yml");                       // jeden Morgen ca. 5:10/6:10 Uhr
     if (h === 17 && [5, 6, 0].includes(wd)) due.push("angebote.yml");             // Fr, Sa, So abends
     if (h === 2 && wd === 0) due.push("artikelstamm.yml");                        // sonntags nachts
+    if ([6, 12, 18].includes(h)) due.push("bilder.yml");                         // Bilder-Wächter 3× am Tag
     const pros = [4, 5, 6, 0].includes(wd) ? h >= 5 && h <= 21 : wd === 1 ? h >= 5 && h <= 20 : [5, 9, 15].includes(h);
     if (pros && !due.includes("angebote.yml")) due.push("prospekte.yml");         // Prospekt-Wächter
     ctx.waitUntil(Promise.all(due.map(f => fetch(`https://api.github.com/repos/Tiry38/sparradar/actions/workflows/${f}/dispatches`, {

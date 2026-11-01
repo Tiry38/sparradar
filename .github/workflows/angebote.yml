@@ -46,6 +46,12 @@ jobs:
         working-directory: fetcher
         run: python check_new.py --save
 
+      - name: Bilder für neue Artikel aus eigenen Daten ergänzen (schnell, ohne Suche)
+        if: steps.gate.outputs.skip != '1'
+        env:
+          SR_IMG_MAX: "0"
+        run: python fetcher/fill_images.py || true
+
       - name: Daten speichern
         if: steps.gate.outputs.skip != '1'
         run: |

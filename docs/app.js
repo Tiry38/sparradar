@@ -499,8 +499,22 @@ function loadCatalog(then){if(CATALOG||catLoading)return;catLoading=true;
 // und aus catalog-img.json (Open Food Facts / Open Beauty Facts). Wird erst beim ersten Vorschlag geladen.
 let SIMG=null,simgLoading=false,CAT_IDX=null;
 function loadSugImgs(then){if(SIMG||simgLoading)return;simgLoading=true;
-  Promise.all([fetch("data/names-img.json").then(r=>r.json()).catch(()=>({})),fetch("data/catalog-img.json").then(r=>r.json()).catch(()=>[])])
-    .then(([n,c])=>{SIMG={names:n&&typeof n==="object"?n:{},cat:Array.isArray(c)?c:[]};then&&then()})}
+  const j=(u,d)=>fetch(u).then(r=>r.json()).catch(()=>d);
+  Promise.all([j("data/names-img.json",{}),j("data/catalog-img.json",[]),j("data/img-extra.json",{})])
+    .then(([n,c,x])=>{const ex=x&&typeof x==="object"?x:{},exN={};for(const k in ex)exN[norm(k)]=ex[k];
+      SIMG={names:n&&typeof n==="object"?n:{},cat:Array.isArray(c)?c:[],extra:ex,extraN:exN};then&&then()})}
+// Letzter Versuch für Merklisten-Artikel ohne Bild: Open Food Facts direkt fragen (Ergebnis bleibt 14 Tage im Gerät gemerkt)
+const WIMG=store.get("wimg",{});let wimgBusy=0;
+function liveImg(t){const k=norm(t),c=WIMG[k];if(c&&(c.u||Date.now()-c.at<14*864e5))return c.u||"";
+  if(wimgBusy>=3||!navigator.onLine)return "";wimgBusy++;
+  const w=wTokens(t);if(w.length<2){WIMG[k]={u:"",at:Date.now()};store.set("wimg",WIMG);wimgBusy--;return ""}
+  fetch("https://world.openfoodfacts.org/cgi/search.pl?"+new URLSearchParams({search_terms:t,search_simple:1,action:"process",json:1,page_size:10,fields:"product_name,product_name_de,brands,image_front_small_url"}))
+    .then(r=>r.json()).then(d=>{let best=0,u="";for(const p of d.products||[]){const im=p.image_front_small_url;if(!im||!safeUrl(im))continue;
+        const pt=wTokens((p.brands||"").split(",")[0]+" "+(p.product_name_de||p.product_name||""));
+        if(pt[0]!==w[0]||!(pt.includes(w[1])))continue;const n=w.filter(x=>pt.includes(x)).length,sc=n/Math.max(w.length,pt.length);
+        if(n>=Math.min(2,w.length)&&n>=w.length*.6&&sc>best){best=sc;u=im}}
+      WIMG[k]={u,at:Date.now()};store.set("wimg",WIMG);if(u&&S.tab==="watch")render()})
+    .catch(()=>{}).finally(()=>wimgBusy--);return ""}
 // Kein Bild für genau diesen Namen? Ähnlichster Artikel im Artikelstamm (gleiche Marke = erstes Wort, mind. 3 gleiche Wörter)
 function simImg(t){if(!SIMG||!CATALOG||!SIMG.cat.length)return "";const w=wTokens(t);if(w.length<3)return "";
   let best=-1,bi=-1;for(let i=0;i<CATALOG.length;i++){const c=CATALOG_N[i];if(!SIMG.cat[i]||!c.startsWith(w[0]))continue;
@@ -509,7 +523,7 @@ function simImg(t){if(!SIMG||!CATALOG||!SIMG.cat.length)return "";const w=wToken
 function sugImg(t){
   const k=norm(t),o=OFFERS.find(x=>x.img&&(norm(x.n)===k||norm((x.b||"")+x.n)===k));if(o)return sharp(o.img);
   if(!SIMG)return "";
-  const n=SIMG.names[t];if(n)return n;
+  const n=SIMG.names[t]||SIMG.extra[t]||SIMG.extraN[k];if(n)return n;
   if(CATALOG_N&&SIMG.cat.length){if(!CAT_IDX){CAT_IDX=new Map();CATALOG_N.forEach((x,i)=>{if(!CAT_IDX.has(x))CAT_IDX.set(x,i)})}
     const c=SIMG.cat[CAT_IDX.get(k)];if(c)return (c[0]==="b"?"https://images.openbeautyfacts.org":"https://images.openfoodfacts.org")+"/images/products/"+c.slice(2)+".jpg"}
   return ""}
@@ -738,6 +752,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  99:["Mehr Bilder: Artikel in der Merkliste und in den Vorschlägen bekommen jetzt fast immer ein Produktfoto. SparRadar sucht fehlende Bilder mehrmals am Tag automatisch."],
   98:["Neu oben bei den Angeboten: „Deine Woche“ – Merklisten-Treffer, Zettel, Geld-zurück-Bons und Preis-Alarme auf einen Blick.","Einkaufszettel sortiert nach dem Weg durch den Markt: Obst zuerst, Tiefkühl zuletzt.","„Günstiger einkaufen“ zeigt, was du ohne Umweg sparst und ob sich ein Abstecher zu einem anderen Markt lohnt – mit einem Tipp alles tauschen.","📉 Preis-Alarm: so günstig wie seit Wochen nicht (erscheint, sobald genug Preisverlauf da ist).","Am Handy 2 Angebote nebeneinander mit größeren Bildern, jede Karte mit der Farbe ihres Markts.","Merkliste genauer: „Butter“ meldet keine Buttermilch und keinen Butter-Spekulatius mehr, „Kaffee“ keinen Kaffeevollautomaten, „Käse“ keinen Leberkäse."],
   97:["Merkliste und Filter „Bio“/„Vegan“ lesen keine Werbetexte mehr mit: „ideal zu Bratkartoffeln“ meldet keine Gurkensülze mehr, wenn du dir Kartoffeln merkst."],
   96:["Am PC verteilen sich die Markt-Kacheln jetzt über die ganze Breite.","Artikel landen in der richtigen Kategorie: Katzenfutter-Kroketten nicht mehr bei Tiefkühl, Spielzeug nicht mehr bei Garten, Pflanzen nicht mehr bei Vorrat und vieles mehr.","Die Vorschau auf nächste Woche bei Rewe und Edeka bleibt jetzt drin, bis der echte Prospekt vollständig da ist."],
@@ -918,7 +933,7 @@ function renderWatch(){
     <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt. Die Zahl am Tab „Merkliste“ zeigt dir beim Öffnen, wie viele Treffer gerade im Angebot sind.</p>
     <form class="addrow" id="kwForm"><input id="kwIn" placeholder="z. B. Mozzarella, Felix, Cola" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg (optional)" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
     <div id="kwSugg"></div>
-    <div class="wlist">${S.watch.map((w,i)=>{const n=wh[i].hits.length,im=sugImg(w.k)||(wh[i].hits.find(o=>o.img)||{}).img||simImg(w.k)||"",on=S.wsel===i;
+    <div class="wlist">${S.watch.map((w,i)=>{const n=wh[i].hits.length,im=sugImg(w.k)||(wh[i].hits.find(o=>o.img)||{}).img||simImg(w.k)||(SIMG&&CATALOG_N?liveImg(w.k):"")||"",on=S.wsel===i;
       return `<div class="witem${n?" hit":""}${on?" on":""}"><button class="wmain" data-wsel="${i}" aria-pressed="${on}" title="${esc(w.k)}">${safeUrl(im)?`<img src="${esc(sharp(im))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<span class="wph">${IC.bell}</span>`}<span class="wtx"><b>${esc(w.k)}</b><small>${n?`${n} ${n===1?"Treffer":"Treffer"} im Angebot`:"gerade nicht im Angebot"}${w.max?` · bis ${eur(w.max)}/kg`:""}</small></span></button><button class="wdel" data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></div>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
    </section>
    <div class="meta"><h2>${S.wsel!=null?`Treffer für „${esc(S.watch[S.wsel].k)}“`:"Deine Treffer"}</h2><span>${S.wsel!=null?`<button class="linkbtn" data-wsel="${S.wsel}">Alle zeigen</button> · `:""}${hits.length} Angebote</span></div>

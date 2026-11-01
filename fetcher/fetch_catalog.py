@@ -112,16 +112,21 @@ def main():
             log("  ! Export fehlgeschlagen:", url, repr(e))
     # zuerst Artikel unserer Märkte, dann nach Beliebtheit (Scans)
     allf.sort(key=lambda t: (not t[0], -t[1]))
-    seen, out = set(), []
+    seen, out = {}, []
     out_img = []
     for _, _, n, img in allf:
         k = norm(n)
-        if k and k not in seen:
-            seen.add(k)
-            out.append(n)
-            out_img.append(img)
-            if len(out) >= MAX_ITEMS:
-                break
+        if not k:
+            continue
+        if k in seen:  # doppelter Artikel: Bild vom Doppelten übernehmen, falls der erste keins hat
+            if img and not out_img[seen[k]]:
+                out_img[seen[k]] = img
+            continue
+        if len(out) >= MAX_ITEMS:
+            continue
+        seen[k] = len(out)
+        out.append(n)
+        out_img.append(img)
     log("Artikelstamm:", len(out), "Artikel, davon bei unseren Märkten:", sum(1 for t in allf if t[0]))
     if len(out) < 5000:
         log("! Zu wenige Artikel, alter Artikelstamm bleibt stehen.")
