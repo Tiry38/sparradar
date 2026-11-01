@@ -577,3 +577,7 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 @media(max-width:559px){.receipt .ract{margin-left:0;flex-wrap:wrap}.receipt .actbtn{margin-left:auto}}
 .cpsteps{padding:12px 14px;border-radius:14px;background:var(--surface2);margin:4px 0 12px}.cpsteps ol{margin:6px 0;padding-left:20px;display:grid;gap:4px}.cpsteps small{color:var(--muted)}
 .cpmore{margin-top:12px;border-top:1px solid var(--line);padding-top:8px}.cpmore summary{cursor:pointer;font-weight:600;color:var(--muted);padding:6px 0}.cpmore[open] summary{margin-bottom:8px}
+
+/* v110: Angebot startet erst später in dieser Woche („ab Do“) */
+.valid.soon{color:#fff;background:#2D7FF9;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;width:fit-content;align-self:flex-start}
+@media (max-width:559px){html:not(.zoomed) .grid>.card .valid.soon{flex:0 0 auto;margin-right:100%}}

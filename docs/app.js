@@ -78,6 +78,10 @@ const esc = s => String(s??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">"
 const parseNum = s => {const v=parseFloat(String(s||"").replace(",","."));return isFinite(v)&&v>0?v:null};
 // Prospekte „ab Sonntag“ starten im Laden erst am Montag (sonntags geschlossen)
 const shopDay = d => {if(!d)return d;const x=new Date(d+"T12:00:00");if(x.getDay()!==0)return d;x.setDate(x.getDate()+1);return x.toISOString().slice(0,10)};
+// Kevins Wunsch (01.11.): „Diese Woche“ = alles bis Samstag, auch was erst ab Donnerstag gilt (Einkauf am Samstag planen).
+// „Nächste Woche“ = alles ab dem nächsten Montag.
+const NEXTMON = (()=>{const x=new Date(SHOP+"T12:00:00");x.setDate(x.getDate()+((8-x.getDay())%7||7));return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,"0")}-${String(x.getDate()).padStart(2,"0")}`})();
+const isNextWk = o => !!o.from && shopDay(o.from)>=NEXTMON;
 const fmtDate = d => d ? new Date(d+"T12:00:00").toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"}) : "";
 // Markt-Logo: das Website-Symbol des Markts (wird beim Öffnen geladen, liegt nicht im Repo).
 // Lädt es nicht, bleibt das farbige Kürzel darunter sichtbar.
@@ -294,11 +298,7 @@ const sharp = u => !u ? u : u.replace(/\?impolicy=SEO-offer-(?:normal|thumbnails
 const LOWPX=320;
 const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}${o.iw&&Math.max(...o.iw)<LOWPX?" lowres":""}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
 // Beschriftung für kommende Angebote: „Nächste Woche“, oder „Ab Donnerstag“, wenn etwas noch diese Woche startet
-function nextLabel(){const nx=OFFERS.filter(o=>o.from&&o.from>SHOP).map(o=>shopDay(o.from)).sort()[0];
-  if(!nx)return "Nächste Woche";
-  const d=new Date(SHOP+"T12:00:00"),mon=new Date(d);mon.setDate(d.getDate()+((8-d.getDay())%7||7));
-  const nextMon=`${mon.getFullYear()}-${String(mon.getMonth()+1).padStart(2,"0")}-${String(mon.getDate()).padStart(2,"0")}`;
-  return nx>=nextMon?"Nächste Woche":"Ab "+new Date(nx+"T12:00:00").toLocaleDateString("de-DE",{weekday:"long"})}
+function nextLabel(){return "Nächste Woche"}
 const nextShort = () => {const l=nextLabel();return l==="Nächste Woche"?"nächste Woche":l.replace("Ab","ab")};
 // ---------- Vorteil ohne „statt“-Preis ----------
 // Steht im Prospekt kein „statt“-Preis, zeigt SparRadar den Vorteil aus eigenen Daten – klar gekennzeichnet (blau):
@@ -391,7 +391,7 @@ const wasLbl = o => o.o&&o.ou===1&&ref(o)===o.o?"UVP":"statt";
 const dealWarn = o => !!(o.rk&&o.rk.t==="warn");
 // Sortierung: zweifelhafte Rabatte zählen nur mit der realistischen Ersparnis (sonst höchstens 45 %)
 const sortPct = o => dealWarn(o)?(o.rk.real!=null?Math.min(o.rk.real,offPct(o)):Math.min(offPct(o),45)):offPct(o);
-const weekOffers = () => OFFERS.filter(o => S.week ? (o.from && o.from>SHOP) : (!o.from || o.from<=SHOP));
+const weekOffers = () => OFFERS.filter(o => S.week ? isNextWk(o) : !isNextWk(o));
 function filtered(){
   let r=weekOffers();
   if(S.stores.size)r=r.filter(o=>S.stores.has(o.s));
@@ -437,7 +437,7 @@ const ranked = () => {const all=weekOffers().filter(o=>o.p>0&&!NONFOOD_CATS.incl
   return r};
 // Märkte mit Angeboten, aber ohne belegbaren Rabatt (Rewe druckt fast nie „statt“) -> kurzer Hinweis im Kracher
 const noProof=()=>{const r=ranked(),ws=weekOffers();return [...new Set(ws.map(o=>o.s))].filter(st=>!r.slice(0,8).some(o=>o.s===st))}
-const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>SHOP:!o.from||o.from<=SHOP))&&hitW(o,w))}));
+const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?isNextWk(o):!isNextWk(o)))&&hitW(o,w))}));
 
 async function load(){
   try{
@@ -574,7 +574,7 @@ function card(o,bestIds){
      <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
    ${ls?`<div class="alarm" title="${esc(ls.l)}">📉 ${esc(ls.s)}</div>`:`<div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>`}
    ${combo}
-   <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}">${validTxt(o)}</span>
+   <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}${o.from&&o.from>SHOP?" soon":""}">${validTxt(o)}</span>
      <button class="ibtn" data-fav="${esc(o.id)}" aria-pressed="${fav}" aria-label="${fav?"Von Merkliste entfernen":"Auf Merkliste setzen"}" title="Merken">${IC.star}</button>
      ${inL?qStep(o.id):""}<button class="ibtn add" data-add="${esc(o.id)}" aria-pressed="${inL}" aria-label="${inL?"Vom Einkaufszettel nehmen":"Auf den Einkaufszettel"}" title="Einkaufszettel">${inL?IC.check:IC.plus}</button></div>
    </div></article>`}
@@ -616,7 +616,7 @@ function renderOffers(){
   const r=filtered(),bestIds=new Set();
   if((S.q.trim()||S.cats.size)&&r.length>1){const by={};r.forEach(o=>{if(unit(o)==null)return;const k=o.gp.u;if(!by[k]||unit(o)<unit(by[k]))by[k]=o});Object.values(by).forEach(o=>bestIds.add(o.id))}
   const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
-  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):WEEKEND?"Angebote ab Montag":"Angebote, die jetzt gelten");
+  const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+(nextShort()==="nächste Woche"?"der nächsten Woche":nextShort()):WEEKEND?"Angebote ab Montag":"Angebote dieser Woche");
   const shown=r.slice(0,S.limit);
   return `${kracherBtn()}
    ${S.q.trim()||S.cats.size?(hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""):weekHTML(hitCount)}
@@ -758,6 +758,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  110:["„Diese Woche“ zeigt jetzt alle Angebote bis Samstag – auch die, die erst ab Donnerstag gelten (mit „ab Do“ auf der Karte). So planst du deinen Einkauf ohne Umschalten. „Nächste Woche“ zeigt alles ab Montag."],
   109:["Oben neben „Stand“ siehst du jetzt, wann SparRadar zuletzt nach neuen Prospekten gesucht hat. „Stand“ ist der letzte komplette Abruf aller Angebote."],
   108:["App-Angebote stehen nicht mehr doppelt da: Der App-Preis steht jetzt nur noch an einer Karte (z. B. Skyr bei Netto)."],
   107:["Oben an jedem Markt steht jetzt eine kleine orange „💸 Zahl“: So viele Angebote mit Geld zurück hat dieser Markt diese Woche."],
@@ -1663,7 +1664,7 @@ function appTwins(l){const k=x=>[x.s,norm(x.n),x.b||"",x.from||"",x.to||""].join
 function render(){quickCheck();
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
-  document.getElementById("wk1").textContent=nextLabel();document.getElementById("wk0").textContent=WEEKEND?"Ab Montag":"Jetzt gültig";
+  document.getElementById("wk1").textContent=nextLabel();document.getElementById("wk0").textContent=WEEKEND?"Ab Montag":"Diese Woche";
   document.getElementById("wk0").setAttribute("aria-pressed",S.week===0);document.getElementById("wk1").setAttribute("aria-pressed",S.week===1);
   const hits=new Set(watchHits(null).flatMap(x=>x.hits.map(o=>o.id))).size;
   const wb=document.getElementById("watchBadge");wb.textContent=hits;wb.hidden=!hits;
