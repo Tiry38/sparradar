@@ -538,12 +538,14 @@ function suggest(q){
   if(CATALOG_N){const a=[],b=[];for(let i=0;i<CATALOG_N.length&&a.length+b.length<400;i++){const n=CATALOG_N[i];if(n.startsWith(k))a.push(CATALOG[i]);else if(hasAll(n))b.push(CATALOG[i])}
     a.sort((x,y)=>x.length-y.length);b.sort((x,y)=>x.length-y.length);[...a,...b].forEach(add)}
   const wo=weekOffers();return out.slice(0,30).map(t=>({t,n:wo.filter(o=>watchMatch(o,t)).length}))}
+const SUGG_BOX={q:"qSugg",kw:"kwSugg",ex:"exSugg"},SUGG_IN={q:"q",kw:"kwIn",ex:"extraIn"};
+const suggQ=kind=>{const v=document.getElementById(SUGG_IN[kind])?.value||"";return kind==="q"?S.q:kind==="ex"?parseExtra(v).n:v};
 function suggHTML(q,kind){const list=suggest(q);if(!list.length)return "";
-  if(!SIMG)loadSugImgs(()=>{const box=document.getElementById(kind==="q"?"qSugg":"kwSugg");if(box&&box.innerHTML)showSugg(box.id,kind==="q"?S.q:(document.getElementById("kwIn")?.value||""),kind)});
+  if(!SIMG)loadSugImgs(()=>{const box=document.getElementById(SUGG_BOX[kind]);if(box&&box.innerHTML)showSugg(box.id,suggQ(kind),kind)});
   return `<div class="sugg" role="listbox" aria-label="Vorschläge">${list.map(x=>{const im=sugImg(x.t);return `<button type="button" role="option" data-sugg="${kind}" data-v="${esc(x.t)}"><i class="simg">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'}</i><span class="st">${esc(x.t)}</span>${x.n?`<em class="on">${x.n} im Angebot</em>`:`<em>nicht im Angebot</em>`}</button>`}).join("")}</div>`}
 function showSugg(id,q,kind){const el=document.getElementById(id);if(!el)return;el.innerHTML=suggHTML(q,kind);
-  if(!CATALOG)loadCatalog(()=>{const inp=document.getElementById(kind==="q"?"q":"kwIn");if(inp&&document.activeElement===inp)showSugg(id,inp.value,kind)})}
-const hideSugg=()=>["qSugg","kwSugg"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=""});
+  if(!CATALOG)loadCatalog(()=>{const inp=document.getElementById(SUGG_IN[kind]);if(inp&&document.activeElement===inp)showSugg(id,suggQ(kind),kind)})}
+const hideSugg=()=>["qSugg","kwSugg","exSugg"].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=""});
 
 // ---------- Teilen ----------
 const APP_URL="https://tiry38.github.io/sparradar/",APK_URL="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-App.apk";
@@ -752,6 +754,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  100:["Einkaufszettel: Beim Eintippen erscheinen jetzt passende Artikel mit Bild – auch alles, was gerade nicht im Angebot ist. Antippen setzt ihn auf den Zettel. Ist er gerade im Angebot, kommt gleich das Angebot mit Preis drauf."],
   99:["Mehr Bilder: Artikel in der Merkliste und in den Vorschlägen bekommen jetzt fast immer ein Produktfoto. SparRadar sucht fehlende Bilder mehrmals am Tag automatisch."],
   98:["Neu oben bei den Angeboten: „Deine Woche“ – Merklisten-Treffer, Zettel, Geld-zurück-Bons und Preis-Alarme auf einen Blick.","Einkaufszettel sortiert nach dem Weg durch den Markt: Obst zuerst, Tiefkühl zuletzt.","„Günstiger einkaufen“ zeigt, was du ohne Umweg sparst und ob sich ein Abstecher zu einem anderen Markt lohnt – mit einem Tipp alles tauschen.","📉 Preis-Alarm: so günstig wie seit Wochen nicht (erscheint, sobald genug Preisverlauf da ist).","Am Handy 2 Angebote nebeneinander mit größeren Bildern, jede Karte mit der Farbe ihres Markts.","Merkliste genauer: „Butter“ meldet keine Buttermilch und keinen Butter-Spekulatius mehr, „Kaffee“ keinen Kaffeevollautomaten, „Käse“ keinen Leberkäse."],
   97:["Merkliste und Filter „Bio“/„Vegan“ lesen keine Werbetexte mehr mit: „ideal zu Bratkartoffeln“ meldet keine Gurkensülze mehr, wenn du dir Kartoffeln merkst."],
@@ -1133,8 +1136,8 @@ function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>
    ${TOUCH()&&inCart&&inCart<all.length?`<button class="btn ghost sm cart-done" data-tripfinish="1">Einkauf jetzt abschließen (Rest bleibt auf dem Zettel)</button>`:""}</div>`}
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;
-  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Eigener Eintrag, z. B. Brot 1,99 oder 3x Joghurt" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form>`;
-  if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder schreib oben selbst etwas dazu. SparRadar sortiert alles nach Markt.</div>`}${tripsHTML()}`;
+  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
+  if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const done=id=>S.checked.includes(id);
   const sortDone=a=>[...a.filter(x=>!done(x.id)),...a.filter(x=>done(x.id))];  // was im Wagen liegt, rutscht nach unten
@@ -1506,6 +1509,11 @@ document.addEventListener("click",e=>{
   if(!b)return;
   if(b.dataset.detail){S.detail=b.dataset.detail;S.dImg=0;S.sheet="detail";S._shown=null;render();return}
   if(b.dataset.sugg==="q"){const v=b.dataset.v;S.q=v;document.getElementById("q").value=v;S.limit=60;hideSugg();S.tab="offers";render();return}
+  if(b.dataset.sugg==="ex"){const inp=document.getElementById("extraIn"),x=parseExtra(inp?.value||""),v=b.dataset.v,k=norm(v);hideSugg();
+    const o=weekOffers().find(o=>norm(o.n)===k||norm((o.b||"")+o.n)===k);
+    if(o){if(!S.list.includes(o.id))S.list.push(o.id);if(x.q>1)S.qty[o.id]=x.q;toast(`${o.n} im Angebot bei ${sname(o.s)} – auf den Zettel gesetzt`)}
+    else{const id="x-"+Date.now();S.extra.push(x.p?{id,n:v,p:x.p}:{id,n:v});if(x.q>1)S.qty[id]=x.q;toast(`${v} auf den Zettel gesetzt`)}
+    save();render();document.getElementById("extraIn")?.focus();return}
   if(b.dataset.sugg==="kw"){const v=b.dataset.v;document.getElementById("kwIn").value=v;hideSugg();document.getElementById("kwForm").requestSubmit();return}
   if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
   if(b.id==="wk0"||b.id==="wk1"){S.week=+b.id[2];S.limit=60;render();return}
@@ -1613,7 +1621,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.lightbox){S.light
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
-  if(e.target.id==="extraForm"){e.preventDefault();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p}:{id,n:x.n});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
+  if(e.target.id==="extraForm"){e.preventDefault();hideSugg();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p}:{id,n:x.n});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
   if(e.target.id==="cpqForm"){e.preventDefault();cpqSave(e.target.dataset.id,document.getElementById("cpqType").value,parseNum(document.getElementById("cpqVal").value));return}
   if(e.target.id==="devForm"){e.preventDefault();const v=document.getElementById("devName").value.trim().slice(0,30);store.set("devName",v);Sync.push().then(()=>{toast(v?`Dieses Gerät heißt jetzt „${v}“`:"Name zurückgesetzt");render()});return}
   if(e.target.id==="syncForm"){e.preventDefault();const cp=codeParse(document.getElementById("syncToken").value),t=cp.t;if(cp.p)store.set("syncPick",cp.p);
@@ -1635,7 +1643,7 @@ document.addEventListener("submit",e=>{
 document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render();showSugg("qSugg",S.q,"q")});
 document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.target.value,"q"));
-document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");
+document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");if(e.target.id==="extraIn")showSugg("exSugg",parseExtra(e.target.value).n,"ex");
   if(e.target.id==="syncToken"){const cp=codeParse(e.target.value);if(cp.p){store.set("syncPick",cp.p);
     document.querySelectorAll("[data-pick]").forEach(c=>{const on=cp.p[c.dataset.pick];c.classList.toggle("on",on);c.setAttribute("aria-pressed",on);c.textContent=(on?"✓ ":"")+Sync.PARTS[c.dataset.pick].n})}}
   if(e.target.id==="inviteName"){store.set("inviteName",e.target.value.trim());const a=document.getElementById("inviteWa");if(a)a.href=waLink(inviteText());const m=document.getElementById("pcMail");if(m)m.href=pcMailLink()}});

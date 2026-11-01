@@ -72,7 +72,8 @@ header.top,#filters,main{grid-template-columns:minmax(0,1fr)}
 .steps-d summary{cursor:pointer;font-weight:700;color:var(--accent)}
 .steps-d .steps{margin-top:8px}
 /* Vorschläge beim Tippen */
-#qSugg:empty,#kwSugg:empty{display:none}
+#qSugg:empty,#kwSugg:empty,#exSugg:empty{display:none}
+#exSugg,.exhint{max-width:460px;width:100%;justify-self:center;box-sizing:border-box}#exSugg{margin:6px 0 4px}.exhint{margin:6px 2px 0;font-size:.8rem;color:var(--muted);text-align:center}
 .sugg{display:grid;background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
 .sugg button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 14px;border-top:1px solid var(--line);min-width:0}
 .sugg button:first-child{border-top:0}
