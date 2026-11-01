@@ -93,7 +93,7 @@ def main():
     items = sorted(got.values(), key=lambda r: (r[5], r[0]))
     f.log(f"Aldi-Dauerpreise: {len(items)} Artikel aus {n} Seiten")
     old = f.load("dauerpreise.json", {}) or {}
-    if len(items) < 0.5 * len(old.get("items") or []):
+    if not items or len(items) < 0.5 * len(old.get("items") or []):
         f.log("  ! deutlich weniger als letztes Mal – alte Liste bleibt")
         return
     f.save("dauerpreise.json", {"at": dt.date.today().isoformat(), "src": "aldi-sued.de", "items": items})
