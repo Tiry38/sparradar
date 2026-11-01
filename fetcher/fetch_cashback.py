@@ -20,8 +20,9 @@ def get(u):
 def txt(s):
     return re.sub(r"\s+", " ", html.unescape(re.sub(r"<[^>]+>", " ", s))).strip()
 
-def date(s):
-    m = re.search(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", s or "")
+def date(s, last=False):
+    ms = list(re.finditer(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", s or ""))  # „01.04.2026 bis 31.12.2026“ -> Enddatum
+    m = (ms[-1] if last else ms[0]) if ms else None
     return f"{m.group(3)}-{int(m.group(2)):02d}-{int(m.group(1)):02d}" if m else None
 
 def main():
@@ -46,7 +47,7 @@ def main():
         pct = re.search(r"(\d+)\s*%", cb)
         mx = re.search(r"max\.?\s*([\d,]+)\s*€", cb)
         wert = re.search(r"Wert:\s*(?:<[^>]+>\s*)*([\d,]+)\s*€", blk)
-        kauf = date(f.get("Aktionszeitraum")) ; ende = date(f.get("Einsendeschluss")) or kauf
+        kauf = date(f.get("Aktionszeitraum"), last=True) ; ende = date(f.get("Einsendeschluss"), last=True) or kauf
         if (kauf and kauf < today) or (ende and ende < today):
             continue
         if not kauf and not ende:
