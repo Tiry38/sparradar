@@ -32,6 +32,10 @@ KD_STORES = {  # kaufDA-Händlerseiten für Wörth am Rhein
     "lidl": "https://www.kaufda.de/Woerth-am-Rhein/Lidl/p-r74",
     "dm": "https://www.kaufda.de/Woerth-am-Rhein/dm-drogerie-markt/p-r104",
 }
+# Händlerseiten der Nachbarorte zeigen je Ort andere 16 Angebote aus DEMSELBEN Prospekt (Diagnose 01.11.:
+# Edeka 16 -> 48, dm 16 -> 32). Übernommen wird nur, was aus dem Prospekt der eigenen Händlerseite stammt.
+KD_NEAR = {"edeka": ["Kandel", "Hagenbach", "Bellheim", "Herxheim", "Bad-Bergzabern"],
+           "dm": ["Karlsruhe", "Ettlingen", "Rastatt"]}
 KD_PUBLISHER = {"REWE": "rewe", "Netto Marken-Discount": "netto", "EDEKA": "edeka", "Lidl": "lidl",
                 "ALDI SÜD": "aldi", "dm-drogerie markt": "dm", "dm": "dm", "DM": "dm"}
 KD_CITY = "Karlsruhe"  # Stichwort-Seiten gibt es nicht für Wörth; Karlsruhe ist 10 km entfernt, gleiche Prospekt-Region
@@ -199,7 +203,8 @@ def classify(title, brand="", food=True, cats=None):
     name = GENERIC.sub(" ", f"{title or ''} {brand or ''}".lower())
     ct = " / ".join(c for c in (cats or [])[-2:] if isinstance(c, str)).lower()
     ident = name + " / " + ct
-    if re.search(r"katze", ident) and not re.search(r"streu|spielzeug|kratz|toilette", ident):
+    # Katzen-Motiv auf Socken/Shirt ist Kleidung, kein Katzenbedarf (01.11.: dm-Socken landeten bei Katze)
+    if re.search(r"katze", ident) and not re.search(r"streu|spielzeug|kratz|toilette|motiv", ident) and not re.search(NF_CATS[6][1], name):
         return "katze"
     # genaueste Warengruppe „Hundefutter“ schlägt den Namen („Rinder-Herzen“ von ZooRoyal ist Hundefutter)
     if re.search(r"hundefutter|hundenahrung|hunde ?snack|katzenfutter|katzennahrung|zooroyal|vitakraft|pedigree|chappi|rinti|frolic|animonda|beneful", ident):
@@ -619,6 +624,9 @@ def kd_offer(it):
 def fetch_kaufda():
     out = []
     pages = list(KD_STORES.values())
+    near = {f"https://www.kaufda.de/{city}/{'/'.join(KD_STORES[st].split('/')[4:])}": st for st, cities in KD_NEAR.items() for city in cities}
+    pages += list(near)
+    near_n = 0
     seen_kw = set()
     # Stichwortseiten (Karlsruhe): wichtig vor allem für Edeka und dm, für die es keine Sortiment-Seiten gibt
     for kw in KEYWORDS + SORTIMENT:
@@ -633,6 +641,16 @@ def fetch_kaufda():
     regional = {"rewe": [], "edeka": []}  # Angebote regionaler Händler aus Karlsruhe: erst prüfen, ob gleicher Prospekt
     for n, url in enumerate(pages, 1):
         items = kd_items(url)
+        if url in near:
+            home = {b for b in KD_INFO.get(KD_STORES[near[url]], {}).get("brochures", set()) if b and b != "None"}
+            for it in items:
+                if str((it.get("parentContent") or {}).get("id")) in home and KD_PUBLISHER.get(it.get("publisherName")) == near[url]:
+                    o = kd_offer(it)
+                    if o:
+                        out.append(o)
+                        collect([o])
+                        near_n += 1
+            continue
         for it in items:
             st = KD_PUBLISHER.get(it.get("publisherName"))
             if url not in KD_STORES.values() and st in regional:
@@ -646,6 +664,7 @@ def fetch_kaufda():
             early_save("kaufDA-Händlerseiten")
         if n % 20 == 0:
             log(f"  kaufDA: {n}/{len(pages)} Seiten")
+    log(f"  kaufDA Nachbarorte (gleicher Prospekt): {near_n} Angebote")
     more, accepted = fetch_sortiment(regional)
     out += more
     log("kaufDA:", len(out), "(vor Duplikat-Bereinigung)")

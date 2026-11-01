@@ -481,9 +481,10 @@ const fltOk=o=>{const F=S.flt;
   if(F.low&&verdict(o).t!=="low"&&!lowSince(o))return false;
   if(F.cb&&!cbFor(o))return false;
   if(F.nw&&!isNew(o))return false;
+  if(F.vr&&!vorrat(o))return false;
   return true};
 const fltCount=()=>Object.values(S.flt).filter(Boolean).length;
-const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis",cb:"💸 Geld zurück"};
+const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis",cb:"💸 Geld zurück",vr:"📦 Vorrats-Tipps"};
 // App-Angebot? (Preis nur mit App = ao, oder extra App-Preis = ap) -> Name der App fürs Abzeichen
 const appName = o => (o.ao||"").replace(/-App$/," App")||(o.ap&&o.ap<o.p?(o.s==="lidl"?"Lidl Plus":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App":"App")):"");
 const fltSummary=()=>[].concat(S.flt.nw?["🆕 Neu seit deinem letzten Besuch"]:[],S.flt.min?[`ab ${S.flt.min} %`]:[],S.flt.max?[`bis ${eur(S.flt.max)}`]:[],Object.keys(FLT_LABEL).filter(k=>S.flt[k]).map(k=>FLT_LABEL[k]));
@@ -555,6 +556,7 @@ async function load(){
   render();  if(OFFERS.length)checkNews();
   checkWhatsNew(); // nur wenn kein anderes Fenster offen ist, sonst beim nächsten Öffnen
   bonFromShare(); // Kassenbon über „Teilen“ aus einer anderen App
+  Sync.srv().then(()=>connectInvite()); // Einladung „Für jemand anderen eingerichtet“: gemeinsamen Zettel verbinden?
   Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
   Sync.srv().then(u=>{if(u&&S.sheet==="settings"&&!Sync.ready())render()}); // „Familien-Code erstellen“ nur zeigen, wenn der Speicher eingerichtet ist
 }
@@ -693,6 +695,8 @@ function weekHTML(hitCount){const t=[];
   if(ow)t.splice(nw?1:0,0,`<button class="wk wk-n" data-gonew="${S.week?0:1}"><i>🆕</i><b>${ow} ${ow===1?"neues Angebot":"neue Angebote"} ${S.week?(WEEKEND?"ab Montag":"diese Woche"):nextShort()}${bei}</b><small>antippen zeigt ${ow===1?"es":"sie"}</small></button>`);
   const cbn=wo.filter(o=>cbFor(o)).length;
   if(cbn||S.flt.cb)t.push(`<button class="wk wk-c${S.flt.cb?" on":""}" data-gocb="1" aria-pressed="${!!S.flt.cb}"><i>💸</i><b>${cbn?`${cbn} ${cbn===1?"Angebot":"Angebote"} mit Geld zurück${bei}`:`Kein Angebot mit Geld zurück${bei}`}</b>${S.flt.cb?ON:`<small>Antippen zeigt ${cbn===1?"es":"sie"} – Hersteller zahlt dir etwas zurück</small>`}</button>`);
+  const vrAll=wo.filter(vorrat),vrm=vrMine(vrAll).length;
+  if(vrAll.length||S.flt.vr)t.push(`<button class="wk wk-v${S.flt.vr?" on":""}" data-govr="1" aria-pressed="${!!S.flt.vr}"><i>📦</i><b>${vrAll.length?`${vrAll.length} Vorrats-Tipps${bei}`:`Kein Vorrats-Tipp${bei}`}</b>${S.flt.vr?ON:`<small>${vrm?`${vrm} davon kaufst du oft · `:""}haltbar und gerade besonders günstig</small>`}</button>`);
   if(!t.length)return "";
   return `<section class="wkbox" aria-label="Deine Woche"><h3>Deine Woche</h3><div class="wkrow">${t.join("")}</div></section>`}
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
@@ -717,7 +721,7 @@ function renderOffers(){
   const hitCount=new Set(watchHits(S.week).flatMap(x=>x.hits.map(o=>o.id))).size;
   const title=S.q.trim()?`„${esc(S.q.trim())}“ im Angebot`:S.cats.size?catTitle():(S.week?"Angebote "+nextShort():WEEKEND?"Angebote ab Montag":"Angebote dieser Woche");
   const shown=r.slice(0,S.limit);
-  return `${kracherBtn()}
+  return `${kracherBtn()}${forYouHTML()}
    ${S.q.trim()||S.cats.size?(hitCount?`<button class="alertbar" id="goWatch">${IC.bell}${hitCount} Angebote passen zu deiner Merkliste</button>`:""):weekHTML(hitCount)}
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${missingHTML()}
@@ -844,6 +848,7 @@ function renderDetail(){
     </dl>
     ${o.inf?`<div class="dtext"><h4>Beschreibung</h4><p>${esc(o.inf)}</p></div>`:""}
     ${lowSince(o)?`<div class="alarm big">📉 <span><b>Preis-Alarm:</b> ${esc(lowSince(o).l)}</span></div>`:""}
+    ${vrBoxHTML(o)}
     <div class="verdict ${vd.t}">${spark(o,90,24)}<span>${esc(vd.l)}</span></div>
     ${hist.length?`<div class="dtext"><h4>So viel kostete es bei ${esc(sname(o.s))}</h4>${hst?`<p class="hstat">${hst}</p>`:""}<ul class="dhist">${hist.map(x=>`<li><span>${x.from===x.to?fmtDate(x.from):dShort(x.from)+" – "+dShort(x.to)}${x.to>=TODAY&&x.from<=TODAY?" · jetzt":""}</span><b>${eur(x.p)}</b></li>`).join("")}</ul></div>`:""}
     <div class="dactions">
@@ -860,6 +865,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  120:["💡 Zettel versteht einfache Wörter: Schreibst du „Milch“, zeigt SparRadar darunter das beste Angebot – mit „Nehmen“ tauschst du es ein. Nichts passiert von selbst.","🏷️ Gibt es keinen Rabatt, steht der Aldi-Normalpreis dabei – mit einem Tipp eingetragen.","🧮 Spar-Check auf dem Zettel: zeigt, was du sparen kannst, und übernimmt alle Tipps mit einem Knopf.","⏰ Auf dem Zettel steht, welches Angebot heute oder morgen endet.","🧾 Kassen-Kontrolle: Liest du den Kassenbon ein, merkt SparRadar, wenn du mehr bezahlt hast als im Angebot.","📦 Vorrats-Tipps: haltbare Artikel, die gerade besonders günstig sind – mit „2 Stück“ oder „3 Stück“ gleich auf den Zettel.","👓 Einfache Ansicht (Einstellungen): weniger Knöpfe, größere Schrift, oben „Für dich im Angebot“.","👪 Für jemand anderen einrichten (Einstellungen): ein WhatsApp-Link – installieren, „Verbinden“, und ihr habt denselben Einkaufszettel."],
   119:["🆕 Neu seit deinem letzten Besuch: Neue Angebote tragen ein grünes „Neu“, oben bei „Deine Woche“ zeigt eine Kachel sie mit einem Tipp.","⭐ Merkliste: Mit „Beste Angebote auf den Zettel“ legst du je Begriff das günstigste Angebot mit einem Tipp auf den Zettel.","🔄 Ist ein Angebot auf deinem Zettel abgelaufen und gibt es denselben Artikel im selben Markt wieder, wird es automatisch erneuert.","Artikel-Fenster: „Auf den Einkaufszettel“ und „Merken“ bleiben unten immer sichtbar.","Merkliste schlägt vor, was du oft kaufst – ein Tipp, und SparRadar beobachtet es."],
   118:["Neue Angebote kommen jetzt schneller: Am Wochenende sucht SparRadar alle 5 Minuten nach neuen Prospekten (vorher alle 15), und die offene App holt neue Angebote jede Minute ab."],
   117:["⚠️ Achtung-Hinweis: Gibt es genau denselben Artikel bei einem anderen Markt billiger, steht das auf der Karte. Setzt du den teureren auf den Einkaufszettel, fragt SparRadar nach, welchen du nehmen willst.","Doppelte Karten im selben Markt (z. B. Butter und „Butter oder Streichzart“) sind jetzt eine Karte mit allen Bildern."],
@@ -1104,11 +1110,14 @@ function planOf(items){items=items.filter(o=>!S.checked.includes(o.id));if(!item
   const det=Object.entries(by).map(([s,rs])=>({s,rs,v:sv(rs)})).sort((a,b)=>b.v-a.v)[0];
   const extra=det&&det.v>=2?det:null;  // Abstecher lohnt erst ab 2 €
   return {free,freeV:sv(free),extra,save:r2(sv(free)+(extra?extra.v:0))}}
-function planHTML(items){const p=planOf(items);if(!p||(!p.free.length&&!p.extra))return "";
+function planHTML(items,extra,now){const p=planOf(items)||{free:[],freeV:0,extra:null,save:0},ex=exPlan(items,extra||[]);if(!p.free.length&&!p.extra&&!ex.length)return "";
+  const exV=r2(ex.reduce((a,r)=>a+r.v,0)),oneV=r2(p.freeV+exV),n1=p.free.length+ex.length;
   const row=({o,x})=>`<div class="swap"><span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} ${eur(fin(o))} → ${esc(sname(x.s))} ${eur(fin(x))} · ${eur(fin(o)-fin(x))} weniger${qty(o.id)>1?" je Stück":""}</small></span><button class="btn ghost sm" data-swap="${esc(o.id)}|${esc(x.id)}">Tauschen</button></div>`;
   const all=rs=>rs.map(r=>r.o.id+"|"+r.x.id).join(",");
-  return `<section class="panel swaps plan"><h3>💡 Günstiger einkaufen</h3><p>Derselbe Artikel in gleicher Menge kostet bei einem anderen Markt weniger.</p>
-   ${p.free.length?`<h4>Ohne Umweg: ${eur(p.freeV)} sparen</h4><p class="ph">Bei Märkten, zu denen du sowieso gehst.</p><div class="rows">${p.free.map(row).join("")}</div>${p.free.length>1?`<button class="btn sm" data-swapall="${esc(all(p.free))}">Alle ${p.free.length} tauschen (${eur(p.freeV)} sparen)</button>`:""}`:""}
+  return `<section class="panel swaps plan"><h3>🧮 Spar-Check${oneV>=.01?`: ${eur(oneV)} sparen`:""}</h3>
+   ${n1?`<p class="pcsum">${now!=null&&oneV>=.01?`Dein Zettel jetzt <b>${eur(now)}</b> → mit den Tipps <b class="sv">${eur(now-oneV)}</b>. `:""}${ex.length?`${ex.length} ${ex.length===1?"eigener Eintrag ist":"eigene Einträge sind"} gerade im Angebot (💡 beim Artikel). `:""}Ohne Umweg, nur bei Märkten, zu denen du sowieso gehst.</p>
+   <button class="btn big pcall" data-sparall="1">✓ Alle ${n1} ${n1===1?"Tipp":"Tipps"} übernehmen${oneV>=.01?` (${eur(oneV)} sparen)`:""}</button>`:""}
+   ${p.free.length?`<h4>Gleicher Artikel günstiger: ${eur(p.freeV)} sparen</h4><p class="ph">Derselbe Artikel in gleicher Menge kostet bei einem Markt, zu dem du sowieso gehst, weniger.</p><div class="rows">${p.free.map(row).join("")}</div>`:""}
    ${p.extra?`<h4>Mit Abstecher zu ${esc(sname(p.extra.s))}: noch ${eur(p.extra.v)} sparen</h4><p class="ph">Lohnt sich, wenn ${esc(sname(p.extra.s))} auf deinem Weg liegt.</p><div class="rows">${p.extra.rs.map(row).join("")}</div>${p.extra.rs.length>1?`<button class="btn ghost sm" data-swapall="${esc(all(p.extra.rs))}">Alle ${p.extra.rs.length} zu ${esc(sname(p.extra.s))} (${eur(p.extra.v)} sparen)</button>`:""}`:""}
   </section>`}
 // Zettel-Einträge, deren Angebot abgelaufen ist: nicht still verschwinden lassen, sondern zeigen + neues Angebot vorschlagen
@@ -1245,7 +1254,7 @@ function tripsHTML(){if(!S.trips.length)return "";
    </div>
    ${months.length>1?`<div class="mhist">${months.map(k=>{const ts=S.trips.filter(t=>monKey(t.d)===k);return `<div><span>${esc(monName(k))}</span><span>${ts.length} ×</span><span>${eur(sum(ts,"paid"))}</span><span class="sv">−${eur(sum(ts,"saved")).replace("−","")}</span></div>`}).join("")}</div>`:""}
    <div class="tlist">${S.trips.slice(0,S.tripLimit||10).map(t=>{const st=[...new Set(t.items.map(x=>x.s))];
-     return `<button class="trow" data-tripopen="${t.id}"><span class="td">${t.bon?"🧾 ":""}${fmtDate(t.d)}<small>${new Date(t.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr</small></span><span class="tm">${st.map(x=>sb(x)).join("")}${t.extra.length?`<em>+${t.extra.length}</em>`:""}<small>${t.items.length+t.extra.length} Artikel</small></span><span class="tp">${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></button>`}).join("")}</div>
+     return `<button class="trow" data-tripopen="${t.id}"><span class="td">${t.bon?"🧾 ":""}${t.chk&&t.chk.length?"⚠️ ":""}${fmtDate(t.d)}<small>${new Date(t.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr</small></span><span class="tm">${st.map(x=>sb(x)).join("")}${t.extra.length?`<em>+${t.extra.length}</em>`:""}<small>${t.items.length+t.extra.length} Artikel</small></span><span class="tp">${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></button>`}).join("")}</div>
    ${S.trips.length>(S.tripLimit||10)?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""}
   </section>`}
 function renderTrip(){const t=S.trips.find(x=>x.id===S.tripId);if(!t)return renderKracher();
@@ -1254,6 +1263,7 @@ function renderTrip(){const t=S.trips.find(x=>x.id===S.tripId);if(!t)return rend
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Einkauf vom ${fmtDate(t.d)}">
    <div class="sheet-h"><span class="newsico">🧾</span><h2>Einkauf vom ${fmtDate(t.d)}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <div class="mrep-g"><div><span>Bezahlt</span><b>${eur(t.paid)}</b></div><div><span>Gespart</span><b class="sv">${eur(t.saved)}</b></div><div><span>Artikel</span><b>${t.items.length+t.extra.length}</b></div></div>
+   ${chkHTML(t)}
    <div class="receipt">${Object.entries(g).map(([s,xs])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>${xs.map(row).join("")}</div>`).join("")}
     ${t.extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Eigene Einträge</div>${t.extra.map(row).join("")}</div>`:""}
     <div class="rtot"><div class="big"><span>BEZAHLT</span><span>${eur(t.paid)}</span></div>${t.saved>0?`<div class="sv"><span>GESPART</span><span>${eur(t.saved)}</span></div>`:""}</div></div>
@@ -1278,8 +1288,111 @@ function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>
    <div class="cart-bar"><i style="width:${pct}%"></i></div>
    <div class="cart-f">${b?`<span class="${left<0?"over":""}">Budget ${eur(b)} · ${left<0?`${eur(-left)} drüber`:`noch ${eur(left)} frei`}</span>`:`<span>${TOUCH()?"Im Laden: Artikel antippen, wenn er im Wagen liegt.":"Am Handy beim Einkaufen abhaken – der letzte Artikel schließt den Einkauf ab."}</span>`}<button class="linkbtn" data-budget="1">${b?"Budget ändern":"Budget festlegen"}</button></div>
    ${TOUCH()&&inCart&&inCart<all.length?`<button class="btn ghost sm cart-done" data-tripfinish="1">Einkauf jetzt abschließen (Rest bleibt auf dem Zettel)</button>`:""}</div>`}
+// ---------- Zettel versteht einfache Wörter (Kevin 01.11.: nur Hinweis + Knopf, NIE automatisch tauschen) ----------
+// Eigener Eintrag „Milch“ -> bestes Angebot der Woche je Markt (gleicher Abgleich wie die Merkliste)
+// Treffer nach Güte: 3 = ganzes Wort im Namen („fettarme Milch“, „H-Milch“), 2 = Wortende („Vollmilch“), 1 = sonst (Marke, Beschreibung …).
+// Nur die beste Stufe zählt, dazu die häufigste Warengruppe (sonst schlägt „Milch“ Schoko-„Milch Mäuse“ oder Buttermilch vor).
+const exWords=s=>String(s||"").split(/[\s\/,&+()]+/).flatMap(t=>{const p=t.split("-");return [norm(t),norm(p[p.length-1])]}).filter(Boolean);
+const exEq=(w,k)=>w===k||["n","e","en","s","er","es"].some(e=>w===k+e||k===w+e);
+// Hauptwort = letztes großgeschriebenes Wort vor „,/mit/oder …“: „Milch Mäuse“ -> Mäuse, „Haltbare fettarme Milch“ -> Milch (Stufe 4)
+const exHead=n=>{const seg=String(n||"").split(/,|\/|\(|(?:^|\s)(?:mit|oder|und|in|aus|für)\s/)[0],ws=seg.split(/\s+/).filter(w=>/^[A-ZÄÖÜ][a-zäöüß]|-[A-ZÄÖÜ][a-zäöüß]/.test(w));return ws.length?exWords(ws[ws.length-1]):[]};
+function exRank(hs,name){const kw=exWords(name);if(!hs.length||!kw.length)return hs;const last=kw[kw.length-1];
+  const tier=o=>{const ws=exWords(o.n);return kw.every(k=>ws.some(w=>exEq(w,k)))?(exHead(o.n).some(w=>exEq(w,last))?4:3):kw.every(k=>ws.some(w=>exEq(w,k)||w.endsWith(k)))?2:1};
+  const t=hs.map(o=>({o,t:tier(o)})),c={};t.forEach(r=>{const g=r.o.c||r.o.grp||"";c[g]=(c[g]||0)+r.t});
+  const g=Object.keys(c).sort((a,b)=>c[b]-c[a])[0],in_=t.filter(r=>(r.o.c||r.o.grp||"")===g),top=Math.max(...in_.map(r=>r.t));
+  return in_.filter(r=>r.t===top).map(r=>r.o)}
+const exHits=x=>{if(S.checked.includes(x.id)||norm(x.n).length<3)return [];const by={};
+  exRank(weekOffers().filter(o=>o.p&&!S.list.includes(o.id)&&watchMatch(o,x.n)),x.n).forEach(o=>{(by[o.s]=by[o.s]||[]).push(o)});
+  const u=(a,b)=>unit(a)!=null&&unit(b)!=null&&a.gp.u===b.gp.u?unit(a)-unit(b):fin(a)-fin(b);
+  return Object.values(by).map(bestHit).filter(o=>!x.p||fin(o)<x.p-.004).sort(u)};
+// Aldi-Dauerpreise (Normalpreise des ganzen Sortiments, wöchentlich von aldi-sued.de): lädt erst, wenn der Zettel eigene Einträge hat
+let DP=null,DP_LOAD=null;
+function loadDauer(){if(DP||DP_LOAD)return;DP_LOAD=fetch("data/dauerpreise.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(d=>{
+  DP={at:d?.at||"",items:(d?.items||[]).map(r=>({n:r[0],b:r[1]||"",p:r[2],gp:r[3]?{v:r[3],u:r[4]}:null,s:"aldi",c:"",d:"",grp:r[5]||""}))};
+  if(S.tab==="list"&&S.extra.length)render()}).catch(()=>{DP={at:"",items:[]}})}
+const dpHit=x=>{if(!DP||!DP.items.length||S.checked.includes(x.id)||norm(x.n).length<3)return null;
+  const h=exRank(DP.items.filter(o=>watchMatch(o,x.n)),x.n);if(!h.length)return null;
+  const c={};h.forEach(o=>{const u=o.gp?.u||"";c[u]=(c[u]||0)+1});const mu=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];
+  return h.filter(o=>(o.gp?.u||"")===mu).sort((a,b)=>(a.gp&&b.gp?a.gp.v-b.gp.v:a.p-b.p))[0]};
+function exHintHTML(x){const h=exHits(x);
+  if(h.length){const o=h[0];
+    return `<div class="exhit"><span>💡 Im Angebot: <b>${esc(sname(o.s))} ${eur(fin(o))}</b> <small>${esc((o.b?o.b+" ":"")+o.n)}${unitTxt(o)?" · "+esc(unitTxt(o)):""}</small></span><button class="btn sm" data-extake="${esc(x.id)}|${esc(o.id)}">Nehmen</button>${h.length>1?`<span class="exalt">Auch: ${h.slice(1,4).map(y=>`<button class="chip plain" data-extake="${esc(x.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))}</button>`).join("")}</span>`:""}</div>`}
+  if(x.p)return "";const d=dpHit(x);if(!d)return "";
+  return `<div class="exhit dp"><span>🏷️ Aldi-Normalpreis: <b>${eur(d.p)}</b> <small>${esc((d.b?d.b+" ":"")+d.n)}</small></span><button class="btn ghost sm" data-exprice="${esc(x.id)}|${d.p}">Preis eintragen</button></div>`}
+// ⏰ Angebot endet bald / gilt erst ab … (auf dem Zettel)
+const endLbl=o=>o.to===TODAY?` <em class="rend">⏰ nur noch heute</em>`:o.to===TOMORROW?` <em class="rend">⏰ endet morgen</em>`:o.from&&shopDay(o.from)>SHOP?` <em class="rsoon">ab ${fmtDate(shopDay(o.from))}</em>`:"";
+function endSoonHTML(items){const open=items.filter(o=>!S.checked.includes(o.id)),t=open.filter(o=>o.to===TODAY).length,m=open.filter(o=>o.to===TOMORROW).length;
+  if(!t&&!m)return "";return `<div class="endsoon">⏰ <span><b>${t?`${t} ${t===1?"Angebot endet":"Angebote enden"} heute`:`${m} ${m===1?"Angebot endet":"Angebote enden"} morgen`}</b>${t&&m?` · ${m} morgen`:""} – am besten bald einkaufen.</span></div>`}
+// ---------- 📦 Vorrats-Tipp: haltbar + gerade besonders günstig -> lohnt sich, mehr zu kaufen ----------
+const VORRAT_C=new Set(["vorrat","kaffee","getraenke","katze","drogerie","haushalt","tk","suess","tier","baby"]);
+const VORRAT_NO=/frisch|gekühlt|salat|brötchen|baguette|blumen|pflanze|strauß/i;
+function vorrat(o){if(o._vr!==undefined)return o._vr;let r=null;
+  if(o.p&&!o.pv&&VORRAT_C.has(o.c)&&!VORRAT_NO.test(o.n)){const ls=lowSince(o),v=ls?null:verdict(o);
+    r=ls?ls.s:v.t==="low"?"So billig wie noch nie":(o.rk||{}).t==="ok"&&offPct(o)>=40?`echte ${Math.round(offPct(o))} % günstiger`:null}
+  return o._vr=r}
+function boughtSet(){const c={};S.trips.slice(0,60).forEach(t=>[...t.items,...t.extra].forEach(x=>{const k=norm(x.n);if(k)c[k]=(c[k]||0)+1}));return c}
+// relevant für dich: auf dem Zettel, auf der Merkliste oder schon mind. 2× gekauft
+function vrMine(os){const c=boughtSet();return os.filter(o=>vorrat(o)&&(S.list.includes(o.id)||S.watch.some(w=>hitW(o,w))||(c[norm(o.n)]||0)>=2))}
+const vrBoxHTML=o=>{const v=vorrat(o);if(!v)return "";const q=S.list.includes(o.id)?qty(o.id):0;
+  return `<div class="vrbox">📦 <span><b>Vorrats-Tipp:</b> ${esc(v)}. Hält lange – gleich mehr mitnehmen lohnt sich.</span><span class="vrq">${[2,3].map(n=>`<button class="btn ${q===n?"":"ghost "}sm" data-vrq="${esc(o.id)}|${n}">${n} Stück</button>`).join("")}</span></div>`};
+// ---------- 🧾 Kassen-Kontrolle: Bon-Preis höher als das Angebot? ----------
+const BON_STOP=new Set(["stk","stueck","pfand","eur","gesamt","summe","und","mit","der","die","das","fuer","von","bio","kg"]);
+const bToks=s=>(String(s||"").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").match(/[a-z]{3,}/g)||[]);
+function bonOffer(x,s,d){if(!s||x.disc||x.kg||!(x.p>0))return null;const q=x.q||1,u=r2(x.p/q),w=[...new Set(bToks(x.n))].filter(t=>!BON_STOP.has(t));if(w.length<2)return null;
+  let best=null,bs=0;
+  for(const o of [...OFFERS,...OLD.values()]){if(o.s!==s||o.ao||!(o.p>0)||(o.from&&shopDay(o.from)>d)||(o.to&&o.to<d))continue;
+    const ot=bToks(o.n+" "+(o.b||"")),hit=w.filter(t=>ot.some(v=>v.startsWith(t)||(t.startsWith(v)&&v.length>=4))).length,sc=hit/w.length;
+    if(hit>=2&&sc>=.6&&sc>bs){bs=sc;best=o}}
+  if(!best||[best.p,best.ap].some(v=>v&&Math.abs(v-u)<.005))return null;
+  return u>best.p+.04&&u<best.p*1.8?best:null}
+const chkHTML=t=>!t.chk||!t.chk.length?"":`<div class="chkbox"><b>⚠️ Kassen-Kontrolle: ${t.chk.length} ${t.chk.length===1?"Artikel":"Artikel"} teurer als im Angebot?</b>
+  ${t.chk.map(c=>`<div class="chkrow"><span>${c.q>1?c.q+"× ":""}${esc(c.n)}<small>Angebot: ${esc(c.on)}</small></span><span>Bon ${eur(c.paid)}<small>Angebot ${eur(c.off)} · ${eur(c.paid-c.off)} mehr${c.q>1?" je Stück":""}</small></span></div>`).join("")}
+  <small>Bitte auf dem Bon nachsehen. Stimmt es, an der Kasse oder Info Bescheid sagen – meist bekommst du die Differenz zurück.</small></div>`;
+// ---------- 🧮 Spar-Check: alle Tipps mit einem Tipp übernehmen ----------
+function exPlan(items,extra){const open=extra.filter(x=>!S.checked.includes(x.id)),hs=open.map(x=>({x,h:exHits(x)})).filter(r=>r.h.length);if(!hs.length)return [];
+  let mine=new Set(items.filter(o=>!S.checked.includes(o.id)).map(o=>o.s));
+  if(!mine.size){const c={};hs.forEach(r=>new Set(r.h.map(o=>o.s)).forEach(s=>c[s]=(c[s]||0)+1));mine=new Set([Object.keys(c).sort((a,b)=>c[b]-c[a])[0]])}
+  return hs.map(({x,h})=>{const o=h.find(o=>mine.has(o.s));return o?{x,o,v:x.p?r2(Math.max(0,x.p-fin(o))*qty(x.id)):0}:null}).filter(Boolean)}
+function sparAll(){const items=S.list.map(byId).filter(Boolean),p=planOf(items),ex=exPlan(items,S.extra);let n=0;
+  (p?p.free:[]).forEach(({o,x})=>{const i=S.list.indexOf(o.id);if(i>=0&&!S.list.includes(x.id)){S.list[i]=x.id;if(S.qty[o.id]){S.qty[x.id]=S.qty[o.id];delete S.qty[o.id]}n++}});
+  ex.forEach(({x,o})=>{if(exTake(x.id,o.id))n++});return n}
+function exTake(xi,oi){const x=S.extra.find(e=>e.id===xi),o=byId(oi);if(!x||!o)return false;
+  S.extra=S.extra.filter(e=>e!==x);if(!S.list.includes(oi))S.list.push(oi);if(S.qty[xi]){S.qty[oi]=Math.max(S.qty[oi]||1,S.qty[xi]);delete S.qty[xi]}return true}
+// ---------- Einfache Ansicht (weniger Knöpfe, große Schrift, „Für dich“ oben) ----------
+const SIMPLE=()=>!!store.get("simple",false);
+function applySimple(){document.documentElement.classList.toggle("simple",SIMPLE())}
+applySimple();
+function forYouHTML(){if(!SIMPLE()||S.q.trim()||S.cats.size)return "";const wo=weekOffers().filter(o=>!S.stores.size||S.stores.has(o.s)),c=boughtSet(),seen=new Set(),out=[];
+  S.watch.forEach(w=>{const b=bestHit(wo.filter(o=>hitW(o,w)));if(b&&!seen.has(b.id)){seen.add(b.id);out.push(b)}});
+  Object.entries(c).filter(([,n])=>n>=2).sort((a,b)=>b[1]-a[1]).forEach(([k])=>{const b=bestHit(wo.filter(o=>norm(o.n)===k));if(b&&!seen.has(b.id)){seen.add(b.id);out.push(b)}});
+  if(!out.length)return "";
+  return `<section class="foryou"><h3>⭐ Für dich im Angebot</h3><div class="fyrows">${out.slice(0,8).map(o=>{const inL=S.list.includes(o.id);
+    return `<div class="fyrow"><button class="fyn" data-detail="${esc(o.id)}">${sb(o.s)}<span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} · ${esc(validTxt(o))}</small></span></button><b class="fyp">${eur(fin(o))}</b><button class="btn ${inL?"ghost ":""}sm" data-add="${esc(o.id)}" aria-label="${inL?"Auf dem Zettel":"Auf den Zettel"}">${inL?IC.check:IC.plus}</button></div>`}).join("")}</div></section>`}
+// ---------- 👪 Für jemand anderen einrichten: Link per WhatsApp, verbindet den gemeinsamen Einkaufszettel ----------
+const forLink=()=>inviteUrl()+"#c="+encodeURIComponent(Sync.code()+"#sr:list");
+const forText=()=>{const n=(store.get("inviteName","")||"").trim();
+  return `👪 Ich habe dir SparRadar eingerichtet – mit unserem gemeinsamen Einkaufszettel${n?" ("+n+")":""}.\n\nSo geht's:\n1. Link antippen\n2. „SparRadar installieren“ drücken\n3. SparRadar öffnen und „Verbinden“ tippen – fertig!\n\nWas einer auf den Zettel schreibt oder abhakt, sieht der andere sofort.\n${forLink()}`};
+function renderFor(){if(!Sync._srv)return "";const gist=!!Sync.cfg()?.gist;
+  return `<section class="panel" id="forPanel"><h3>👪 Für jemand anderen einrichten</h3>
+   <p>Zum Beispiel für Eltern oder Großeltern: Du schickst <b>einen Link per WhatsApp</b>. Die andere Person tippt drauf, installiert SparRadar und hat sofort <b>euren gemeinsamen Einkaufszettel</b> – ohne Code abtippen, ohne Einstellungen.</p>
+   ${gist?`<p class="fhint">Dafür bitte zuerst oben bei „Geräte verbinden“ auf einen SparRadar-Code umziehen.</p>`
+   :Sync.ready()?`<div class="links"><a class="btn wa" id="forWa" href="${waLink(forText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp einrichten</a><button class="btn ghost" id="forCopy">Link kopieren</button></div>`
+   :`<button class="btn" id="forStart" style="width:100%">✨ Jetzt einrichten</button>`}
+   <small class="fhint">Geteilt wird nur der Einkaufszettel. Merkliste und Coupons bleiben privat. 🔒 Den Link nur Menschen geben, denen du vertraust.</small></section>`}
+let CONNECT=null;
+function connectInvite(){let c=null;const m=location.hash.match(/[#&]c=([^&]+)/);
+  if(m){try{c=decodeURIComponent(m[1])}catch(e){}history.replaceState(null,"",location.pathname+location.search)}
+  c=c||store.get("connect",null);store.set("connect",null);if(!c)return;
+  const cp=codeParse(c);if(!/^SR-[A-Za-z0-9]{20}$/.test(cp.t)||Sync.code()===cp.t)return;
+  CONNECT=cp;if(!S.sheet||S.sheet==="whatsnew"||S.sheet==="welcome"||S.sheet==="news"){S.sheet="connect";render()}}
+function renderConnect(){const close=`<button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button>`;
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Gemeinsamer Einkaufszettel"><div class="sheet-h"><span class="newsico">👪</span><h2>Gemeinsamer Einkaufszettel</h2>${close}</div>
+   <p class="bonlead">Jemand hat SparRadar für dich eingerichtet. Mit einem Tipp habt ihr <b>denselben Einkaufszettel</b>: Was einer draufschreibt oder abhakt, sieht der andere sofort.</p>
+   <p class="fhint">Geteilt wird nur der Einkaufszettel. Deine Merkliste und Coupons bleiben auf deinem Handy.${Sync.ready()?" Dieses Gerät ist schon mit jemandem verbunden – diese Verbindung wird ersetzt. Deine Listen bleiben erhalten.":""}</p>
+   <div class="factions"><button class="btn ghost" data-connect="0">Nicht jetzt</button><button class="btn big" data-connect="1">✓ Verbinden</button></div></div>`}
+
 function renderList(){
-  const items=S.list.map(byId).filter(Boolean),extra=S.extra;
+  const items=S.list.map(byId).filter(Boolean),extra=S.extra;if(extra.length)loadDauer();
   const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
   if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
@@ -1294,9 +1407,10 @@ function renderList(){
         :`<div class="ract"><span>📱 Mit <b>${esc(an)}</b> nur ${eur(with_)}${o.ao&&!o.o?"":` statt ${eur(without)}`} – ${how}.${o.ao&&!o.o?" Ohne App ist der Preis höher.":""}</span><button class="actbtn" data-act="${esc(o.id)}" aria-pressed="false">Aktiviert ✓</button></div>`)}
     const later=steps(o).filter(offTill);
     if(later.length)out.push(`<div class="ract later"><span>💰 Kommt später zurück (nicht an der Kasse): ${later.map(x=>esc(x.l)+" "+eur(-x.v*q)).join(" · ")}</span></div>`);
+    const vr=vorrat(o);if(vr&&q<2)out.push(`<div class="ract vr"><span>📦 <b>Vorrats-Tipp:</b> ${esc(vr)} – hält lange, mehr mitnehmen lohnt sich.</span><button class="actbtn" data-qp="${esc(o.id)}" aria-label="eins mehr">+1</button></div>`);
     return out.join("")};
   const walkLines=os=>{let last=-1;const open=walk(os.filter(o=>!done(o.id)));
-    return open.map(o=>{const a=aisle(o),h=os.length>3&&a!==last?`<div class="raisle">${esc(AISLE_N[a])}</div>`:"";last=a;return h+line(o.id,o.n,(tillUnknown(o)?"ca. ":"")+eur(lineP(o)))+actRow(o)}).join("")
+    return open.map(o=>{const a=aisle(o),h=os.length>3&&a!==last?`<div class="raisle">${esc(AISLE_N[a])}</div>`:"";last=a;return h+line(o.id,o.n,(tillUnknown(o)?"ca. ":"")+eur(lineP(o)),endLbl(o))+actRow(o)}).join("")
       +os.filter(o=>done(o.id)).map(o=>line(o.id,o.n,eur(lineP(o)))).join("")};
   // Pro Markt oben: wie viele App-Vorteile noch nicht aktiviert sind und was sie sparen
   const actSum=os=>{const n=os.filter(o=>!done(o.id)&&needAct(o)&&!isAct(o));if(!n.length)return "";
@@ -1311,10 +1425,10 @@ function renderList(){
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i><span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
-  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
+  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${endSoonHTML(items)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items,extra,sum)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
      ${actSum(os)}${walkLines(os)}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
-   ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"")).join("")}</div>`:""}
+   ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"",x.dp?` <em class="rsoon">${esc(x.dp)}</em>`:"")+exHintHTML(x)).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    <div class="rnote">Die Summe ist dein Preis an der Kasse. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.</div></div>
    <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
@@ -1451,11 +1565,14 @@ function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   if(!items.length)return;
   const t={id:"t"+Date.now(),d,at,bon:1,items,extra:[]};
   t.paid=r2(items.reduce((a,x)=>a+x.p,0));t.saved=r2(items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
+  // Kassen-Kontrolle: Artikel teurer bezahlt als im Angebot desselben Markts (gültig am Einkaufstag)?
+  const chk=r.items.filter(x=>x.on&&!bonMatch(x,r.s)).map(x=>{const o=bonOffer(x,r.s,d),q=x.q||1;return o?{n:x.n,q,paid:r2(x.p/q),off:o.p,on:(o.b?o.b+" ":"")+o.n}:null}).filter(Boolean);
+  if(chk.length)t.chk=chk;
   // Gleicher Tag + gleicher Markt schon als Einkauf vom Zettel? Der Bon ist genauer und ersetzt ihn.
   const dup=S.trips.find(x=>!x.bon&&x.d===d&&x.items.some(i=>i.s===r.s));
   if(dup)S.trips=S.trips.filter(x=>x!==dup);
   S.trips.unshift(t);S.trips.sort((a,b)=>b.at.localeCompare(a.at));S.trips=S.trips.slice(0,400);
-  save();BON.st=null;S.tripId=t.id;S.sheet="trip";render();toast(dup?"✓ Bon gespeichert – ersetzt den Einkauf vom Zettel":"✓ Bon gespeichert: "+items.length+" Artikel, "+eur(t.paid))}
+  save();BON.st=null;S.tripId=t.id;S.sheet="trip";render();toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:dup?"✓ Bon gespeichert – ersetzt den Einkauf vom Zettel":"✓ Bon gespeichert: "+items.length+" Artikel, "+eur(t.paid))}
 // Geteilter Bon (Teilen-Menü -> SparRadar): liegt kurz im Service-Worker-Speicher
 async function bonFromShare(){if(!/[?&]bon=1/.test(location.search))return;history.replaceState(null,"",location.pathname);
   try{const c=await caches.open("sr-share"),f=await c.match("bon-file"),t=await c.match("bon-text");
@@ -1651,8 +1768,10 @@ function renderSettings(){
   const g=META.generated?new Date(META.generated):null;
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Einstellungen">
    <div class="sheet-h"><span class="newsico">${IC.gear}</span><h2>Einstellungen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <section class="panel"><h3>👓 Einfache Ansicht</h3><p>Weniger Knöpfe, größere Schrift und oben „Für dich im Angebot“ – ideal, wenn es übersichtlich sein soll.</p><button class="chip${SIMPLE()?" on":""}" data-simple="1" aria-pressed="${SIMPLE()}">${SIMPLE()?"✓ Einfache Ansicht an":"Einfache Ansicht einschalten"}</button></section>
    ${renderShare()}
    ${renderSync()}
+   ${renderFor()}
    ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hakst du am Handy den letzten Artikel ab, gilt der Einkauf als erledigt. Danach öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA, ALDI SÜD, Netto, Mein dm), damit du an der Kasse gleich deine Kundenkarte zeigen kannst.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
    <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
    <section class="panel"><h3>SparRadar als App</h3><p><b>Am einfachsten:</b> SparRadar in Chrome öffnen → Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. Ohne Warnungen, aktualisiert sich selbst.</p><p>Alternativ als Datei: Android-App (APK, Android fragt dabei nach Erlaubnis) oder Windows-Setup. Beide aktualisieren sich danach ebenfalls selbst.</p>
@@ -1772,7 +1891,7 @@ const viewKey=()=>[...S.stores].sort().join()+"|"+[...S.cats].sort().join()+"|"+
 function fltStore(){const f={...S.flt};if(QUICK)for(const k of QUICK.keys)f[k]=0;store.set("flt",f)}
 function quickCheck(){if(!QUICK||QUICK.at===viewKey())return;
   const ks=[...QUICK.keys];QUICK=null;ks.forEach(k=>S.flt[k]=0);
-  if(ks.length)toast((ks.includes("nw")?"🆕 Neu-Filter":ks.includes("cb")?"💸 Geld-zurück-Filter":"📉 Preis-Alarm-Filter")+" aus – du siehst wieder alle Angebote")}
+  if(ks.length)toast((ks.includes("nw")?"🆕 Neu-Filter":ks.includes("cb")?"💸 Geld-zurück-Filter":ks.includes("vr")?"📦 Vorrats-Filter":"📉 Preis-Alarm-Filter")+" aus – du siehst wieder alle Angebote")}
 function quickToggle(k){const on=!S.flt[k];S.flt[k]=on?1:0;
   if(on)QUICK={keys:new Set([...(QUICK&&QUICK.at===viewKey()?QUICK.keys:[]),k]),at:viewKey()};else if(QUICK)QUICK.keys.delete(k);
   S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});return on}
@@ -1835,7 +1954,7 @@ function render(){quickCheck();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip,cbget:renderCbGet,bon:renderBon}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip,cbget:renderCbGet,bon:renderBon,connect:renderConnect}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -1928,6 +2047,18 @@ document.addEventListener("click",e=>{
   if(b.dataset.gonew!=null){const w=+b.dataset.gonew;if(w!==S.week&&!S.flt.nw){S.week=w;S.limit=60;quickCheck()}
     toast(quickToggle("nw")?"Filter an: nur neue Angebote seit deinem letzten Besuch – nochmal antippen = aus":"Filter aus: alle Angebote");return}
   if(b.dataset.w2l){const a=watchToList(S.week);toast(a.length?`Auf den Zettel: ${w2lTxt(a)}`:"Schon alles auf dem Zettel");render();return}
+  if(b.dataset.govr){toast(quickToggle("vr")?"Filter an: nur Vorrats-Tipps – haltbar und gerade besonders günstig":"Filter aus: alle Angebote");return}
+  if(b.dataset.vrq){const [id,n]=b.dataset.vrq.split("|"),o=byId(id);if(!S.list.includes(id))S.list.push(id);S.qty[id]=+n;save();toast(`${n}× ${o?o.n:"Artikel"} auf dem Zettel`);render();return}
+  if(b.dataset.extake){const [xi,oi]=b.dataset.extake.split("|"),o=byId(oi);if(exTake(xi,oi)){save();toast(`Übernommen: ${o.n} bei ${sname(o.s)} für ${eur(fin(o))}`);render()}return}
+  if(b.dataset.exprice){const [xi,pr]=b.dataset.exprice.split("|"),x=S.extra.find(e=>e.id===xi);if(x){x.p=+pr;x.dp="Aldi-Preis";save();toast(`${x.n}: ${eur(+pr)} eingetragen (Aldi-Normalpreis)`);render()}return}
+  if(b.dataset.sparall){const n=sparAll();save();toast(n?`✓ ${n} ${n===1?"Tipp":"Tipps"} übernommen`:"Nichts mehr zu tauschen");render();return}
+  if(b.dataset.simple){const on=!SIMPLE();store.set("simple",on);if(on&&store.get("zoom",1)<1.2){store.set("zoom",1.2);applyZoom()}applySimple();toast(on?"Einfache Ansicht an":"Einfache Ansicht aus");render();return}
+  if(b.dataset.connect){const cp=CONNECT;CONNECT=null;S.sheet=null;
+    if(b.dataset.connect==="1"&&cp){if(Sync.ready())Sync.disconnect();toast("Verbinde …");
+      Sync.connect(cp.t,cp.p||DEF_PICK).then(()=>{toast("✓ Verbunden! Ihr habt jetzt denselben Einkaufszettel.");S.tab="list";render()},err=>toast("Verbinden fehlgeschlagen: "+err.message))}
+    render();return}
+  if(b.id==="forStart"){b.disabled=true;toast("Richte ein …");Sync.create(store.get("syncPick",null)||DEF_PICK).then(()=>{toast("Fertig! Jetzt „Per WhatsApp einrichten“ tippen.");render();setTimeout(()=>document.getElementById("forPanel")?.scrollIntoView({block:"start",behavior:"smooth"}),80)},e=>{b.disabled=false;toast("Hat nicht geklappt: "+e.message)});return}
+  if(b.id==="forCopy"){copy(forLink(),"Link kopiert – jetzt z. B. per WhatsApp oder SMS schicken.");return}
   if(b.dataset.gocb){toast(quickToggle("cb")?"Filter an: nur Angebote mit Geld zurück – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
   if(b.dataset.golow){toast(quickToggle("low")?"Filter an: nur Preis-Alarme – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}

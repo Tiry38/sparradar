@@ -618,3 +618,44 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 @media (max-width:559px){.w2l>.btn{flex:1 1 auto;justify-content:center}}
 .w2l small{flex-basis:100%;color:var(--muted);font-size:.8rem;line-height:1.35}
 .freq.often{margin:12px 0 0}
+/* v120: Zettel versteht einfache Wörter (Hinweis + Knopf, nie automatisch) */
+.receipt .exhit{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-2px 0 8px 28px;padding:7px 9px;border-radius:10px;background:color-mix(in oklab,#F2B705 16%,transparent);font-family:var(--font,inherit);font-size:.8rem;line-height:1.35}
+.receipt .exhit>span:first-child{flex:1 1 180px;min-width:0;overflow-wrap:anywhere}
+.receipt .exhit small{color:var(--muted)}
+.receipt .exhit .btn{flex:none;white-space:nowrap}
+.receipt .exhit.dp{background:color-mix(in oklab,#3B6FD9 11%,transparent)}
+.receipt .exalt{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;color:var(--muted)}
+.receipt .exalt .chip{font-size:.76rem;padding:4px 9px;min-height:0}
+@media(max-width:559px){.receipt .exhit{margin-left:0}}
+.rline em.rend,.rline em.rsoon{font-style:normal;font-weight:700;font-size:.72rem;white-space:nowrap;padding:1px 6px;border-radius:999px;margin-left:2px}
+.rline em.rend{color:#B45309;background:rgba(234,88,12,.12)}
+.rline em.rsoon{color:#2459C7;background:color-mix(in oklab,#3B6FD9 13%,transparent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .rline em.rend{color:#FDBA74}:root:not([data-theme="light"]) .rline em.rsoon{color:#9DBBFF}}
+:root[data-theme="dark"] .rline em.rend{color:#FDBA74}:root[data-theme="dark"] .rline em.rsoon{color:#9DBBFF}
+.endsoon{display:flex;gap:8px;align-items:flex-start;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(234,88,12,.1);font-size:.88rem;line-height:1.4}
+/* Spar-Check */
+.plan .pcsum{margin:0 0 10px;font-size:.9rem;line-height:1.45}
+.plan .pcall{width:100%;justify-content:center;min-height:48px;margin:0 0 6px}
+/* Vorrats-Tipp */
+.wk-v{--wkc:color-mix(in oklab,#8B5CF6 20%,transparent)}
+.vrbox{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 8px;padding:10px 12px;border-radius:12px;background:color-mix(in oklab,#8B5CF6 12%,transparent);font-size:.88rem;line-height:1.4}
+.vrbox>span:first-of-type{flex:1 1 200px;min-width:0}
+.vrbox .vrq{display:flex;gap:6px;flex:none}
+.receipt .ract.vr{background:color-mix(in oklab,#8B5CF6 10%,transparent)}
+/* Kassen-Kontrolle */
+.chkbox{margin:10px 0;padding:12px 14px;border-radius:14px;border:2px solid #EA580C;background:rgba(234,88,12,.07);display:grid;gap:8px;font-size:.88rem;line-height:1.4}
+.chkbox .chkrow{display:flex;justify-content:space-between;gap:10px;padding-top:6px;border-top:1px dashed var(--line)}
+.chkbox .chkrow span{min-width:0;overflow-wrap:anywhere}.chkbox .chkrow span:last-child{text-align:right;flex:none;font-weight:700}
+.chkbox .chkrow small{display:block;color:var(--muted);font-weight:400;font-size:.76rem}
+.chkbox>small{color:var(--muted)}
+/* Einfache Ansicht */
+html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,html.simple #openFilter2{display:none!important}
+.foryou{margin:0 0 14px;padding:12px 14px;border-radius:16px;border:1px solid var(--line);background:var(--surface)}
+.foryou h3{margin:0 0 8px;font-size:1rem}
+.fyrows{display:grid;gap:6px}
+.fyrow{display:flex;align-items:center;gap:8px;min-width:0}
+.fyrow .fyn{all:unset;box-sizing:border-box;cursor:pointer;flex:1;min-width:0;display:flex;align-items:center;gap:8px}
+.fyrow .fyn span{min-width:0;display:grid}.fyrow .fyn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fyrow .fyn small{color:var(--muted);font-size:.76rem}
+.fyrow .fyp{flex:none;font-size:1rem}
+.fyrow .btn{flex:none}

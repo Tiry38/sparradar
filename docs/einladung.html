@@ -64,6 +64,7 @@
   <span class="badge">🎁 PERSÖNLICHE EINLADUNG</span>
   <h1>Willkommen bei <span>SparRadar</span></h1>
   <p class="from" id="from">Du wurdest <b>persönlich ausgewählt</b>.</p>
+  <p class="safe" id="shared" hidden>👪 Mit <b>gemeinsamem Einkaufszettel</b>: Nach dem Installieren SparRadar öffnen und „Verbinden“ tippen – fertig.</p>
   <ul>
     <li><i>🛒</i><span>Alle Angebote von <b>Lidl, Aldi, Rewe, Netto, Edeka und dm</b> rund um Wörth – jeden Morgen frisch</span></li>
     <li><i>🔥</i><span>Der <b>Kracher der Woche</b> und die stärksten Rabatte immer ganz oben</span></li>
@@ -88,6 +89,16 @@
   if (von) document.getElementById("from").innerHTML = "<b></b> hat dich <b>persönlich</b> zu SparRadar eingeladen.";
   if (von) document.querySelector("#from b").textContent = von.slice(0, 30);
 
+  // Gemeinsamer Einkaufszettel: Code steht im Link hinter # (geht nicht an den Server) bzw. bei „In Chrome öffnen“ als ?c=.
+  // Er wird nur im Speicher dieses Geräts abgelegt; SparRadar fragt beim Öffnen, ob verbunden werden soll.
+  const qs = new URLSearchParams(location.search), hc = (location.hash.match(/[#&]c=([^&]+)/) || [])[1];
+  let code = hc ? decodeURIComponent(hc) : qs.get("c");
+  if (code && /^SR-[A-Za-z0-9]{20}(#sr:[a-z,]*)?$/.test(code)) {
+    try { localStorage.setItem("sr_connect", JSON.stringify(code)); } catch (e) {}
+    document.getElementById("shared").hidden = false;
+    qs.delete("c");
+    history.replaceState(null, "", location.pathname + (qs.toString() ? "?" + qs : ""));
+  } else code = null;
   const btn = document.getElementById("install"), help = document.getElementById("help");
   const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
   const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone;
@@ -105,13 +116,15 @@
       c.href = "#";
       c.addEventListener("click", e => {
         e.preventDefault();
-        const u = location.href.split("#")[0];
+        const u = location.href.split("#")[0] + (code ? (location.search ? "&" : "?") + "c=" + encodeURIComponent(code) : "");
         (navigator.clipboard ? navigator.clipboard.writeText(u) : Promise.reject()).then(
           () => { c.textContent = "✅ Link kopiert – jetzt Chrome öffnen und oben einfügen"; },
           () => { help.className = "help show"; help.innerHTML = "Diesen Link in Chrome öffnen:<br><b></b>"; help.querySelector("b").textContent = u; });
       });
     } else {
-      c.href = "intent://" + location.host + location.pathname + location.search + "#Intent;scheme=https;package=com.android.chrome;end";
+      const q = new URLSearchParams(location.search);
+      if (code) q.set("c", code);  // Chrome hat einen eigenen Speicher -> Code mitgeben
+      c.href = "intent://" + location.host + location.pathname + (q.toString() ? "?" + q : "") + "#Intent;scheme=https;package=com.android.chrome;end";
     }
     c.hidden = false;
     btn.hidden = true;
