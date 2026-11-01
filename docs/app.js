@@ -114,10 +114,23 @@ const Sync = {
   snap(p){return JSON.stringify(this.get(p))},
   // alte Datei {updatedAt,data} (vor Version 67) in Bereiche umrechnen; ist „data“ neuer, gewinnt es
   norm(r){const parts={...(r.parts||{})};if(r.data)Object.keys(this.PARTS).forEach(p=>{if(!parts[p]||(r.updatedAt||0)>(parts[p].at||0))parts[p]={at:r.updatedAt||1,d:this.pick(r.data,p)}});return parts},
+  // Zwei Speicher: Familien-Code (SR-…, eigener Cloudflare-Speicher, Adresse in docs/sync.json) oder GitHub-Gist (ghp_…)
+  ready(){const c=this.cfg();return !!(c&&(c.gist||c.srv))},
+  _srv:undefined,
+  async srv(){if(this._srv!==undefined)return this._srv;try{const r=await fetch("sync.json",{cache:"no-store"});this._srv=r.ok?((await r.json()).url||null):null}catch(e){this._srv=null}return this._srv},
+  async sreq(path,opt={}){const u=await this.srv();if(!u)throw new Error("Sync-Speicher nicht erreichbar");
+    let r;try{r=await fetch(u+path,{...opt,cache:"no-store",headers:opt.body?{"Content-Type":"application/json"}:{}})}catch(e){throw new Error("keine Verbindung")}
+    if(r.status===404)throw new Error("Code unbekannt");if(!r.ok)throw new Error("Speicher antwortet nicht ("+r.status+")");return r.json()},
+  code(){const c=this.cfg();return c?.srv?"SR-"+c.srv:c?.token||""},
+  async write(obj){const c=this.cfg();if(c.srv)return this.sreq("/s/"+c.srv,{method:"PUT",body:JSON.stringify(obj)});
+    return this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify(obj)}}})})},
+  async create(parts){const {id}=await this.sreq("/new",{method:"POST"});store.set("sync",{srv:id});if(parts)store.set("syncParts",parts);store.set("syncAt",{});store.set("syncSnaps",{});await this.push();return id},
   async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
     if(r.status===401)throw new Error("Schlüssel ungültig oder abgelaufen");if(!r.ok)throw new Error("GitHub antwortet nicht ("+r.status+")");return r.json()},
-  async load(){const c=this.cfg(),g=await this.req("/gists/"+c.gist),f=g.files[this.FILE];
-    const raw=f?(f.truncated?await (await fetch(f.raw_url,{cache:"no-store"})).text():f.content):"{}";const r=JSON.parse(raw||"{}");
+  async load(){const c=this.cfg();let r;
+    if(c.srv)r=await this.sreq("/s/"+c.srv);
+    else{const g=await this.req("/gists/"+c.gist),f=g.files[this.FILE];
+      const raw=f?(f.truncated?await (await fetch(f.raw_url,{cache:"no-store"})).text():f.content):"{}";r=JSON.parse(raw||"{}")}
     if(r.devices&&typeof r.devices==="object"){this.devices=r.devices;store.set("syncDevs",r.devices)}
     return {parts:this.norm(r),devices:r.devices||{}}},
   // beide Seiten geändert: nichts verlieren, alles zusammenführen
@@ -127,7 +140,11 @@ const Sync = {
       extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])],saved:(()=>{const m=new Map();[...(a.saved||[]),...(b.saved||[])].forEach(e=>{const k=e.id+"|"+e.d,o=m.get(k);m.set(k,o&&(o.off||e.off)?{...e,off:1}:e)});return [...m.values()]})(), // gelöscht (off) bleibt gelöscht
       trips:u(a.trips||[],b.trips||[],x=>x.id).sort((x,y)=>(y.at||"").localeCompare(x.at||"")),qty:{...(a.qty||{}),...(b.qty||{})}}},
   mergeP(p,remote,local){return this.pick({...this.merge(remote,local)},p)},
-  async connect(token,parts){store.set("sync",{token});
+  async connect(token,parts){
+    if(/^SR-/.test(token)){const id=token.slice(3);store.set("sync",{srv:id});
+      try{await this.load();if(parts)store.set("syncParts",parts);store.set("syncAt",{});store.set("syncSnaps",{});await this.pull(true);return true}
+      catch(e){store.set("sync",null);throw e}}
+    store.set("sync",{token});
     try{const gs=await this.req("/gists?per_page=100");let g=gs.find(x=>x.description===this.DESC&&x.files[this.FILE]);
       if(!g)g=await this.req("/gists",{method:"POST",body:JSON.stringify({description:this.DESC,public:false,files:{[this.FILE]:{content:JSON.stringify({v:2,updatedAt:Date.now(),parts:{},devices:{}})}}})});
       store.set("sync",{token,gist:g.id});if(parts)store.set("syncParts",parts);store.set("syncAt",{});store.set("syncSnaps",{});await this.pull(true);return true}
@@ -136,7 +153,7 @@ const Sync = {
   // neu geteilten Bereich beim nächsten Abgleich zusammenführen statt überschreiben
   setShare(sh){const old=this.share();store.set("syncParts",sh);const sn=store.get("syncSnaps",{}),at=store.get("syncAt",{});
     Object.keys(this.PARTS).forEach(p=>{if(sh[p]&&!old[p]){delete sn[p];at[p]=-1}});store.set("syncSnaps",sn);store.set("syncAt",at)},
-  async pull(){const c=this.cfg();if(!c?.gist||this.busy)return;this.busy=true;
+  async pull(){if(!this.ready()||this.busy)return;this.busy=true;
     try{const {parts}=await this.load(),at=store.get("syncAt",{}),sn=store.get("syncSnaps",{});let push=false,changed=false;
       for(const p of this.on()){const rp=parts[p],localNew=this.snap(p)!==sn[p],fresh=at[p]==null||at[p]<0;
         if(rp&&(rp.at||0)>(at[p]||0)){
@@ -151,17 +168,17 @@ const Sync = {
       this.ok()}
     catch(e){this.fail(e)}finally{this.busy=false}},
   // lesen – zusammenführen – schreiben: so gehen Änderungen anderer Geräte/Personen nie verloren
-  async push(){const c=this.cfg();if(!c?.gist)return;if(this.busy){this.changed();return}this.busy=true;
+  async push(){if(!this.ready())return;if(this.busy){this.changed();return}this.busy=true;
     try{const {parts}=await this.load(),at=store.get("syncAt",{}),sn=store.get("syncSnaps",{}),now=Date.now();let changed=false;
       for(const p of this.on()){const rp=parts[p];
         if(rp&&(rp.at||0)>(at[p]||0)){this.set(p,this.mergeP(p,rp.d,this.get(p)));changed=true}
         if(!rp||this.snap(p)!==sn[p]||(rp.at||0)>(at[p]||0)){parts[p]={at:now,d:this.get(p)};at[p]=now}
         sn[p]=this.snap(p)}
       const devs=this.devs();
-      await this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify({v:2,updatedAt:now,parts,devices:devs})}}})});
+      await this.write({v:2,updatedAt:now,parts,devices:devs});
       this.devices=devs;store.set("syncDevs",devs);store.set("syncAt",at);store.set("syncSnaps",sn);this.ok();if(changed)render()}
     catch(e){this.fail(e)}finally{this.busy=false}},
-  changed(){if(!this.cfg()?.gist)return;clearTimeout(this.timer);this.timer=setTimeout(()=>this.push(),1500)},
+  changed(){if(!this.ready())return;clearTimeout(this.timer);this.timer=setTimeout(()=>this.push(),1500)},
   ok(){this.status="Verbunden · abgeglichen "+new Date().toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})+" Uhr";const el=document.getElementById("syncState");if(el)el.textContent=this.status},
   fail(e){this.status="Abgleich fehlgeschlagen: "+e.message;const el=document.getElementById("syncState");if(el)el.textContent=this.status}
 };
@@ -400,6 +417,7 @@ async function load(){
   render();  if(OFFERS.length)checkNews();
   checkWhatsNew(); // nur wenn kein anderes Fenster offen ist, sonst beim nächsten Öffnen
   Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
+  Sync.srv().then(u=>{if(u&&S.sheet==="settings"&&!Sync.ready())render()}); // „Familien-Code erstellen“ nur zeigen, wenn der Speicher eingerichtet ist
 }
 // Wie aktuell sind die Prospekte? Häufigster Zeitraum je Markt, dazu wann die nächsten starten
 function flyerInfo(){
@@ -660,6 +678,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  72:["Geräte verbinden ohne GitHub: „Neuen Familien-Code erstellen“ antippen, Code kopieren, an die Familie schicken – fertig."],
   71:["Gespart-Zähler antippen: Einträge einzeln löschen oder alles auf 0 setzen (z. B. nach einem Test)."],
   70:["Im Willkommens-Fenster steht jetzt: Fehler entdeckt? Einfach Kevin schreiben."],
   69:["Auf dem Einkaufszettel steht neben Lidl, Rewe und Edeka ein Knopf „📱 Lidl Plus“ usw. – ein Tipp öffnet die App des Markts, z. B. für deinen Code an der Kasse."],
@@ -1022,7 +1041,7 @@ function shareChecks(sh,attr){return `<div class="shchk">${Object.entries(Sync.P
 function renderSync(){
   const c=Sync.cfg();
   return `<section class="panel" id="syncPanel"><h3>📱 ↔ 💻 Geräte verbinden</h3>
-   ${c?.gist?(()=>{const ds=Object.entries(Sync.devs()).sort((a,b)=>(b[0]===Sync.devId())-(a[0]===Sync.devId())||b[1].at-a[1].at),ic={phone:"📱",tablet:"📱",pc:"💻"};
+   ${Sync.ready()?(()=>{const ds=Object.entries(Sync.devs()).sort((a,b)=>(b[0]===Sync.devId())-(a[0]===Sync.devId())||b[1].at-a[1].at),ic={phone:"📱",tablet:"📱",pc:"💻"};
      const ago=t=>{const m=Math.round((Date.now()-t)/6e4);return m<2?"gerade aktiv":m<60?`vor ${m} Min.`:m<1440?`vor ${Math.round(m/60)} Std.`:`vor ${Math.round(m/1440)} Tag${Math.round(m/1440)===1?"":"en"}`};
      const pn=a=>(a||[]).map(p=>Sync.PARTS[p]?.n).filter(Boolean).join(", ")||"nichts";
      return `<p><b>${ds.length} ${ds.length===1?"Gerät":"Geräte"} verbunden.</b> Jedes Gerät wählt selbst, was es mit den anderen teilt. Änderungen kommen automatisch überall an.</p>
@@ -1033,13 +1052,14 @@ function renderSync(){
      <p><b>Weiteres Gerät verbinden</b> (beliebig viele, z. B. das Handy von Mama und Stefan, Tablet oder PC): Code kopieren, per WhatsApp schicken und auf dem anderen Gerät hier unter „Geräte verbinden“ einfügen. Wer den Code hat, sieht und ändert eure gemeinsamen Listen – also nur an Familie geben.</p>`})()+`
      <div class="shbox"><b>Was soll das neue Gerät mit euch teilen?</b>${shareChecks(store.get("syncGive",null)||DEF_PICK,"data-give")}<small>Kommt mit im Code – das andere Gerät muss nur noch einfügen. Für deinen eigenen PC: alles anhaken. Für Mama oder Stefan: nur Einkaufszettel.</small></div>
      <div class="links"><button class="btn sm" id="syncCopy">Code kopieren</button><button class="btn ghost sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
-   :`<p>Damit mehrere Geräte denselben Einkaufszettel haben – deine eigenen (Handy, PC, Tablet) oder die deiner Familie. Ob auch Merkliste und Coupons gleich sein sollen, wählst du selbst. Einmal pro Gerät den Schlüssel eintragen, danach läuft alles unsichtbar im Hintergrund.</p>
-     <p><b>Schon ein Gerät verbunden?</b> Dort „Code kopieren“ drücken, dir schicken und hier einfügen. Fertig.</p>
-     <details class="steps-d"><summary>Noch kein Gerät verbunden? So bekommst du den Code (einmalig, am besten am PC)</summary>
-     <ol class="steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=SparRadar" target="_blank" rel="noopener">Hier tippen</a> und bei GitHub anmelden.</li><li>Bei „Expiration“ <b>No expiration</b> auswählen. Der Haken bei <b>gist</b> ist schon gesetzt, sonst nichts anhaken.</li><li>Ganz unten auf den grünen Knopf <b>Generate token</b>.</li><li>Den langen Code, der mit <code>ghp_</code> anfängt, kopieren und unten einfügen.</li></ol></details>
-     <div class="shbox"><b>Was soll mit den anderen Geräten gleich sein?</b>${shareChecks(store.get("syncPick",null)||DEF_PICK,"data-pick")}<small>Eigenes zweites Gerät (z. B. dein PC)? Dann auch Merkliste und Coupons anhaken. Familie: meist nur den Einkaufszettel. Wurde die Auswahl schon beim Kopieren des Codes getroffen, wird sie beim Einfügen automatisch übernommen.</small></div>
-     <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="Code einfügen (ghp_…)" autocomplete="off" spellcheck="false"><button class="btn" type="submit">Verbinden</button></form>
-     <p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p>`}
+   :`<p>Damit mehrere Geräte denselben Einkaufszettel haben – deine eigenen (Handy, PC, Tablet) oder die deiner Familie. Ob auch Merkliste und Coupons gleich sein sollen, wählst du selbst.</p>
+     <div class="shbox"><b>Was soll mit den anderen Geräten gleich sein?</b>${shareChecks(store.get("syncPick",null)||DEF_PICK,"data-pick")}<small>Eigenes zweites Gerät (z. B. dein PC)? Dann auch Merkliste und Coupons anhaken. Familie: meist nur den Einkaufszettel. Kam der Code mit Auswahl, wird sie beim Einfügen übernommen.</small></div>
+     ${Sync._srv?`<p><b>Noch kein Code?</b> Einfach einen eigenen erstellen – kostenlos, ohne Anmeldung:</p><button class="btn" id="syncCreate" style="width:100%">✨ Neuen Familien-Code erstellen</button>
+     <p style="margin-top:14px"><b>Code bekommen?</b> Hier einfügen und verbinden:</p>`:`<p><b>Schon ein Gerät verbunden?</b> Dort „Code kopieren“ drücken, dir schicken und hier einfügen. Fertig.</p>`}
+     <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="Code einfügen (SR-… oder ghp_…)" autocomplete="off" spellcheck="false"><button class="btn${Sync._srv?" ghost":""}" type="submit">Verbinden</button></form>
+     <details class="steps-d"><summary>${Sync._srv?"Für Profis: eigenen GitHub-Schlüssel benutzen":"Noch kein Gerät verbunden? So bekommst du den Code (einmalig, am besten am PC)"}</summary>
+     <ol class="steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=SparRadar" target="_blank" rel="noopener">Hier tippen</a> und bei GitHub anmelden.</li><li>Bei „Expiration“ <b>No expiration</b> auswählen. Der Haken bei <b>gist</b> ist schon gesetzt, sonst nichts anhaken.</li><li>Ganz unten auf den grünen Knopf <b>Generate token</b>.</li><li>Den langen Code, der mit <code>ghp_</code> anfängt, kopieren und oben einfügen.</li></ol><p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p></details>
+     <p style="font-size:.8rem">Wer den Code hat, sieht und ändert eure geteilten Listen – also nur an Familie geben.</p>`}
   </section>`}
 
 // Einladung: schöne Landingpage (einladung.html) mit Logo-Vorschau in WhatsApp; Name steht nur im Link
@@ -1236,10 +1256,11 @@ document.addEventListener("click",e=>{
   if(b.id==="reloadApp"){location.reload();return}
   if(b.id==="appUpdNow"){try{window.SparRadarApp.checkUpdate()}catch(e){location.href=APK_URL}return}
   if(b.id==="syncCopy"){const g=store.get("syncGive",null)||DEF_PICK,on=Object.keys(Sync.PARTS).filter(k=>g[k]);
-    copy(`${Sync.cfg().token}#sr:${on.join(",")}`,`Code kopiert (teilt: ${on.map(k=>Sync.PARTS[k].n).join(", ")||"nichts"}). Jetzt schicken und auf dem anderen Gerät einfügen.`);return}
+    copy(`${Sync.code()}#sr:${on.join(",")}`,`Code kopiert (teilt: ${on.map(k=>Sync.PARTS[k].n).join(", ")||"nichts"}). Jetzt schicken und auf dem anderen Gerät einfügen.`);return}
   if(b.dataset.give){const sh={...(store.get("syncGive",null)||DEF_PICK)};sh[b.dataset.give]=!sh[b.dataset.give];store.set("syncGive",sh);render();return}
   if(b.dataset.share){const sh={...Sync.share()};sh[b.dataset.share]=!sh[b.dataset.share];Sync.setShare(sh);render();Sync.pull().then(()=>{toast(sh[b.dataset.share]?`${Sync.PARTS[b.dataset.share].n} wird jetzt geteilt`:`${Sync.PARTS[b.dataset.share].n} bleibt jetzt nur auf diesem Gerät`);render()});return}
   if(b.dataset.pick){const sh={...(store.get("syncPick",null)||DEF_PICK)};sh[b.dataset.pick]=!sh[b.dataset.pick];store.set("syncPick",sh);render();return}
+  if(b.id==="syncCreate"){b.disabled=true;toast("Erstelle Code …");Sync.create(store.get("syncPick",null)||DEF_PICK).then(()=>{toast("Fertig! Jetzt „Code kopieren“ und an die anderen Geräte schicken.");render();setTimeout(()=>document.getElementById("syncPanel")?.scrollIntoView({block:"start",behavior:"smooth"}),80)},e=>{b.disabled=false;toast("Hat nicht geklappt: "+e.message)});return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
@@ -1314,7 +1335,7 @@ document.addEventListener("submit",e=>{
   if(e.target.id==="cpqForm"){e.preventDefault();cpqSave(e.target.dataset.id,document.getElementById("cpqType").value,parseNum(document.getElementById("cpqVal").value));return}
   if(e.target.id==="devForm"){e.preventDefault();const v=document.getElementById("devName").value.trim().slice(0,30);store.set("devName",v);Sync.push().then(()=>{toast(v?`Dieses Gerät heißt jetzt „${v}“`:"Name zurückgesetzt");render()});return}
   if(e.target.id==="syncForm"){e.preventDefault();const cp=codeParse(document.getElementById("syncToken").value),t=cp.t;if(cp.p)store.set("syncPick",cp.p);
-    if(!/^(ghp_|github_pat_)/.test(t)){toast("Das sieht nicht wie ein GitHub-Schlüssel aus (beginnt mit ghp_).");return}
+    if(!/^(ghp_|github_pat_)/.test(t)&&!/^SR-[A-Za-z0-9]{20}$/.test(t)){toast("Das sieht nicht wie ein SparRadar-Code aus (beginnt mit SR-).");return}
     const pick=store.get("syncPick",null)||DEF_PICK;
     toast("Verbinde …");Sync.connect(t,pick).then(()=>{toast(`Verbunden! Geteilt: ${Sync.on().map(p=>Sync.PARTS[p].n).join(", ")||"nichts"}`);render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
   if(e.target.id==="eanForm"){e.preventDefault();const v=document.getElementById("eanIn").value;Scan.last=v;Scan.lookup(v);return}

@@ -1,0 +1,80 @@
+# Richtet den Sync-Speicher (Familien-Codes) auf Cloudflare ein – komplett automatisch.
+# Braucht zwei GitHub-Secrets: CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID (Anleitung: cloudflare/README.md).
+# Schreibt die Adresse des Speichers nach docs/sync.json, die App liest sie von dort.
+name: Sync-Speicher einrichten
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["cloudflare/**", ".github/workflows/sync-server.yml"]
+permissions:
+  contents: write
+concurrency: { group: sync-server, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Secrets vorhanden?
+        id: chk
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::CLOUDFLARE_API_TOKEN und CLOUDFLARE_ACCOUNT_ID fehlen noch (Anleitung: cloudflare/README.md) – nichts zu tun."
+            echo "ok=false" >> $GITHUB_OUTPUT
+          else echo "ok=true" >> $GITHUB_OUTPUT; fi
+      - uses: actions/setup-node@v4
+        if: steps.chk.outputs.ok == 'true'
+        with: { node-version: 20 }
+      - name: Datenbank anlegen (falls noch nicht da)
+        if: steps.chk.outputs.ok == 'true'
+        working-directory: cloudflare
+        run: |
+          API=https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          ID=$(curl -fsS -H "$H" "$API/d1/database?name=sparradar-sync" | jq -r '.result[] | select(.name=="sparradar-sync") | .uuid' | head -1)
+          if [ -z "$ID" ]; then
+            ID=$(curl -fsS -X POST -H "$H" -H "Content-Type: application/json" "$API/d1/database" -d '{"name":"sparradar-sync"}' | jq -r '.result.uuid')
+          fi
+          [ -n "$ID" ] && [ "$ID" != "null" ] || { echo "::error::Datenbank konnte nicht angelegt werden (Token braucht D1: Edit)"; exit 1; }
+          cat > wrangler.toml <<EOF
+          name = "sparradar-sync"
+          main = "worker.js"
+          compatibility_date = "2025-01-01"
+          workers_dev = true
+          [triggers]
+          crons = ["17 3 * * 0"]
+          [[d1_databases]]
+          binding = "DB"
+          database_name = "sparradar-sync"
+          database_id = "$ID"
+          EOF
+          sed -i 's/^ *//' wrangler.toml
+      - name: workers.dev-Adresse sicherstellen
+        if: steps.chk.outputs.ok == 'true'
+        run: |
+          API=https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          SUB=$(curl -sS -H "$H" "$API/workers/subdomain" | jq -r '.result.subdomain // empty')
+          if [ -z "$SUB" ]; then
+            SUB="sparradar-$(head -c4 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+            curl -fsS -X PUT -H "$H" -H "Content-Type: application/json" "$API/workers/subdomain" -d "{\"subdomain\":\"$SUB\"}" >/dev/null
+          fi
+          echo "SUB=$SUB" >> $GITHUB_ENV
+      - name: Tabelle anlegen und Worker hochladen
+        if: steps.chk.outputs.ok == 'true'
+        working-directory: cloudflare
+        run: |
+          npx --yes wrangler@3.114.1 d1 execute sparradar-sync --remote --file schema.sql
+          npx --yes wrangler@3.114.1 deploy
+      - name: Adresse in die App schreiben
+        if: steps.chk.outputs.ok == 'true'
+        run: |
+          URL="https://sparradar-sync.$SUB.workers.dev"
+          for i in 1 2 3 4 5 6; do curl -fsS "$URL/ping" && break; sleep 10; done
+          echo "{\"url\":\"$URL\"}" > docs/sync.json
+          git config user.name "github-actions[bot]"; git config user.email "41898333+github-actions[bot]@users.noreply.github.com"
+          git add docs/sync.json
+          git diff --cached --quiet || { git commit -m "Sync-Speicher: Adresse aktualisiert"; git pull --rebase; git push; }
