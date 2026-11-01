@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  83:["Einstellungen und Willkommens-Infos neu erklärt – Schritt für Schritt, für jeden verständlich.","Am PC bleibt die obere Leiste auch mit großer Schrift (A+) im Bild."],
   82:["Coupons an der Kasse: Papier-Coupon einfach fotografieren – SparRadar liest den Strichcode. Hakst du den letzten Artikel ab, kommen deine Coupons groß nacheinander, am Ende öffnet ein Tipp die Markt-App mit deiner Karte."],
   81:["Neu im Tab „Coupons“: Knopf „🔍 Coupon suchen“. Zeigt alle App- und Bonus-Vorteile der Woche (Lidl Plus, Edeka-/Netto-App, Rewe Bonus), die größten zuerst – einfach „Einfügen“ oder „Nein“."],
   80:["Kracher: höchstens 2 Angebote pro Markt je Abschnitt – nicht mehr fast nur Edeka mit App-Preis."],
@@ -771,9 +772,10 @@ function renderWelcome(){const it=[
   ["📱","App-Angebote erkennen","Das Abzeichen „📱 Lidl Plus“ usw. zeigt: Dieser Preis gilt nur mit der App des Markts."],
   ["🔔","Merkliste","Artikel merken – SparRadar zeigt dir, sobald sie im Angebot sind."],
   ["🛒","Einkaufszettel","Mit ＋ auf den Zettel. Im Laden antippen, was im Wagen liegt. Mit 🎟️ trägst du einen Coupon mit einem Tipp ein."],
-  ["👨‍👩‍👦","Geräte verbinden","Mehrere Handys, Tablets oder PCs teilen denselben Einkaufszettel. Ob auch die Merkliste gleich sein soll, wählt jedes Gerät selbst – z. B. dein Handy und dein PC ja, die Familie nur den Zettel."],
-  ["⚙️","Einstellungen","Ganz unten im Tab „Coupons“: Geräte verbinden, SparRadar teilen, Schriftgröße mit „A+“ oben rechts."],
-  ["💬","Fehler entdeckt?","Stimmt ein Preis nicht oder klemmt etwas? Schreib gern Kevin, der SparRadar gebaut hat – am einfachsten per WhatsApp. Jeder Hinweis hilft!"]];
+  ["👨‍👩‍👦","Geräte verbinden","Mehrere Handys, Tablets oder PCs teilen denselben Einkaufszettel. Ob auch die Merkliste gleich sein soll, wählt jedes Gerät selbst – z. B. eigene Geräte alles, andere Menschen nur den Zettel."],
+  ["🎟️","Coupons","Tab „Coupons“: „Coupon suchen“ zeigt die größten App-Rabatte der Woche. Papier-Coupons einfach fotografieren – an der Kasse kommen sie groß zum Scannen."],
+  ["⚙️","Einstellungen","Ganz unten im Tab „Coupons“: Geräte verbinden, SparRadar teilen. Schrift größer: „A+“ oben rechts."],
+  ["💬","Fehler entdeckt?","Stimmt ein Preis nicht oder klemmt etwas? Sag gern der Person Bescheid, von der du SparRadar bekommen hast. Jeder Hinweis hilft!"]];
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Willkommen bei SparRadar">
    <div class="sheet-h"><span class="newsico">👋</span><h2>Willkommen bei SparRadar</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <p style="margin:-6px 0 4px;color:var(--muted)">Deine Spar-App für alle Angebote in der Nähe. Das Wichtigste in 30 Sekunden:</p>
@@ -1174,23 +1176,25 @@ function renderSync(){
      const ago=t=>{const m=Math.round((Date.now()-t)/6e4);return m<2?"gerade aktiv":m<60?`vor ${m} Min.`:m<1440?`vor ${Math.round(m/60)} Std.`:`vor ${Math.round(m/1440)} Tag${Math.round(m/1440)===1?"":"en"}`};
      const pn=a=>(a||[]).map(p=>Sync.PARTS[p]?.n).filter(Boolean).join(", ")||"nichts";
      return `<p><b>${ds.length} ${ds.length===1?"Gerät":"Geräte"} verbunden.</b> Jedes Gerät wählt selbst, was es mit den anderen teilt. Änderungen kommen automatisch überall an.</p>
-     <div class="shbox"><b>Dieses Gerät teilt:</b>${shareChecks(Sync.share(),"data-share")}<small>Beispiel: Dein Handy und dein PC teilen Einkaufszettel <i>und</i> Merkliste. Mama und Stefan teilen nur den Einkaufszettel – ihre Merkliste bleibt privat.</small></div>
+     <div class="shbox"><b>Dieses Gerät teilt:</b>${shareChecks(Sync.share(),"data-share")}<small>Antippen = an oder aus. Was hier aus ist, bleibt nur auf diesem Gerät. Was an ist, ist auf allen Geräten gleich, die es ebenfalls teilen.</small></div>
      <div class="devlist">${ds.map(([k,v])=>`<div class="dev${k===Sync.devId()?" me":""}"><span class="di">${ic[v.t]||"📱"}</span><span class="dt"><b>${esc(v.n||"Gerät")}</b><small>${k===Sync.devId()?"dieses Gerät":ago(v.at)}</small><small class="dsh">teilt: ${esc(pn(k===Sync.devId()?Sync.on():v.sh))}</small></span></div>`).join("")}</div>
-     <form class="addrow" id="devForm"><input id="devName" value="${esc(Sync.devName())}" maxlength="30" placeholder="Name dieses Geräts, z. B. Mamas Handy" autocomplete="off"><button class="btn ghost" type="submit">Name speichern</button></form>
+     <form class="addrow" id="devForm"><input id="devName" value="${esc(Sync.devName())}" maxlength="30" placeholder="Name dieses Geräts, z. B. Handy oder Laptop" autocomplete="off"><button class="btn ghost" type="submit">Name speichern</button></form>
      <p id="syncState">${esc(Sync.status||"Verbunden")}</p>
-     <p><b>Weiteres Gerät verbinden</b> (beliebig viele, z. B. das Handy von Mama und Stefan, Tablet oder PC): Code kopieren, per WhatsApp schicken und auf dem anderen Gerät hier unter „Geräte verbinden“ einfügen. Wer den Code hat, sieht und ändert eure gemeinsamen Listen – also nur an Familie geben.</p>`})()+`
-     <div class="shbox"><b>Was soll das neue Gerät mit euch teilen?</b>${shareChecks(store.get("syncGive",null)||DEF_PICK,"data-give")}<small>Kommt mit im Code – das andere Gerät muss nur noch einfügen. Für deinen eigenen PC: alles anhaken. Für Mama oder Stefan: nur Einkaufszettel.</small></div>
-     ${Sync.cfg()?.gist&&Sync._srv?`<div class="shbox"><b>🔒 Sicherer: auf Familien-Code umziehen</b><small>Dein GitHub-Schlüssel darf mehr als nötig. Ein Familien-Code darf nur deine SparRadar-Listen. Alles wird mitgenommen. Danach den neuen Code auf deinen anderen Geräten einfügen.</small><button class="btn sm" id="syncMigrate" style="margin-top:6px">Jetzt umziehen</button></div>`:""}
-     ${Sync.cfg()?.from==="gist"?`<div class="shbox"><b>✅ Umgezogen auf Familien-Code</b><small>1. Unten „Code kopieren“ und auf deinen anderen Geräten unter „Verbindung trennen“ → Code einfügen. 2. Wenn alle Geräte umgezogen sind, den alten Schlüssel löschen: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → „SparRadar“ → Delete.</small><button class="btn ghost sm" id="syncMigDone" style="margin-top:6px">Erledigt, Hinweis ausblenden</button></div>`:""}
+     <p><b>Weiteres Gerät verbinden</b> (beliebig viele: eigenes Tablet oder PC, oder das Handy von jemandem, mit dem du zusammen einkaufst):</p>
+     <ol class="steps"><li>Unten auswählen, was das neue Gerät teilen soll.</li><li>„Code kopieren“ drücken und den Code z. B. per WhatsApp schicken.</li><li>Auf dem neuen Gerät: SparRadar öffnen → Tab „Coupons“ → ganz unten „Einstellungen“ → „Geräte verbinden“ → Code einfügen → „Verbinden“.</li></ol>
+     <p style="font-size:.8rem">🔒 Wer den Code hat, sieht und ändert die geteilten Listen. Gib ihn nur Menschen, denen du vertraust.</p>`})()+`
+     <div class="shbox"><b>Was soll das neue Gerät teilen?</b>${shareChecks(store.get("syncGive",null)||DEF_PICK,"data-give")}<small>Die Auswahl steckt im Code, auf dem neuen Gerät ist nichts mehr einzustellen. Tipp: Ein eigenes zweites Gerät teilt meist alles. Bei einem anderen Menschen reicht oft der Einkaufszettel – dann bleiben Merkliste und Coupons privat.</small></div>
+     ${Sync.cfg()?.gist&&Sync._srv?`<div class="shbox"><b>🔒 Sicherer: auf einen SparRadar-Code umziehen</b><small>Dieses Gerät ist noch mit einem GitHub-Schlüssel verbunden. Ein SparRadar-Code ist sicherer, weil er nur die SparRadar-Listen öffnet. Alles wird mitgenommen. Danach den neuen Code auf den anderen Geräten einfügen.</small><button class="btn sm" id="syncMigrate" style="margin-top:6px">Jetzt umziehen</button></div>`:""}
+     ${Sync.cfg()?.from==="gist"?`<div class="shbox"><b>✅ Umgezogen auf SparRadar-Code</b><small>1. Unten „Code kopieren“ und auf den anderen Geräten unter „Verbindung trennen“ → Code einfügen. 2. Wenn alle Geräte umgezogen sind, den alten Schlüssel löschen: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → „SparRadar“ → Delete.</small><button class="btn ghost sm" id="syncMigDone" style="margin-top:6px">Erledigt, Hinweis ausblenden</button></div>`:""}
      <div class="links"><button class="btn sm" id="syncCopy">Code kopieren</button><button class="btn ghost sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
-   :`<p>Damit mehrere Geräte denselben Einkaufszettel haben – deine eigenen (Handy, PC, Tablet) oder die deiner Familie. Ob auch Merkliste und Coupons gleich sein sollen, wählst du selbst.</p>
-     <div class="shbox"><b>Was soll mit den anderen Geräten gleich sein?</b>${shareChecks(store.get("syncPick",null)||DEF_PICK,"data-pick")}<small>Eigenes zweites Gerät (z. B. dein PC)? Dann auch Merkliste und Coupons anhaken. Familie: meist nur den Einkaufszettel. Kam der Code mit Auswahl, wird sie beim Einfügen übernommen.</small></div>
-     ${Sync._srv?`<p><b>Noch kein Code?</b> Einfach einen eigenen erstellen – kostenlos, ohne Anmeldung:</p><button class="btn" id="syncCreate" style="width:100%">✨ Neuen Familien-Code erstellen</button>
-     <p style="margin-top:14px"><b>Code bekommen?</b> Hier einfügen und verbinden:</p>`:`<p><b>Schon ein Gerät verbunden?</b> Dort „Code kopieren“ drücken, dir schicken und hier einfügen. Fertig.</p>`}
-     <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="Code einfügen (SR-… oder ghp_…)" autocomplete="off" spellcheck="false"><button class="btn${Sync._srv?" ghost":""}" type="submit">Verbinden</button></form>
-     <details class="steps-d"><summary>${Sync._srv?"Für Profis: eigenen GitHub-Schlüssel benutzen":"Noch kein Gerät verbunden? So bekommst du den Code (einmalig, am besten am PC)"}</summary>
+   :`<p>Damit mehrere Geräte denselben Einkaufszettel haben – z. B. Handy und PC oder du und die Menschen, mit denen du einkaufst. Hakt einer etwas ab, sehen es alle sofort. Kostenlos, ohne Anmeldung.</p>
+     <div class="shbox"><b>Was soll dieses Gerät teilen?</b>${shareChecks(store.get("syncPick",null)||DEF_PICK,"data-pick")}<small>Antippen = an oder aus. Hast du einen Code bekommen, ist die Auswahl meist schon drin und wird beim Einfügen übernommen. Später jederzeit änderbar.</small></div>
+     ${Sync._srv?`<p><b>Du fängst an?</b> Code erstellen, danach erscheint „Code kopieren“ zum Weitergeben:</p><button class="btn" id="syncCreate" style="width:100%">✨ Neuen Code erstellen</button>
+     <p style="margin-top:14px"><b>Du hast einen Code bekommen?</b> Hier einfügen und „Verbinden“ drücken:</p>`:`<p><b>Schon ein Gerät verbunden?</b> Dort „Code kopieren“ drücken, dir schicken und hier einfügen. Fertig.</p>`}
+     <form class="addrow" id="syncForm"><input id="syncToken" type="password" placeholder="Code einfügen (beginnt mit SR-)" autocomplete="off" spellcheck="false"><button class="btn${Sync._srv?" ghost":""}" type="submit">Verbinden</button></form>
+     <details class="steps-d"><summary>${Sync._srv?"Andere Möglichkeit: mit eigenem GitHub-Konto verbinden":"Noch kein Gerät verbunden? So bekommst du den Code (einmalig, am besten am PC)"}</summary>
      <ol class="steps"><li><a href="https://github.com/settings/tokens/new?scopes=gist&description=SparRadar" target="_blank" rel="noopener">Hier tippen</a> und bei GitHub anmelden.</li><li>Bei „Expiration“ <b>No expiration</b> auswählen. Der Haken bei <b>gist</b> ist schon gesetzt, sonst nichts anhaken.</li><li>Ganz unten auf den grünen Knopf <b>Generate token</b>.</li><li>Den langen Code, der mit <code>ghp_</code> anfängt, kopieren und oben einfügen.</li></ol><p style="font-size:.8rem">Der Schlüssel bleibt nur auf diesem Gerät und darf nur deinen geheimen SparRadar-Notizzettel bei GitHub lesen und schreiben.</p></details>
-     <p style="font-size:.8rem">Wer den Code hat, sieht und ändert eure geteilten Listen – also nur an Familie geben.</p>`}
+     <p style="font-size:.8rem">🔒 Wer den Code hat, sieht und ändert die geteilten Listen. Gib ihn nur Menschen, denen du vertraust.</p>`}
   </section>`}
 
 // Einladung: schöne Landingpage (einladung.html) mit Logo-Vorschau in WhatsApp; Name steht nur im Link
@@ -1202,8 +1206,8 @@ function renderShare(){
   return `<section class="panel invite" id="sharePanel">
    <div class="inv-head"><span class="inv-logo" aria-hidden="true"><img src="logo-tag.svg" alt="" width="36" height="36"></span>
     <div><span class="inv-badge">🎁 PERSÖNLICHE EINLADUNG</span><h3>SparRadar verschenken</h3></div></div>
-   <p>Lade Familie und Freunde ein. Sie bekommen eine Einladung mit Logo, tippen auf <b>„SparRadar installieren“</b> und haben die App auf dem Startbildschirm – ohne Warnungen, mit automatischen Updates.</p>
-   <label class="inv-name">Dein Name auf der Einladung<input id="inviteName" value="${esc(n)}" placeholder="z. B. Kevin" maxlength="30" autocomplete="off"></label>
+   <p>Lade Freunde, Familie oder Bekannte ein. Sie bekommen eine Einladung mit Logo, tippen auf <b>„SparRadar installieren“</b> und haben die App auf dem Startbildschirm – ohne Warnungen, mit automatischen Updates.</p>
+   <label class="inv-name">Dein Name auf der Einladung<input id="inviteName" value="${esc(n)}" placeholder="z. B. dein Vorname" maxlength="30" autocomplete="off"></label>
    <div class="links"><a class="btn wa inv-btn" id="inviteWa" href="${waLink(inviteText())}" target="_blank" rel="noopener">${WA_ICON}Einladung per WhatsApp senden</a>${navigator.share?'<button class="btn ghost" id="shareOther">Anders teilen …</button>':""}</div>
   </section>`}
 
@@ -1213,9 +1217,9 @@ function renderSettings(){
    <div class="sheet-h"><span class="newsico">${IC.gear}</span><h2>Einstellungen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    ${renderShare()}
    ${renderSync()}
-   ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hast du am Handy den letzten Artikel abgehakt, öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA, ALDI SÜD, Netto, Mein dm) – dann kannst du an der Kasse gleich deinen Code zeigen.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
+   ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hakst du am Handy den letzten Artikel ab, gilt der Einkauf als erledigt. Hast du für den Markt Coupons fotografiert, kommen sie zuerst groß nacheinander zum Scannen. Danach öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA, ALDI SÜD, Netto, Mein dm), damit du an der Kasse gleich deine Kundenkarte zeigen kannst.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
    <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
-   <section class="panel"><h3>SparRadar als App</h3><p>Android: APK aufs Handy laden und öffnen. Windows: Setup starten. Beide aktualisieren sich danach selbst und zeigen immer die neueste Version.</p>
+   <section class="panel"><h3>SparRadar als App</h3><p><b>Am einfachsten:</b> SparRadar in Chrome öffnen → Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. Ohne Warnungen, aktualisiert sich selbst.</p><p>Alternativ als Datei: Android-App (APK, Android fragt dabei nach Erlaubnis) oder Windows-Setup. Beide aktualisieren sich danach ebenfalls selbst.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
    <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen gegen 5:15 Uhr neu abgerufen${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
     <div class="links"><button class="btn ghost sm" id="reloadApp">App neu laden</button>${window.SparRadarApp?'<button class="btn ghost sm" id="appUpdNow">Nach App-Update suchen</button>':""}</div></section>
@@ -1392,7 +1396,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.share){const sh={...Sync.share()};sh[b.dataset.share]=!sh[b.dataset.share];Sync.setShare(sh);render();Sync.pull().then(()=>{toast(sh[b.dataset.share]?`${Sync.PARTS[b.dataset.share].n} wird jetzt geteilt`:`${Sync.PARTS[b.dataset.share].n} bleibt jetzt nur auf diesem Gerät`);render()});return}
   if(b.dataset.pick){const sh={...(store.get("syncPick",null)||DEF_PICK)};sh[b.dataset.pick]=!sh[b.dataset.pick];store.set("syncPick",sh);render();return}
   if(b.id==="syncCreate"){b.disabled=true;toast("Erstelle Code …");Sync.create(store.get("syncPick",null)||DEF_PICK).then(()=>{toast("Fertig! Jetzt „Code kopieren“ und an die anderen Geräte schicken.");render();setTimeout(()=>document.getElementById("syncPanel")?.scrollIntoView({block:"start",behavior:"smooth"}),80)},e=>{b.disabled=false;toast("Hat nicht geklappt: "+e.message)});return}
-  if(b.id==="syncMigrate"){if(!confirm("Auf Familien-Code umziehen? Merkliste, Zettel, Coupons und Geräte werden mitgenommen."))return;b.disabled=true;toast("Ziehe um …");
+  if(b.id==="syncMigrate"){if(!confirm("Auf einen SparRadar-Code umziehen? Merkliste, Zettel, Coupons und Geräte werden mitgenommen."))return;b.disabled=true;toast("Ziehe um …");
     Sync.migrate().then(()=>{toast("Umgezogen! Jetzt den neuen Code auf deinen anderen Geräten einfügen.");render()},e=>{b.disabled=false;toast("Hat nicht geklappt: "+e.message)});return}
   if(b.id==="syncMigDone"){const c=Sync.cfg();delete c.from;store.set("sync",c);render();return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}

@@ -28,6 +28,9 @@ App: https://tiry38.github.io/sparradar/ · Repo: https://github.com/Tiry38/spar
 - **Android-App-Hülle möglichst nie mehr ändern** (Kevins Wunsch): Jedes APK-Update verlangt in Android Bestätigungen und Warnungen. Alles Neue kommt über die Web-App. Der grüne Update-Balken für Android ist deshalb abgeschaltet; nur in den Einstellungen „Nach App-Update suchen“. Empfohlen für neue Nutzer: **Web-App über Chrome installieren** („App installieren“), ganz ohne APK und ohne Warnungen.
 - **Android-Updater:** Die APK prüft beim Start `version.json` im Release `apps` und bietet „Aktualisieren“ an (PackageInstaller, Android fragt selbst nach). Die Versionsnummer = 100 + Anzahl Commits in `android/`. Signiert wird mit dem festen Schlüssel aus dem GitHub-Secret `ANDROID_KEYSTORE` (Base64 einer PKCS12-Datei, Alias `sparradar`). Den Schlüssel **nie** ins Repo legen und nicht austauschen, sonst schlagen alle Updates fehl und jeder muss neu installieren.
 
+## Texte in der App
+- **Für jeden Nutzer erklärt** (Kevins Wunsch 01.11.: die App geht auch an Bekannte): keine Namen (Mama, Stefan, Kevin) und keine Entwickler-Sprache in Einstellungen, Willkommen oder Hinweisen. Schritt für Schritt, „du“-Form, allgemeine Beispiele („eigenes zweites Gerät“, „jemand, mit dem du einkaufst“). Code heißt in der App „SparRadar-Code“ bzw. „Code“ (nicht „Familien-Code“).
+
 ## Design und Bedienung (Stand 31.10.)
 - **Logo:** weißes Preisschild mit Prozentzeichen auf Farbverlauf Anthrazit -> Grün (`docs/icon.svg`, `icon-maskable.svg`, `logo-tag.svg` für die Logo-Kacheln, PNGs, `og.png`, `og-einladung.png`, Android `ic_launcher_*.xml`). Bei Logo-Änderung alle diese Dateien neu erzeugen und die Windows-Version (Commit in `desktop/`) hochzählen.
 - **Einladung:** `docs/einladung.html?von=<Name>` (Name nur im Link, nicht im Repo), installiert die Web-App über Chrome (keine APK, keine Warnung). Empfohlener Weg für alle Nutzer.
