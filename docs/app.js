@@ -50,6 +50,7 @@ const IC = {
  scale:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 3v18M5 7h14M5 7l-3 7h6zM19 7l-3 7h6z"/></svg>',
  box:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="m3 7 9-4 9 4v10l-9 4-9-4z"/><path d="m3 7 9 4 9-4M12 11v10"/></svg>',
  gear:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>',
+ scan:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>',
  bag:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M5 8h14l-1 13H6z"/><path d="M9 8a3 3 0 0 1 6 0"/></svg>'
 };
 
@@ -762,10 +763,12 @@ function compareHTML(o){
 // ---------- Barcode-Scanner ----------
 // Kamera -> Strichcode (EAN) -> Artikelname über Open Food Facts / Open Beauty Facts (offene Datenbanken)
 // -> passende Angebote. Erkennung: eingebauter BarcodeDetector (Chrome auf Android), sonst ZXing (docs/vendor).
-const Scan={stream:null,timer:null,busy:false,last:"",res:"",
-  msg(t){const e=document.getElementById("scanMsg");if(e)e.textContent=t},
+const Scan={stream:null,timer:null,busy:false,last:"",res:"",mode:"",added:[],unknown:"",cart:null,msgT:"",
+  msg(t){this.msgT=t;const e=document.getElementById("scanMsg");if(e)e.textContent=t},
   stop(){clearTimeout(this.timer);this.timer=null;if(this.stream){this.stream.getTracks().forEach(t=>t.stop());this.stream=null}},
-  sync(){if(S.sheet!=="scan"){this.stop();return}const v=document.getElementById("scanVideo");if(v&&!this.stream&&!this.busy)this.start(v)},
+  // Fenster neu gezeichnet (z. B. neue Daten) -> laufende Kamera an das neue Videofeld hängen
+  sync(){if(S.sheet!=="scan"){this.stop();return}const v=document.getElementById("scanVideo");if(!v)return;
+    if(this.stream){if(v.srcObject!==this.stream){v.srcObject=this.stream;v.play().catch(()=>{})}}else if(!this.busy)this.start(v)},
   async start(v){
     if(!navigator.mediaDevices?.getUserMedia){this.msg("Die Kamera ist hier nicht verfügbar. Tippe die Nummer unter dem Strichcode unten ein.");return}
     this.busy=true;
@@ -773,15 +776,15 @@ const Scan={stream:null,timer:null,busy:false,last:"",res:"",
     catch(e){this.busy=false;this.msg(/SparRadarAndroid/.test(navigator.userAgent)?"Die alte Android-App darf die Kamera nicht nutzen. Installiere SparRadar über Chrome (Einladungslink) oder tippe die Nummer unten ein.":"Kein Zugriff auf die Kamera. Erlaube den Zugriff oder tippe die Nummer unter dem Strichcode unten ein.");return}
     this.busy=false;if(S.sheet!=="scan"){this.stop();return}
     v.srcObject=this.stream;try{await v.play()}catch(e){}
-    this.msg("Strichcode in das Feld halten …");
+    this.msg(this.mode==="list"?"Strichcode in das Feld halten – der Artikel kommt sofort auf den Zettel.":"Strichcode in das Feld halten …");
     let det=null;
     if("BarcodeDetector" in window){try{const f=await BarcodeDetector.getSupportedFormats();if(f.includes("ean_13"))det=new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e"]})}catch(e){}}
     if(!det){try{await loadZXing()}catch(e){this.msg("Scanner konnte nicht geladen werden. Tippe die Nummer unten ein.");return}}
     const c=document.createElement("canvas"),ctx=c.getContext("2d",{willReadFrequently:true});
     const zx=det?null:(()=>{const h=new Map();h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,[ZXing.BarcodeFormat.EAN_13,ZXing.BarcodeFormat.EAN_8,ZXing.BarcodeFormat.UPC_A,ZXing.BarcodeFormat.UPC_E]);h.set(ZXing.DecodeHintType.TRY_HARDER,true);const r=new ZXing.MultiFormatReader();r.setHints(h);return r})();
-    const tick=async()=>{if(!this.stream||S.sheet!=="scan")return;let code="";
-      try{if(det){const r=await det.detect(v);code=r[0]?.rawValue||""}
-        else if(v.videoWidth){c.width=v.videoWidth;c.height=v.videoHeight;ctx.drawImage(v,0,0);
+    const tick=async()=>{if(!this.stream||S.sheet!=="scan")return;let code="";const vv=document.getElementById("scanVideo")||v;
+      try{if(det){const r=await det.detect(vv);code=r[0]?.rawValue||""}
+        else if(vv.videoWidth){c.width=vv.videoWidth;c.height=vv.videoHeight;ctx.drawImage(vv,0,0);
           code=zx.decodeWithState(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(c)))).getText()}}catch(e){}
       if(code&&code!==this.last){this.last=code;try{navigator.vibrate?.(80)}catch(e){}this.lookup(code)}
       this.timer=setTimeout(tick,det?250:400)};
@@ -789,13 +792,16 @@ const Scan={stream:null,timer:null,busy:false,last:"",res:"",
   async lookup(code){
     code=String(code).replace(/\D/g,"");if(code.length<8){this.msg("Bitte die ganze Nummer unter dem Strichcode eingeben (8 oder 13 Ziffern).");return}
     this.msg(`Strichcode ${code} erkannt – suche Artikel …`);
-    let p=null;
-    for(const host of ["world.openfoodfacts.org","world.openbeautyfacts.org"]){
+    const own=store.get("ean",{})[code],list=this.mode==="list";  // selbst eingetippte Namen (nur auf diesem Gerät)
+    let p=own?{product_name:own}:null;
+    if(!p)for(const host of ["world.openfoodfacts.org","world.openbeautyfacts.org"]){
       try{const r=await fetch(`https://${host}/api/v2/product/${code}.json?fields=product_name,product_name_de,brands,quantity`);
         const j=await r.json();if(j.status===1&&j.product){p=j.product;break}}catch(e){}}
     const box=document.getElementById("scanRes");if(!box)return;
-    if(!p){this.msg(`Strichcode ${code}: Artikel nicht in der offenen Produktdatenbank gefunden.`);box.innerHTML=`<p class="cmp-sub">Tipp: Gib den Namen oben in die Suche ein.</p>`;return}
-    const brand=(p.brands||"").split(",")[0].trim(),name=(p.product_name_de||p.product_name||"").trim(),full=[brand&&!norm(name).includes(norm(brand))?brand:"",name].filter(Boolean).join(" ");
+    const brand=(p?.brands||"").split(",")[0].trim(),name=(p?.product_name_de||p?.product_name||"").trim(),full=[brand&&!norm(name).includes(norm(brand))?brand:"",name].filter(Boolean).join(" ");
+    if(list){if(!name){this.unknown=code;this.uHint=brand;this.msg(`Strichcode ${code} ist nicht in der Produktdatenbank. Wie heißt der Artikel?`);zPaint();setTimeout(()=>document.getElementById("zNameIn")?.focus(),60);return}
+      this.unknown="";this.msg(`Erkannt: ${full}${p.quantity?" ("+p.quantity+")":""}`);zAdd(full,brand,code);return}
+    if(!full){this.msg(`Strichcode ${code}: Artikel nicht in der offenen Produktdatenbank gefunden.`);box.innerHTML=`<p class="cmp-sub">Tipp: Gib den Namen oben in die Suche ein.</p>`;return}
     this.msg(`Erkannt: ${full}${p.quantity?" ("+p.quantity+")":""}`);
     box.innerHTML=scanResultHTML(full,brand,name);this.res=box.innerHTML},
 };
@@ -810,14 +816,74 @@ function scanResultHTML(full,brand,name){
   return `${hits.length?`<h4>${esc(how)} im Angebot</h4>${hits.map(o=>`<button class="cmprow" data-detail="${esc(o.id)}">${sb(o.s)}<span class="cn">${esc(o.n)}<small>${esc(sname(o.s))}${o.d?" · "+esc(o.d):""}</small></span><span class="cp"><b>${eur(fin(o))}</b>${offPct(o)?`<small>−${offPct(o)} %</small>`:""}</span></button>`).join("")}`
     :`<p><b>Gerade nicht im Angebot.</b> Setz ihn auf die Merkliste, dann siehst du es, sobald ein Markt ihn reduziert.</p>`}
    ${full?(on?`<p class="cmp-sub">✓ „${esc(full)}“ ist auf deiner Merkliste.</p>`:`<button class="btn" data-watchname="${esc(full)}">${IC.star}„${esc(full)}“ merken</button>`):""}`}
-function renderScan(){
-  return `<div class="sheet scan" role="dialog" aria-modal="true" aria-label="Barcode scannen">
-   <div class="sheet-h"><h2>Artikel scannen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+function renderScan(){const list=Scan.mode==="list";
+  return `<div class="sheet scan" role="dialog" aria-modal="true" aria-label="${list?"Artikel auf den Einkaufszettel scannen":"Barcode scannen"}">
+   <div class="sheet-h"><h2>${list?"Auf den Zettel scannen":"Artikel scannen"}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <div class="scanbox"><video id="scanVideo" playsinline muted></video><i class="scanframe"></i></div>
-   <p id="scanMsg" class="scanmsg">Kamera wird gestartet …</p>
-   <form class="addrow" id="eanForm"><input id="eanIn" inputmode="numeric" pattern="[0-9 ]*" placeholder="oder Nummer unter dem Strichcode eintippen" autocomplete="off"><button class="btn" type="submit">Suchen</button></form>
-   <div id="scanRes" class="cmp scanres">${Scan.res}</div>
+   <p id="scanMsg" class="scanmsg">${esc(Scan.msgT||"Kamera wird gestartet …")}</p>
+   ${list?`<label class="zcart"><input type="checkbox" id="zCart"${zCart()?" checked":""}> 🛒 Gleich in den Wagen legen (abgehakt)</label>`:""}
+   <div id="scanRes" class="cmp scanres">${list?zResHTML():Scan.res}</div>
+   <form class="addrow" id="eanForm"><input id="eanIn" inputmode="numeric" pattern="[0-9 ]*" placeholder="oder Nummer unter dem Strichcode eintippen" autocomplete="off"><button class="btn" type="submit">${list?"Dazu":"Suchen"}</button></form>
+   ${list?`<button class="btn big zdone" id="zDone" type="button">${IC.check}Fertig – zum Zettel</button>`:""}
    <p class="cmp-sub">Artikeldaten: Open Food Facts / Open Beauty Facts (offene Datenbanken). Das Kamerabild bleibt auf deinem Gerät.</p></div>`}
+
+// ---------- Scanner für den Einkaufszettel (Kevins Wunsch 01.11.) ----------
+// Im Laden Strichcode scannen -> Artikel sofort auf den Zettel. Passt er sicher (gleiche Marke, Namenswörter) zu einem
+// Angebot im Markt, in dem man gerade ist (zuletzt abgehakt) bzw. der schon auf dem Zettel steht, kommt das Angebot mit
+// Preis drauf, sonst ein eigener Eintrag mit dem Namen (+ Angebote anderer Märkte als Knopf, nie automatisch).
+// Läuft der Einkauf schon (etwas abgehakt), landet er gleich im Wagen (abschaltbar). Steht er schon drauf -> nur abhaken.
+const ZSTOP=new Set(["mit","und","oder","der","die","das","den","von","fuer","aus","ohne","auf","zum","zur","versch","verschiedene","sorten","sorte","pro","stueck","packung","per"]);
+const zWords=s=>toks(s||"").filter(w=>w.length>2&&!/\d/.test(w)&&!ZSTOP.has(w));
+const zHas=(a,w)=>a.some(s=>s===w||(w.length>=4&&s.length>=4&&(s.endsWith(w)||w.endsWith(s))));
+const zCart=()=>Scan.cart??S.checked.some(id=>S.list.includes(id)||S.extra.some(x=>x.id===id));
+function zMatch(full,brand){const sw=zWords(full),bn=norm(brand||"").slice(0,12);if(!sw.length)return [];
+  const pool=zCart()?OFFERS.filter(o=>(o.from||"")<=TODAY&&(!o.to||o.to>=TODAY)):weekOffers();
+  return pool.map(o=>{const ob=norm(o.b||"").slice(0,12);
+    if(bn){if(ob?!(ob.startsWith(bn)||bn.startsWith(ob)):!norm(o.n).includes(bn))return null}
+    // „Cola, Fanta oder Sprite“: eine der Sorten muss passen
+    let r=0;for(const alt of String(o.n).split(/,|\/|\s+oder\s+|\s+od\.\s+/)){const nw=zWords(alt).filter(w=>!bn||w!==bn);if(!nw.length)continue;
+      const hit=nw.filter(w=>zHas(sw,w)).length;if(hit&&hit/nw.length>=.6&&(bn||hit>=2))r=Math.max(r,hit/nw.length)}
+    return r?{o,r}:null}).filter(Boolean)}
+function cartPut(id){if(S.checked.includes(id))return false;S.checked.push(id);wakeOn();const o=byId(id);
+  if(o){const v=r2((ref(o)-fin(o))*qty(id));if(v>0)S.saved.push({id,n:o.n,s:o.s,v,d:TODAY})}return true}
+function cartTake(id){S.checked=S.checked.filter(c=>c!==id);const j=S.saved.map(x=>x.off?null:x.id).lastIndexOf(id);if(j>=0)S.saved.splice(j,1)}
+function zAdd(full,brand,code){full=String(full||"").trim();if(!full)return;
+  const cart=zCart(),ms=zMatch(full,brand),onList=S.list.map(byId).filter(Boolean);
+  const here=[...S.checked].reverse().map(byId).find(o=>o&&S.list.includes(o.id))?.s,mkts=here?new Set([here]):new Set(onList.map(o=>o.s));
+  const pick=ms.filter(m=>mkts.has(m.o.s)).sort((a,b)=>b.r-a.r||fin(a.o)-fin(b.o))[0]?.o;
+  const ex=S.extra.find(x=>(code&&x.ean===code)||norm(x.n)===norm(full));
+  let id,st;
+  if(pick&&S.list.includes(pick.id)){id=pick.id;st="had"}
+  else if(ex){id=ex.id;st="had"}
+  else if(pick){S.list.push(pick.id);id=pick.id;st="offer"}
+  else{id="x-"+Date.now();while(S.extra.some(x=>x.id===id))id="x-"+(+id.slice(2)+1);S.extra.push(code?{id,n:full,ean:code}:{id,n:full});st="own"}
+  const carted=cart&&cartPut(id),alt=st==="own"?ms.map(m=>m.o).sort((a,b)=>fin(a)-fin(b)).filter((o,i,a)=>a.findIndex(y=>y.s===o.s)===i).slice(0,3).map(o=>o.id):[];
+  const old=Scan.added.findIndex(a=>a.id===id);
+  if(st==="had"&&old>=0){const a=Scan.added.splice(old,1)[0];a.carted=a.carted||carted;Scan.added.unshift(a)}
+  else Scan.added.unshift({id,n:full,st,carted,alt});
+  Scan.added=Scan.added.slice(0,8);
+  try{navigator.vibrate?.(st==="had"?[40,60,40]:120)}catch(e){}
+  save();zPaint()}
+function zUndo(id){const i=Scan.added.findIndex(a=>a.id===id);if(i<0)return;const a=Scan.added[i];
+  if(a.carted)cartTake(id);
+  if(a.st==="offer")S.list=S.list.filter(x=>x!==id);
+  if(a.st==="own")S.extra=S.extra.filter(x=>x.id!==id);
+  if(a.st!=="had")delete S.qty[id];
+  Scan.added.splice(i,1);Scan.last="";save();zPaint()}
+function zTake(xi,oi){const a=Scan.added.find(a=>a.id===xi),inCart=S.checked.includes(xi),had=S.list.includes(oi);if(!exTake(xi,oi))return;
+  if(inCart){cartTake(xi);cartPut(oi)}
+  if(a){a.id=oi;a.st=had?"had":"offer";a.carted=a.carted&&inCart;a.alt=[]}
+  save();zPaint()}
+function zResHTML(){
+  const ask=Scan.unknown?`<form class="addrow zask" id="zNameForm"><input id="zNameIn" value="${esc(Scan.uHint||"")}" placeholder="Wie heißt der Artikel? z. B. Kaffee" autocomplete="off"><button class="btn" type="submit">${IC.plus}Auf den Zettel</button></form>`:"";
+  if(!Scan.added.length)return ask+`<p class="cmp-sub">${zCart()?"Gescannte Artikel kommen auf den Zettel und gleich in den Wagen.":"Gescannte Artikel kommen sofort auf den Zettel."} Ist ein Artikel im Angebot, steht er mit Angebotspreis drauf.</p>`;
+  return ask+Scan.added.map((a,i)=>{const o=byId(a.id),x=S.extra.find(e=>e.id===a.id),inC=S.checked.includes(a.id),q=qty(a.id);
+    const what=a.st==="had"?(a.carted?"stand schon auf dem Zettel – jetzt im Wagen":inC?"stand schon auf dem Zettel, ist im Wagen":"steht schon auf dem Zettel")
+      :(o?`Angebot bei ${sname(o.s)}: ${eur(fin(o))}`:"auf dem Zettel")+(inC?" · im Wagen":"");
+    const alt=x&&a.alt.map(byId).filter(Boolean);
+    return `<div class="zrow${i?"":" new"}"><span class="zn"><b>✓ ${esc(a.n)}</b><small>${esc(what)}${q>1?` · ${q}×`:""}</small></span><span class="zbtns"><button class="btn sm ghost" data-zq="${esc(a.id)}" aria-label="eins mehr">+1</button><button class="btn sm ghost" data-zundo="${esc(a.id)}">Rückgängig</button></span>
+      ${alt&&alt.length?`<span class="zalt">💡 Im Angebot: ${alt.map(y=>`<button class="chip plain" data-ztake="${esc(a.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))} nehmen</button>`).join("")}</span>`:""}</div>`}).join("")}
+function zPaint(){const b=document.getElementById("scanRes");if(b&&Scan.mode==="list")b.innerHTML=zResHTML()}
 
 // ---------- Detailansicht eines Artikels ----------
 const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
@@ -871,6 +937,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  125:["📷 Einkaufszettel: Neuer Knopf „Scannen“. Im Laden einfach den Strichcode scannen – der Artikel kommt sofort auf den Zettel. Ist er im Angebot, steht er gleich mit Angebotspreis drauf. Während des Einkaufs liegt er direkt im Wagen."],
   124:["🌅 Neue Angebote kommen jetzt jeden Morgen eine Stunde früher: fertig gegen 5 Uhr (im Sommer gegen 6 Uhr). So kannst du auch vor einem frühen Einkauf noch reinschauen."],
   123:["🏷️ Zettel: Bei „Butter“, „Waschmittel“, „Eis“ & Co. zeigt der Aldi-Hinweis jetzt den wirklich günstigsten Artikel (z. B. Markenbutter 1,15 € statt Irische Butter)."],
   122:["⚡ Viel schneller: Kacheln, Filter und Märkte reagieren jetzt sofort beim Antippen – kein Hängen mehr.","🧹 Die Kachel „neue Angebote“ ist weg. Neue Angebote erkennst du weiter am grünen „Neu“ auf dem Bild."],
@@ -1420,7 +1487,7 @@ function renderConnect(){const close=`<button class="ibtn" id="closeSheet" aria-
 
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;if(extra.length)loadDauer();
-  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
+  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
   if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const done=id=>S.checked.includes(id);
@@ -1980,7 +2047,7 @@ function render(){memoReset();quickCheck();
   document.getElementById("main").innerHTML={offers:renderOffers,watch:renderWatch,list:renderList,tips:renderTips}[S.tab]();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
-  if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
+  if(S.sheet==="scan"&&S._shown==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen (nur wenn das Fenster schon offen ist)
   else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip,cbget:renderCbGet,bon:renderBon,connect:renderConnect}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
@@ -2043,7 +2110,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.fflag){const k=b.dataset.fflag;if(QUICK)QUICK.keys.delete(k);S.flt[k]=S.flt[k]?0:1;S.limit=60;fltStore();render();return}
   if(b.dataset.fclear){S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0,cb:0};fltStore();render();return}
   if(b.dataset.fdone){S.sheet=null;render();scrollTo({top:0});return}
-  if(b.id==="closeSheet"){S.sheet=null;render();return}
+  if(b.id==="closeSheet"||b.id==="zDone"){if(S.sheet==="scan"&&Scan.mode==="list"){const n=Scan.added.filter(a=>a.st!=="had").length;if(n)toast(`${n} ${n===1?"Artikel":"Artikel"} per Scan auf den Zettel gesetzt`)}S.sheet=null;render();return}
   if(b.id==="more"){S.limit+=60;render();return}
   if(b.dataset.store!==undefined){const k=b.dataset.store;if(!k)S.stores.clear();else S.stores.has(k)?S.stores.delete(k):S.stores.add(k);S.limit=60;render();return}
   if(b.dataset.cat!==undefined){const k=b.dataset.cat;if(!k)S.cats.clear();else S.cats.has(k)?S.cats.delete(k):S.cats.add(k);S.limit=60;render();return}
@@ -2090,7 +2157,10 @@ document.addEventListener("click",e=>{
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
   if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
-  if(b.id==="scanBtn"){Scan.last="";Scan.res="";S.sheet="scan";render();return}
+  if(b.id==="scanBtn"||b.id==="zScan"){Object.assign(Scan,{mode:b.id==="zScan"?"list":"",last:"",res:"",added:[],unknown:"",cart:null,msgT:""});S.sheet="scan";render();return}
+  if(b.dataset.zq){const id=b.dataset.zq;S.qty[id]=Math.min(49,qty(id)+1);save();zPaint();return}
+  if(b.dataset.zundo){zUndo(b.dataset.zundo);return}
+  if(b.dataset.ztake){const [x,o]=b.dataset.ztake.split("|");zTake(x,o);return}
   if(b.dataset.swap){const [a,c]=b.dataset.swap.split("|"),i=S.list.indexOf(a);if(i>=0)S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}const n=byId(c);save();toast(n?`Getauscht: jetzt bei ${sname(n.s)}`:"Getauscht");render();return}
   if(b.dataset.check){const id=b.dataset.check,i=S.checked.indexOf(id);
     if(i>=0){S.checked.splice(i,1);const j=S.saved.map(x=>x.off?null:x.id).lastIndexOf(id);if(j>=0)S.saved.splice(j,1)}
@@ -2147,7 +2217,10 @@ document.addEventListener("submit",e=>{
     if(!/^(ghp_|github_pat_)/.test(t)&&!/^SR-[A-Za-z0-9]{20}$/.test(t)){toast("Das sieht nicht wie ein SparRadar-Code aus (beginnt mit SR-).");return}
     const pick=store.get("syncPick",null)||DEF_PICK;
     toast("Verbinde …");Sync.connect(t,pick).then(()=>{toast(`Verbunden! Geteilt: ${Sync.on().map(p=>Sync.PARTS[p].n).join(", ")||"nichts"}`);render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
-  if(e.target.id==="eanForm"){e.preventDefault();const v=document.getElementById("eanIn").value;Scan.last=v;Scan.lookup(v);return}
+  if(e.target.id==="eanForm"){e.preventDefault();const inp=document.getElementById("eanIn"),v=inp.value;Scan.last=v.replace(/\D/g,"");Scan.lookup(v);if(Scan.mode==="list")inp.value="";return}
+  if(e.target.id==="zNameForm"){e.preventDefault();const n=document.getElementById("zNameIn").value.trim(),c=Scan.unknown;if(!n)return;
+    if(c){const m=store.get("ean",{});m[c]=n;const k=Object.keys(m);if(k.length>400)delete m[k[0]];store.set("ean",m)}
+    Scan.unknown="";Scan.msg(`Gespeichert: ${n}`);zAdd(n,"",c);return}
   if(e.target.id==="cpForm"){e.preventDefault();
     const val=id=>document.getElementById(id).value.trim();
     const v=parseNum(val("cpVal")),k=val("cpKw").replace(/\s+/g," ");
@@ -2159,7 +2232,7 @@ document.addEventListener("submit",e=>{
     toast(n?`Coupon gespeichert, passt zu ${n} Angebot${n===1?"":"en"}`:"Coupon gespeichert. Gerade passt kein Angebot dazu.");render();return}
 });
 // Programm passend zum gewählten Markt vorschlagen
-document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
+document.addEventListener("change",e=>{if(e.target.id==="zCart"){Scan.cart=e.target.checked;zPaint();return}if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render();showSugg("qSugg",S.q,"q")});
 document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.target.value,"q"));
 document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");if(e.target.id==="extraIn")showSugg("exSugg",parseExtra(e.target.value).n,"ex");
