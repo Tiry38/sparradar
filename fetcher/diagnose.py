@@ -1,15 +1,16 @@
-"""Diagnose (nur von Hand): Bilder-Wächter für einen einzelnen Artikel testen (Archiv + Sitemap-Größe)."""
-import fill_images as fi
-
-name = "IronMaxx SqueeBarista Caramel"
-ts, orig = fi.wayback_aldi(name)
-print("Archiv:", ts, orig)
-if ts:
-    html = fi.http(f"https://web.archive.org/web/{ts}id_/{orig}")
-    im = fi.page_img(html)
-    print("Bild:", im, "->", f"https://web.archive.org/web/{ts}im_/{im}" if im else "-")
-for shop, sm in fi.SITEMAPS.items():
-    urls = fi.sitemap_urls(sm, r"/produkt/|/p/[^/]+/p\d+")
-    print(shop, len(urls), urls[:3])
-    if urls:
-        h = fi.http(urls[0]); print("   og:image", fi.page_img(h))
+"""Diagnose (nur von Hand): Open Prices (Open Food Facts) als Quelle für echte Ladenpreise prüfen."""
+import json, urllib.request
+UA = {"User-Agent": "SparRadar/1.0 (+https://github.com/Tiry38/sparradar) Preisvergleich"}
+def get(u, n=3000):
+    try:
+        r = urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=40)
+        b = r.read(n); return r.status, b.decode("utf-8", "replace")
+    except Exception as e:
+        return "ERR", str(e)[:300]
+for u in ["https://prices.openfoodfacts.org/robots.txt",
+          "https://prices.openfoodfacts.org/api/v1/prices?product_code=4000405004562&size=3",
+          "https://prices.openfoodfacts.org/api/v1/prices?location__osm_address_country=Deutschland&size=1",
+          "https://huggingface.co/api/datasets/openfoodfacts/open-prices/tree/main",
+          "https://huggingface.co/robots.txt"]:
+    s, t = get(u)
+    print("==", u, s); print(t[:1500])
