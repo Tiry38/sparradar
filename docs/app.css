@@ -400,3 +400,4 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .pinbar{display:grid;gap:12px;min-width:0}
 @media (min-width:721px){.pinbar.pinned{position:fixed;top:0;z-index:20;padding:8px 0 10px;background:var(--bg);box-shadow:0 10px 24px -12px rgba(0,0,0,.45)}
   .pinbar.pinned::before{content:"";position:absolute;inset:0 -16px;background:var(--bg);z-index:-1}}
+.kr-note{font-size:.8rem;color:var(--muted);margin:10px 2px 0}

@@ -402,7 +402,13 @@ const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o
 // Kracher (Kevins Wunsch 01.11.): nur Lebensmittel & Drogerie – keine Non-Food-Aktionen wie Edekas Topf-Serie mit 70 %.
 // Und Abwechslung: höchstens 2 Artikel derselben Warengruppe pro Markt vorne, der Rest rutscht nach hinten.
 const ranked = () => {const all=weekOffers().filter(o=>o.p>0&&!NONFOOD_CATS.includes(o.c)).sort((a,b)=>score(b)-score(a)),n={},head=[],tail=[];
-  all.forEach(o=>{const k=o.s+"|"+o.c;n[k]=(n[k]||0)+1;(n[k]<=2?head:tail).push(o)});return head.concat(tail)};
+  all.forEach(o=>{const k=o.s+"|"+o.c;n[k]=(n[k]||0)+1;(n[k]<=2?head:tail).push(o)});const r=head.concat(tail);
+  // jeder Markt mit belegtem Vorteil (Rabatt oder „Dein Vorteil“) bekommt einen Platz unter den ersten 8 (Kevin: Rewe soll auch dabei sein)
+  [...new Set(r.map(o=>o.s))].forEach(st=>{if(r.slice(0,8).some(o=>o.s===st))return;
+    const b=r.find(o=>o.s===st&&(score(o)>0||perk(o)));if(b){r.splice(r.indexOf(b),1);r.splice(7,0,b)}});
+  return r};
+// Märkte mit Angeboten, aber ohne belegbaren Rabatt (Rewe druckt fast nie „statt“) -> kurzer Hinweis im Kracher
+const noProof=()=>{const r=ranked(),ws=weekOffers();return [...new Set(ws.map(o=>o.s))].filter(st=>!r.slice(0,8).some(o=>o.s===st))}
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>SHOP:!o.from||o.from<=SHOP))&&hitW(o,w))}));
 
 async function load(){
@@ -687,6 +693,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  78:["Kracher: Jeder Markt mit einem belegten Rabatt bekommt einen Platz. Fehlt ein Markt (oft Rewe, der selten „statt“-Preise druckt), steht kurz dabei, warum."],
   77:["Am PC bleibt die ganze obere Leiste (Logo, Schriftgröße, Woche und Reiter) beim Scrollen stehen."],
   76:["Kracher der Woche: nur noch Lebensmittel & Drogerie – keine Töpfe, Leitern & Co. mehr. Und mehr Abwechslung statt zehnmal dasselbe."],
   75:["Am PC bleibt die Leiste mit Angebote, Merkliste, Einkaufszettel und Coupons beim Runterscrollen oben stehen."],
@@ -820,6 +827,7 @@ function renderKracher(){
     </div></section>
    ${top.length?`<h3 class="sec-h">Beste Kombi-Deals</h3><p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Angebot + App-Preis, Bonus-Guthaben und deine Coupons zusammengerechnet.</p><div class="rows">${top.map(drow).join("")}</div>`:""}
    <h3 class="sec-h">Weitere Top-Angebote</h3><div class="rows">${rest.map(drow).join("")}</div>
+   ${noProof().length?`<p class="kr-note">ℹ️ ${noProof().map(sname).join(", ")}: im Prospekt stehen diesmal keine Vergleichspreise („statt“), daher kein belegbarer Kracher. Sobald es welche gibt, ist ${noProof().length>1?"jeder Markt":sname(noProof()[0])} automatisch dabei.</p>`:""}
    <h3 class="sec-h">Dein Wochenplan</h3>
    ${plan.length?`<p style="margin:-8px 0 0;color:var(--muted);font-size:.88rem">Für deine Merkliste lohnen sich ${plan.length} ${plan.length===1?"Markt":"Märkte"}:</p>
     <div class="plan">${plan.map(([s,g])=>`<div class="stop"><h4>${sb(s)}${esc(sname(s))}${g.save>0.005?`<em>spart ${eur(g.save)}</em>`:""}</h4><ul>${g.items.map(o=>`<li>${esc(o.n)}: ${eur(fin(o))}${unitTxt(o)?" ("+unitTxt(o)+")":""}</li>`).join("")}</ul></div>`).join("")}</div>
