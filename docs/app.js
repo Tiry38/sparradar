@@ -204,15 +204,15 @@ function steps(o){if(!o.p)return [{l:"Bonus-Aktion",v:0,t:"base"}]; // Rewe-Bonu
 const PROGS = ["Lidl Plus","Rewe Bonus","Payback","Netto App","Edeka App","dm App","Cashback-App","Geld zurück","Hersteller-Coupon","Sonstiges"];
 const CP_TYPES = {euro:"€ Rabatt / Guthaben",pct:"% Rabatt",preis:"Coupon-Preis (zahlst nur …)",punkte:"Payback-Extrapunkte"};
 const defaultProg = s => ({lidl:"Lidl Plus",rewe:"Rewe Bonus",netto:"Payback",edeka:"Payback",dm:"dm App",all:"Cashback-App"})[s]||"Sonstiges";
-const cpActive = c => !c.to || c.to>=TODAY;
+const cpActive = c => !c.done && (!c.to || c.to>=TODAY); // done = Geld-zurück-Bon eingereicht
 const couponsFor = o => S.coupons.filter(c=>cpActive(c)&&c.k&&(c.s==="all"||c.s===o.s)&&c.k.split(/\s+/).every(w=>matches(o,w)));
 function cpValue(c,cur){
-  if(c.t==="euro")return c.v;
+  if(c.t==="euro")return Math.min(c.v,cur);
   if(c.t==="pct"){const d=Math.round(cur*c.v)/100;return c.mx?Math.min(d,c.mx):d}
   if(c.t==="preis")return Math.max(0,cur-c.v);
   if(c.t==="punkte")return c.v/100; // 1 Payback-Punkt = 1 Cent
   return 0} // t:"app" (vom Coupon-Sucher) = App-Preis/Bonus steht schon im Angebot -> nicht doppelt abziehen
-function cpValueTxt(c){return !c.v?"Coupon":c.t==="app"?"−"+eur(c.v)+" mit App":c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
+function cpValueTxt(c){return c.lbl?c.lbl:!c.v?"Coupon":c.t==="app"?"−"+eur(c.v)+" mit App":c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
 const cpLabel = c => `${c.prog} ${cpValueTxt(c)}`;
 const fin = o => Math.round(steps(o).reduce((a,s)=>a+s.v,0)*100)/100;
 const offPct = o => {const r=ref(o);return r>0?Math.max(0,Math.round((1-fin(o)/r)*100)):0};
@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  89:["Geld zurück ganz einfach: Nach dem Einkauf zeigt SparRadar oben „💸 Geld zurückholen“ – Bon hochladen antippen, danach „Erledigt“.","Coupon-Finder: jetzt auch „2 kaufen, 1 gratis“ und feste Euro-Beträge vom Hersteller (z. B. 5 € zurück) – aus einer zweiten Übersicht, also deutlich mehr Aktionen."],
   88:["Die Coupon-Suche heißt jetzt „Coupon-Finder“."],
   87:["Neu: der Coupon-Finder findet jetzt geheime Geld-zurück-Aktionen der Hersteller (oft 100 % zurück), die in keiner Markt-App stehen. App-Preise siehst du weiter direkt bei den Angeboten.","Nach dem Einkauf erinnert SparRadar dich, den Kassenbon hochzuladen."],
   86:["Coupon-Bericht: oben nach Markt filtern – z. B. nur Lidl-Coupons ansehen."],
@@ -924,6 +925,7 @@ function finishTrip(ids,auto){
     extra:ex.map(x=>({id:x.id,n:x.n,q:qty(x.id),p:extraP(x)}))};
   t.paid=r2(t.items.reduce((a,x)=>a+x.p,0)+t.extra.reduce((a,x)=>a+x.p,0));t.saved=r2(t.items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
   S.trips.unshift(t);S.trips=S.trips.slice(0,400);
+  tripCb(t,1).forEach(c=>{if(!c.buy)c.buy=t.d}); // Geld-zurück: ab jetzt „Bon hochladen“ anzeigen
   S.list=S.list.filter(id=>!ids.includes(id));S.extra=S.extra.filter(x=>!ids.includes(x.id));S.checked=S.checked.filter(id=>!ids.includes(id));
   ids.forEach(id=>delete S.qty[id]);
   if(!S.list.length&&!S.extra.length)wakeOff();
@@ -951,13 +953,22 @@ function tripPop(t,auto){
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
    <div class="tp-n">${n} Artikel · bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</div>
    <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>
-   ${tripCb(t).map(c=>`<a class="btn ghost sm tp-cb" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">💸 Geld zurück: ${esc(c.n||c.k)} – Bon hochladen ↗</a>`).join("")}
+   ${tripCb(t).length?`<div class="tp-cbh">💸 Geld zurück! <b>Kassenbon aufheben</b> und jetzt oder später hochladen:</div>`:""}${tripCb(t).map(c=>`<a class="btn sm tp-cb" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 ${esc(c.n||c.k)}: Bon hochladen ↗</a>`).join("")}
    ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${auto&&store.get("openMktApp",true)?`${esc(MKT_APP[ms].n)} öffnet sich – Kundenkarte an der Kasse zeigen`:`${esc(MKT_APP[ms].n)}-App öffnen`}</button>`:""}`;
   el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms||tripCb(t).length?15000:auto?9000:6000);
   if(ms&&auto&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),350);
   try{if(TOUCH())navigator.vibrate?.([30,60,30])}catch(e){}}
 // Geld-zurück-Coupons, die zu einem Artikel des Einkaufs passen -> Link „Bon hochladen“
-function tripCb(t){return S.coupons.filter(c=>c.cb&&c.url&&cpActive(c)&&t.items.some(x=>(c.s==="all"||c.s===x.s)&&c.k.split(/\s+/).every(w=>norm((x.b+" "+x.n)).includes(norm(w))))).slice(0,3)}
+function tripCb(t,all){return S.coupons.filter(c=>c.cb&&c.url&&cpActive(c)&&t.items.some(x=>(c.s==="all"||c.s===x.s)&&c.k.split(/\s+/).every(w=>norm((x.b+" "+x.n)).includes(norm(w))))).slice(0,all?99:3)}
+// Offene Geld-zurück-Bons: gekauft (beim Abschluss des Einkaufs erkannt), Bon noch nicht hochgeladen
+const cbDue=()=>S.coupons.filter(c=>c.cb&&c.buy&&cpActive(c));
+function cbDueHTML(){const d=cbDue();if(!d.length)return "";
+  return `<section class="panel cbdue"><h3>💸 Geld zurückholen</h3>
+   <p>Du hast ${d.length===1?"einen Artikel":d.length+" Artikel"} mit Geld-zurück-Aktion gekauft. <b>Kassenbon bereitlegen</b>, dann:</p>
+   <ol class="cbsteps"><li><b>„Bon hochladen“</b> antippen</li><li>Kassenbon fotografieren, Name und Kontonummer (IBAN) eingeben, absenden</li><li>Hier <b>„Erledigt“</b> tippen</li></ol>
+   <div class="rows">${d.map(c=>`<div class="drow cbd-r"><div class="t">${esc(c.n||c.k)}<small>${esc(c.lbl||cpValueTxt(c))}${c.to?" · Bon hochladen bis "+fmtDate(c.to):""}</small></div>
+     <div class="cpf-b"><a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen</a><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div></div>`).join("")}</div>
+   <p class="cpf-n">Das Geld kommt meist nach 2–6 Wochen aufs Konto. Den Bon bis dahin aufheben.</p></section>`}
 function hideTripPop(){const el=document.getElementById("tripPop");if(el)el.hidden=true}
 const monKey=d=>d.slice(0,7),monName=k=>new Date(k+"-15").toLocaleDateString("de-DE",{month:"long",year:"numeric"});
 function storeSplit(ts){const m={};ts.forEach(t=>t.items.forEach(x=>m[x.s]=(m[x.s]||0)+x.p));const ex=ts.reduce((a,t)=>a+t.extra.reduce((b,x)=>b+x.p,0),0);if(ex>0)m._=ex;return Object.entries(m).sort((a,b)=>b[1]-a[1])}
@@ -1012,7 +1023,7 @@ function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;
   const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Eigener Eintrag, z. B. Brot 1,99 oder 3x Joghurt" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form>`;
-  if(!items.length&&!extra.length)return `${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder schreib oben selbst etwas dazu. SparRadar sortiert alles nach Markt.</div>`}${tripsHTML()}`;
+  if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder schreib oben selbst etwas dazu. SparRadar sortiert alles nach Markt.</div>`}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const done=id=>S.checked.includes(id);
   const sortDone=a=>[...a.filter(x=>!done(x.id)),...a.filter(x=>done(x.id))];  // was im Wagen liegt, rutscht nach unten
@@ -1026,7 +1037,7 @@ function renderList(){
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i><span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
-  return `${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}</div>
+  return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
      ${sortDone(os).map(o=>line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")).join("")}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
    ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"")).join("")}</div>`:""}
@@ -1068,14 +1079,20 @@ function SHOP_END(){const o=weekOffers().map(o=>o.to).filter(Boolean).sort();ret
 // Passende Angebote: Marke + (wenn vorhanden) ein weiteres Wort aus dem Aktionsnamen, nur in den genannten Märkten
 function cbOffers(a){const w=cbWords(a);if(!w.length)return [];const [br,...rest]=w;
   return weekOffers().filter(o=>o.p>0&&cbHit(o,br)&&rest.slice(0,2).every(x=>cbHit(o,x))&&(!a.shops?.length||a.shops.includes(o.s))).sort((x,y)=>fin(x)-fin(y))}
-const cbBack=(a,price)=>{const p=a.pct??100;let d=price*p/100;if(a.max)d=Math.min(d,a.max);return Math.round(d*100)/100};
+// Wie viel Geld zurück? pct = Prozent vom Preis, eur = fester Betrag (bei need>1 für alle Packungen zusammen), nfor = „2 kaufen, 1 gratis“
+const cbBack=(a,price)=>{let d=a.typ==="eur"?Math.min(a.eur,price*(a.need||1)):a.typ==="nfor"?price:price*(a.pct??100)/100;if(a.max)d=Math.min(d,a.max);return Math.round(d*100)/100};
+const cbLbl=a=>a.typ==="nfor"?`${a.need} kaufen, 1 gratis`:a.typ==="eur"?(a.need>1?`${a.need} kaufen, ${eur(a.eur)} zurück`:`${eur(a.eur)} zurück`):`${a.pct??100} % Geld zurück`;
+const cbShort=a=>a.typ==="nfor"?`${a.need} für ${a.need-1}`:a.typ==="eur"?"zurück":`${a.pct??100} %`;
+function cbHitTxt(a,o){const p=fin(o),n=a.need||1,back=cbBack(a,p),pay=Math.max(0,p*n-back);
+  if(back>=p*n-.005)return " → mit Geld zurück <b>gratis</b>";
+  return n>1?` → ${n} Stück zahlen, ${eur(back)} zurück: <b>je ${eur(pay/n)}</b>`:` → danach nur <b>${eur(pay)}</b>`}
 function cbFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c.cb).filter(Boolean));
   return (CASHBACK?.items||[]).filter(a=>cbLive(a)&&!no.includes("cb:"+a.id)&&!have.has(a.id)).map(a=>{const os=cbOffers(a),o=os[0]||null;
-    return {a,o,val:o?cbBack(a,fin(o)):(a.max||a.w||0)}}).sort((x,y)=>(!!y.o-!!x.o)||y.val-x.val||String(x.a.kauf||x.a.ende).localeCompare(String(y.a.kauf||y.a.ende)))}
+    return {a,o,val:o?cbBack(a,fin(o)):(a.typ==="eur"?a.eur:a.max||a.w||0)}}).sort((x,y)=>(!!y.o-!!x.o)||y.val-x.val||String(x.a.kauf||x.a.ende).localeCompare(String(y.a.kauf||y.a.ende)))}
 const cbShopTxt=a=>a.shops?.length?"bei "+a.shops.map(sname).join(", "):"in vielen Märkten";
 const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
 function cpHowHTML(){return `<section class="panel cphow"><h3>Geheime Coupons: Geld zurück vom Hersteller</h3>
-  <p>Viele Hersteller zahlen dir den Kaufpreis zurück („Gratis testen“). Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag für dich.</p>
+  <p>Viele Hersteller zahlen dir Geld zurück: oft den ganzen Kaufpreis („Gratis testen“), manchmal einen festen Betrag oder „2 kaufen, 1 gratis“. Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag für dich.</p>
   <ol><li><b>🔍 Coupon-Finder</b> antippen und bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
    <li><b>Ganz normal einkaufen</b> und den <b>Kassenbon aufheben</b>.</li>
    <li><b>💸 Geld holen:</b> Nach dem Einkauf auf „Bon hochladen“ tippen, Kassenbon fotografieren, Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
@@ -1090,17 +1107,19 @@ function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfi
   return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Finder</h3><button class="ibtn" id="cpFindX" aria-label="Coupon-Finder schließen">${IC.x}</button></div>
     ${chips}${f.length?`<p><b>${f.length} Geld-zurück-Aktion${f.length===1?"":"en"} gefunden – zusammen bis zu ${eur(tot)} zurück.</b> Ganz oben: was es gerade auch im Angebot gibt – doppelt gespart.</p>
     <div class="rows">${f.map(({a,o,val})=>`<div class="drow cpf-r">${o?`<button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>`:`<span class="mini cbico" aria-hidden="true">${CB_ICO[a.cat]||"💸"}</span>`}
-      <div class="t">${esc(a.n)}<small>${a.pct??100} % Geld zurück${a.max?" (max. "+eur(a.max)+")":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
-       ${o?`<small class="cbhit">🔥 Gerade im Angebot: ${esc(sname(o.s))} ${eur(fin(o))}${cbBack(a,fin(o))>=fin(o)-.005?" → mit Geld zurück <b>gratis</b>":" → danach nur "+eur(fin(o)-cbBack(a,fin(o)))}</small>`:""}</div>
-      <div class="pr"><b>−${eur(val)}</b><small>${a.pct??100} %</small></div>
+      <div class="t">${esc(a.n)}<small>${esc(cbLbl(a))}${a.max?" (max. "+eur(a.max)+")":""}${a.min?" · ab "+eur(a.min)+" Einkauf":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
+       ${o?`<small class="cbhit">🔥 Gerade im Angebot: ${esc(sname(o.s))} ${eur(fin(o))}${cbHitTxt(a,o)}</small>`:""}</div>
+      <div class="pr"><b>${val?"−"+eur(val):a.typ==="nfor"?"1 gratis":"gratis"}</b><small>${esc(cbShort(a))}</small></div>
       <div class="cpf-b"><button class="btn sm" data-cbadd="${esc(a.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="cb:${esc(a.id)}">Nein</button><a class="btn ghost sm" href="${esc(a.url)}" target="_blank" rel="noopener nofollow">Aktion ↗</a></div></div>`).join("")}</div>
     ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}`
     :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues</b>Alle aktuellen Geld-zurück-Aktionen hast du schon eingefügt oder abgelehnt. SparRadar sucht jeden Tag neu.</div>`}
-    <p class="cpf-n">Gefunden in einer öffentlichen Übersicht von Hersteller-Aktionen, täglich neu. „Aktion ↗“ öffnet die Seite des Herstellers mit allen Bedingungen. Oft gilt: nur eine Teilnahme pro Person, begrenzte Teilnehmerzahl.</p></section>`}
+    <p class="cpf-n">Gefunden in öffentlichen Übersichten von Hersteller-Aktionen (mystipendium.de, sparwelt.de), täglich neu. „Aktion ↗“ öffnet die Seite des Herstellers mit allen Bedingungen. Oft gilt: nur eine Teilnahme pro Person, begrenzte Teilnehmerzahl.</p></section>`}
 function cbAdd(id,quiet){const a=(CASHBACK?.items||[]).find(x=>x.id===id);if(!a)return 0;const o=cbOffers(a)[0],w=cbWords(a);
   const k=o?[w[0],...w.slice(1).filter(x=>cbHit(o,x)).slice(0,1)].join(" "):w.slice(0,2).join(" ");
-  S.coupons.push({id:"cb-"+a.id,s:o?o.s:(a.shops?.length===1?a.shops[0]:"all"),prog:"Geld zurück",k,t:"pct",v:a.pct??100,mx:a.max||null,to:a.ende||a.kauf||null,cb:a.id,url:a.url,n:a.n});
+  const n=a.need||1,val=a.typ==="eur"?{t:"euro",v:Math.round(a.eur/n*100)/100,mx:null}:a.typ==="nfor"?{t:"pct",v:Math.round(1000/n)/10,mx:a.max?Math.round(a.max/n*100)/100:null}:{t:"pct",v:a.pct??100,mx:a.max||null};
+  S.coupons.push({id:"cb-"+a.id,s:o?o.s:(a.shops?.length===1?a.shops[0]:"all"),prog:"Geld zurück",k,...val,lbl:cbLbl(a),to:a.ende||a.kauf||null,cb:a.id,url:a.url,n:a.n});
   if(o&&!S.list.includes(o.id))S.list.push(o.id);
+  if(o&&n>1)S.qty[o.id]=Math.max(S.qty[o.id]||1,n); // „2 kaufen, 1 gratis“: gleich 2 Stück auf den Zettel
   if(!quiet){save();toast(o?`Eingefügt und auf dem Zettel: ${a.n}. Kassenbon aufheben!`:`Eingefügt: ${a.n}. Beim Kauf Kassenbon aufheben!`)}return 1}
 
 function renderCoupons(){
@@ -1110,7 +1129,7 @@ function renderCoupons(){
   const popts=PROGS.map(p=>`<option ${p==="Rewe Bonus"?"selected":""}>${p}</option>`).join("");
   const topts=Object.entries(CP_TYPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
   const plus=7;const d=new Date(Date.now()+plus*864e5).toISOString().slice(0,10);
-  return `${cpFindHTML()}<section class="panel"><h3>Meine Coupons</h3>
+  return `${cbDueHTML()}${cpFindHTML()}<section class="panel"><h3>Meine Coupons</h3>
     <p>Coupon in Lidl Plus, der Rewe-App, bei Payback oder in einer Cashback-App aktiviert? Kurz hier eintragen. SparRadar rechnet ihn dann in alle passenden Angebote, den Kracher und den Einkaufszettel ein. Abgelaufene Coupons verschwinden von selbst.</p>
     <form class="form" id="cpForm">
      <div class="row"><label>Markt<select id="cpStore">${sopts}</select></label><label>Programm<select id="cpProg">${popts}</select></label></div>
@@ -1121,7 +1140,7 @@ function renderCoupons(){
     ${act.length?`<div class="rows">${act.map(({c,i})=>{const n=wo.filter(o=>couponsFor(o).includes(c)).length;
       return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#2B3034"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#2B3034">%</span>`:sb(c.s,true)}</div>
        <div class="t">${esc(c.cb&&c.n?c.n:c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?(c.cb?"Bon einsenden bis ":"bis ")+fmtDate(c.to):"ohne Ende"}</small>
-        ${c.cb&&c.url?`<a class="btn sm cblink" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen ↗</a>`:""}
+        ${c.cb&&c.url?`<div class="cpf-b cblink"><a class="btn sm" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen ↗</a><button class="btn ghost sm" data-cbdone="${esc(c.id)}">✓ Erledigt</button></div>`:""}
         <div class="pills"><span class="pill ${n?"cb":""}">${n?`passt zu ${n} Angebot${n===1?"":"en"}`:"gerade kein passendes Angebot"}</span></div></div>
        <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`
       :'<div class="empty" style="padding:16px"><b>Noch keine Coupons</b>Trag oben deinen ersten aktivierten Coupon ein.</div>'}
@@ -1393,6 +1412,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.cbadd){cbAdd(b.dataset.cbadd);render();return}
   if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set((CASHBACK?.items||[]).map(a=>"cb:"+a.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
   if(b.id==="cpFindAll"){const f=cbFinds().filter(x=>!S.cpfS||!x.a.shops?.length||x.a.shops.includes(S.cpfS)),n=f.reduce((a,x)=>a+cbAdd(x.a.id,true),0);save();toast(`${n} Geld-zurück-Aktionen eingefügt – Kassenbons aufheben!`);render();return}
+  if(b.dataset.cbdone){const c=S.coupons.find(x=>x.id===b.dataset.cbdone);if(c){c.done=TODAY;save();toast("Erledigt – das Geld kommt in ein paar Wochen.");render()}return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}

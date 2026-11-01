@@ -410,7 +410,13 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .cbico{display:grid;place-items:center;font-size:26px;background:color-mix(in srgb,var(--accent,#1f9d55) 12%,transparent)}
 .cbhit{display:block;margin-top:3px;color:var(--ok,#1f9d55);font-weight:600}
 .cbhit b{color:inherit}
-.cblink{display:inline-block;margin-top:6px}
+.cblink{margin-top:6px;grid-template-columns:1fr 1fr}
+.cbdue{border:2px solid var(--ok,#1f9d55)}
+.cbsteps{margin:6px 0 10px;padding-left:20px}
+.cbsteps li{margin:3px 0}
+.cbd-r{grid-template-columns:1fr}
+.cbd-r .cpf-b{grid-template-columns:1fr 1fr}
+.tp-cbh{margin-top:10px;font-size:.92em}
 .cpf-b .btn{justify-content:center}
 @media(min-width:560px){.drow.cpf-r{grid-template-columns:auto minmax(0,1fr) auto auto}.cpf-b{grid-column:auto;display:flex;align-self:center}}
 .cpf-n{font-size:.8rem;color:var(--muted)}
