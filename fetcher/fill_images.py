@@ -252,7 +252,7 @@ def main():
             for u in urls:
                 shops.add(slug_name(u), u)
         found, tried = 0, set()
-        # Durchgang 1: aktuelle Produktseiten (Sitemap-Treffer), Durchgang 2: Internet-Archiv
+        # Durchgang 1: aktuelle Produktseiten (Sitemap-Treffer)
         for n in todo:
             if net >= MAX_NET:
                 break
@@ -262,6 +262,19 @@ def main():
                 img = page_img(html)
                 if img:
                     extra[n] = img; found += 1; log("   +", n, "->", img[:100])
+        # Durchgang 2: gleiche Marke + Produktlinie, andere Sorte (eigene Daten, dann Aldi-/Lidl-Produktseiten)
+        for n in todo:
+            if n in extra:
+                continue
+            u = pool.find(n, loose=True)
+            if not u and net < MAX_NET:
+                page = shops.find(n, loose=True)
+                if page:
+                    html = http(page); net += 1; time.sleep(PAUSE)
+                    u = page_img(html)
+            if u:
+                extra[n] = u; found += 1; log("   ~ (gleiche Produktlinie)", n, "->", u[:90])
+        # Durchgang 3 (teuer, zuletzt): gelöschte Aldi-Seiten im Internet-Archiv
         for n in todo:
             if net >= MAX_NET:
                 break
@@ -274,18 +287,6 @@ def main():
                 if im:  # Bild über das Archiv laden (Original-Adresse kann schon gelöscht sein)
                     extra[n] = f"https://web.archive.org/web/{ts}im_/{im}"; found += 1; log("   + (Archiv)", n, "->", im[:90])
             tried.add(n)
-        # Durchgang 3: gleiche Marke + Produktlinie, andere Sorte (eigene Daten, dann Aldi-/Lidl-Produktseiten)
-        for n in todo:
-            if n in extra:
-                continue
-            u = pool.find(n, loose=True)
-            if not u and net < MAX_NET:
-                page = shops.find(n, loose=True)
-                if page:
-                    html = http(page); net += 1; time.sleep(PAUSE)
-                    u = page_img(html)
-            if u:
-                extra[n] = u; found += 1; log("   ~ (gleiche Produktlinie)", n, "->", u[:90])
         for n in tried:
             if n not in extra:
                 miss[n] = today + "+n"
