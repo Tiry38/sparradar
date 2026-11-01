@@ -562,3 +562,12 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .bonmeta{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px}
 .factions .btn.big{flex:1;min-height:52px;font-size:1.08rem}
 .bondet{margin-top:12px}.bondet summary{cursor:pointer;color:var(--muted);font-weight:600;padding:8px 0}
+/* Zettel: App-Vorteil aktivieren */
+.receipt .ract{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:-2px 0 6px 28px;padding:6px 8px;border-radius:10px;background:rgba(11,143,98,.08);font-family:var(--font,inherit);font-size:.78rem;line-height:1.35}
+.receipt .ract.on{background:rgba(11,143,98,.16)}.receipt .ract.later{background:rgba(234,88,12,.08)}
+.receipt .ract span{min-width:0}
+.receipt .actbtn{flex:none;all:unset;box-sizing:border-box;cursor:pointer;padding:6px 10px;border-radius:999px;background:#0B8F62;color:#fff;font-weight:700;font-size:.78rem;white-space:nowrap}
+.receipt .actbtn.on{background:transparent;color:inherit;border:1px solid var(--line);font-weight:600}
+.receipt .ractsum{margin:4px 0 8px;padding:8px 10px;border-radius:10px;border:1px dashed #0B8F62;font-size:.8rem;line-height:1.4}
+.receipt .rnote{margin-top:12px;font-size:.75rem;color:var(--muted);line-height:1.4}
+@media(max-width:559px){.receipt .ract{margin-left:0;flex-wrap:wrap}.receipt .actbtn{margin-left:auto}}

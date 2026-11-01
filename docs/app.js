@@ -57,7 +57,7 @@ const IC = {
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0},store.get("flt",{})),useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
-  coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),sheet:null,limit:60};
+  coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),act:store.get("act",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),sheet:null,limit:60};
 let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
@@ -88,7 +88,7 @@ let tt; function toast(m){const t=document.getElementById("toast");t.textContent
 // Scheck-In/Serpa und „Angebot eintragen“ wurden entfernt: alte Einträge vom Gerät löschen
 try{localStorage.removeItem("sr_manual")}catch(e){}
 S.coupons=S.coupons.filter(c=>c.s==="all"||STORES[c.s]);
-const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);store.set("saved",S.saved);store.set("trips",S.trips);store.set("qty",S.qty);store.set("budget",S.budget);Sync.changed()};
+const save = () => {store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);store.set("act",S.act);store.set("saved",S.saved);store.set("trips",S.trips);store.set("qty",S.qty);store.set("budget",S.budget);Sync.changed()};
 
 // ---------- Geräte verbinden (Handy <-> PC) ----------
 // Merkliste, Einkaufszettel und Coupons liegen zusätzlich in einem geheimen Gist im
@@ -556,7 +556,7 @@ const waLink = t => "https://wa.me/?text="+encodeURIComponent(t);
 const SHARE_TXT = `Schau mal: SparRadar zeigt alle Angebote rund um Wörth am Rhein (Lidl, Aldi, Rewe, Netto, Edeka, dm) 🛒\n${APP_URL}\n\nAls Android-App zum Installieren:\n${APK_URL}`;
 function listText(){const items=S.list.map(byId).filter(Boolean),g={};items.forEach(o=>(g[o.s]=g[o.s]||[]).push(o));
   const ex=S.extra.length?"\n\nSONSTIGES\n"+S.extra.map(x=>"- "+(qty(x.id)>1?qty(x.id)+"× ":"")+x.n+(x.p?" "+eur(x.p*qty(x.id)):"")).join("\n"):"";
-  return "🛒 Einkaufszettel\n\n"+Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${qty(o.id)>1?qty(o.id)+"× ":""}${o.n}${o.d?" ("+o.d+")":""} ${eur(fin(o)*qty(o.id))}${comboLabels(o).length?" mit "+comboLabels(o).join(" + "):""}`).join("\n")).join("\n\n")+ex}
+  return "🛒 Einkaufszettel\n\n"+Object.entries(g).map(([s,os])=>sname(s).toUpperCase()+"\n"+os.map(o=>`- ${qty(o.id)>1?qty(o.id)+"× ":""}${o.n}${o.d?" ("+o.d+")":""} ${eur(lineP(o))}${needAct(o)&&!isAct(o)?` (mit ${appName(o)||"App"}: ${eur(r2(finTill(o,true)*qty(o.id)))})`:""}`).join("\n")).join("\n\n")+ex}
 const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
 
 // ---------- Ansichten ----------
@@ -757,6 +757,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  103:["Einkaufszettel = Kassenpreis: Die Summe zeigt jetzt genau, was du an der Kasse zahlst. App-Preise zählen erst, wenn du beim Artikel „Aktiviert ✓“ antippst – SparRadar sagt dir dabei, was in welcher App zu tun ist.","Rewe-Bonus-Guthaben, Payback und Geld zurück werden nicht mehr von der Summe abgezogen (die kommen ja erst später). Sie stehen als „Kommt später zurück“ beim Artikel."],
   102:["Geld zurück: Die Zahl bei „Deine Woche“ passt jetzt zum gewählten Markt. Antippen zeigt direkt die Angebote mit Geld zurück.","Den Coupon-Finder gibt es nicht mehr – SparRadar findet Geld-zurück-Aktionen automatisch und zeigt sie direkt bei den Angeboten (oranges Abzeichen „💸“)."],
   101:["Neu: Kassenbon eintragen. Im Einkaufszettel „📷 Bon fotografieren“ antippen – oder in der Markt-App (Lidl Plus, REWE, EDEKA, Netto, dm …) beim Bon auf „Teilen“ → SparRadar. Passt alles, ist der Einkauf sofort mit den echten Preisen gespeichert. Der Bon bleibt nur auf deinem Gerät."],
   100:["Einkaufszettel: Beim Eintippen erscheinen jetzt passende Artikel mit Bild – auch alles, was gerade nicht im Angebot ist. Antippen setzt ihn auf den Zettel. Ist er gerade im Angebot, kommt gleich das Angebot mit Preis drauf."],
@@ -996,7 +997,17 @@ const qty=id=>Math.max(1,S.qty[id]||1);
 function qStep(id,big){return `<span class="qstep cq${big?" big":""}" title="Menge auf dem Einkaufszettel"><button data-qm="${esc(id)}" aria-label="weniger">−</button><b>${qty(id)}<small>×</small></b><button data-qp="${esc(id)}" aria-label="mehr">+</button></span>`}
 const r2=v=>Math.round(v*100)/100;
 // an der Kasse bezahlt: ohne Geld zurück / Cashback / Payback (kommt erst später)
-const finTill=o=>Math.round(steps(o).filter(x=>x.t!=="cb").reduce((a,x)=>a+x.v,0)*100)/100;
+// Kassenpreis (Kevins Wunsch 01.11.: Zettel = genau das, was man an der Kasse zahlt):
+// - Geld zurück, Payback, Cashback und Rewe-Bonus-Guthaben gehen NICHT an der Kasse ab -> nie in der Summe
+// - App-Preise/App-Vorteile zählen erst, wenn auf dem Zettel „In der App aktiviert“ angetippt ist (S.act)
+// - selbst eingetragene Coupons zählen sofort (wer sie einträgt, hat sie)
+const offTill=s=>s.t==="cb"||s.t==="bonus";
+const actStep=s=>!["base","of","coupon","cb","bonus"].includes(s.t);
+const needAct=o=>!!(S.useApp&&(o.ao||steps(o).some(actStep)));
+const isAct=o=>S.act.includes(o.id);
+const tillUnknown=o=>needAct(o)&&!isAct(o)&&!!o.ao&&!o.o; // Preis gilt nur mit App, Preis ohne App steht nirgends
+const tillSteps=(o,on)=>{on=on??(!needAct(o)||isAct(o));return steps(o).filter(s=>!offTill(s)&&(on||!actStep(s))&&!(!on&&o.ao&&s.t==="of"))};
+const finTill=(o,on)=>r2(tillSteps(o,on).reduce((a,x)=>a+x.v,0));
 const lineP=o=>r2(finTill(o)*qty(o.id)),lineR=o=>r2(Math.max(ref(o),finTill(o))*qty(o.id)),extraP=x=>x.p?r2(x.p*qty(x.id)):0;
 // „3x Joghurt“, „Brot 1,99“, „Kaffee 4,49 €“ -> Menge, Name, Preis
 function parseExtra(v){let q=1,n=v.trim(),p=0,m=n.match(/^(\d{1,2})\s*[x×*]\s*(.+)$/i)||n.match(/^(\d{1,2})\s+(.+)$/);
@@ -1018,7 +1029,7 @@ function finishTrip(ids,auto){
     const x=t.items.find(x=>(c.s==="all"||c.s===x.s)&&c.k.split(/\s+/).every(w=>norm(x.b+" "+x.n).includes(norm(w))));
     if(x&&!c.amt){const q=x.q||1;c.amt=r2(Math.min(x.p,cpValue(c,x.p/q)*q))}});
   S.list=S.list.filter(id=>!ids.includes(id));S.extra=S.extra.filter(x=>!ids.includes(x.id));S.checked=S.checked.filter(id=>!ids.includes(id));
-  ids.forEach(id=>delete S.qty[id]);
+  ids.forEach(id=>delete S.qty[id]);S.act=S.act.filter(id=>S.list.includes(id));
   if(!S.list.length&&!S.extra.length)wakeOff();
   save();render();tripPop(t,auto)}
 // Einkauf zurück auf den Zettel holen (zum Nachlesen oder weil noch etwas fehlt) – alles bleibt abgehakt
@@ -1147,12 +1158,23 @@ function renderList(){
   const sortDone=a=>[...a.filter(x=>!done(x.id)),...a.filter(x=>done(x.id))];  // was im Wagen liegt, rutscht nach unten
   // Laufweg im Markt: Obst & Gemüse vorne, Tiefkühl zuletzt (bleibt kalt), Non-Food dazwischen wie in den meisten Märkten
   const aisle=o=>AISLE[o.c]??AISLE.sonstiges,walk=a=>a.slice().sort((x,y)=>aisle(x)-aisle(y));
+  // Unter dem Artikel: was man in der App tun muss (mit Knopf „aktiviert“) und was erst später zurückkommt
+  const actRow=o=>{if(done(o.id))return "";const out=[],q=qty(o.id),an=appName(o)||"Markt-App";
+    if(needAct(o)){const with_=r2(finTill(o,true)*q),without=r2(finTill(o,false)*q),on=isAct(o),how=o.s==="lidl"&&o.ap&&!o.ao?"an der Kasse Lidl Plus zeigen":`in der ${an} aktivieren`;
+      out.push(on?`<div class="ract on"><span>✓ <b>${esc(an)}</b> aktiviert – du zahlst ${eur(with_)}${without>with_+.004?` (spart ${eur(without-with_)})`:""}</span><button class="actbtn on" data-act="${esc(o.id)}" aria-pressed="true">Rückgängig</button></div>`
+        :`<div class="ract"><span>📱 Mit <b>${esc(an)}</b> nur ${eur(with_)}${o.ao&&!o.o?"":` statt ${eur(without)}`} – ${how}.${o.ao&&!o.o?" Ohne App ist der Preis höher.":""}</span><button class="actbtn" data-act="${esc(o.id)}" aria-pressed="false">Aktiviert ✓</button></div>`)}
+    const later=steps(o).filter(offTill);
+    if(later.length)out.push(`<div class="ract later"><span>💰 Kommt später zurück (nicht an der Kasse): ${later.map(x=>esc(x.l)+" "+eur(-x.v*q)).join(" · ")}</span></div>`);
+    return out.join("")};
   const walkLines=os=>{let last=-1;const open=walk(os.filter(o=>!done(o.id)));
-    return open.map(o=>{const a=aisle(o),h=os.length>3&&a!==last?`<div class="raisle">${esc(AISLE_N[a])}</div>`:"";last=a;return h+line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")}).join("")
-      +os.filter(o=>done(o.id)).map(o=>line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")).join("")};
+    return open.map(o=>{const a=aisle(o),h=os.length>3&&a!==last?`<div class="raisle">${esc(AISLE_N[a])}</div>`:"";last=a;return h+line(o.id,o.n,(tillUnknown(o)?"ca. ":"")+eur(lineP(o)))+actRow(o)}).join("")
+      +os.filter(o=>done(o.id)).map(o=>line(o.id,o.n,eur(lineP(o)))).join("")};
+  // Pro Markt oben: wie viele App-Vorteile noch nicht aktiviert sind und was sie sparen
+  const actSum=os=>{const n=os.filter(o=>!done(o.id)&&needAct(o)&&!isAct(o));if(!n.length)return "";
+    const sv=r2(n.reduce((a,o)=>a+(finTill(o,false)-finTill(o,true))*qty(o.id),0)),an=appName(n[0])||"Markt-App";
+    return `<div class="ractsum">📱 <b>${n.length} ${n.length===1?"Vorteil":"Vorteile"} mit ${esc(an)}</b>${sv>.004?` (spart ${eur(sv)})`:""} – beim Artikel „Aktiviert ✓“ antippen, wenn du ${n.length===1?"ihn":"sie"} nutzt.</div>`};
   const sum=items.reduce((a,o)=>a+lineP(o),0)+extra.reduce((a,x)=>a+extraP(x),0),reg=items.reduce((a,o)=>a+lineR(o),0)+extra.reduce((a,x)=>a+extraP(x),0);
   const rest=items.filter(o=>!done(o.id)).reduce((a,o)=>a+lineP(o),0)+extra.filter(x=>!done(x.id)).reduce((a,x)=>a+extraP(x),0);
-  const todo=[...new Set(items.flatMap(comboLabels))];
   // 🎟️ je Artikel: im Laden Coupon mit einem Tipp nachtragen (öffnet den Artikel mit den Coupon-Knöpfen)
   const cpBtn=id=>{if(id.startsWith("x-")||done(id))return "";const o=byId(id);if(!o||!o.p)return "";const c=couponsFor(o)[0];
     return `<button class="cpbtn${c?" on":""}" data-cpqlist="${esc(id)}" aria-label="${c?"Coupon "+esc(cpValueTxt(c)):"Coupon eintragen"}" title="${c?"Coupon eingerechnet":"Ich habe einen Coupon dafür"}">🎟️${c?`<small>${esc(cpValueTxt(c))}</small>`:""}</button>`};
@@ -1162,10 +1184,10 @@ function renderList(){
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
   return `${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
-     ${walkLines(os)}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
+     ${actSum(os)}${walkLines(os)}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
    ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"")).join("")}</div>`:""}
-   <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
-   ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
+   <div class="rtot"><div class="big"><span>SUMME</span><span>${items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
+   <div class="rnote">Die Summe ist dein Preis an der Kasse. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.</div></div>
    <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
    ${bonBoxHTML()}${tripsHTML()}`}
 
@@ -1746,6 +1768,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.mktauto){store.set("openMktApp",!store.get("openMktApp",true));render();return}
   if(b.dataset.tripfinish){finishTrip([...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)].filter(x=>S.checked.includes(x)),false);return}
   if(b.dataset.triprestore){restoreTrip(b.dataset.triprestore);return}
+  if(b.dataset.act){const id=b.dataset.act;S.act=S.act.includes(id)?S.act.filter(x=>x!==id):[...S.act,id];save();render();if(S.act.includes(id))toast("Aktiviert – der App-Preis zählt jetzt in der Summe");return}
   if(b.dataset.bonpick){bonPick(b.dataset.bonpick==="cam");return}
   if(b.dataset.bonmore&&BON.r){BON.more=!BON.more;render();return}
   if(b.dataset.bonx!=null&&BON.r){const x=BON.r.items[+b.dataset.bonx];if(x)x.on=!x.on;render();return}
