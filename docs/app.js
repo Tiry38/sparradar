@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  80:["Kracher: höchstens 2 Angebote pro Markt je Abschnitt – nicht mehr fast nur Edeka mit App-Preis."],
   79:["Angebote nach Ersparnis: erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tierbedarf und zum Schluss Technik, Kleidung & Co. – innerhalb jeder Gruppe weiter nach dem höchsten Rabatt."],
   78:["Kracher: Jeder Markt mit einem belegten Rabatt bekommt einen Platz. Fehlt ein Markt (oft Rewe, der selten „statt“-Preise druckt), steht kurz dabei, warum."],
   77:["Am PC bleibt die ganze obere Leiste (Logo, Schriftgröße, Woche und Reiter) beim Scrollen stehen."],
@@ -811,8 +812,11 @@ function weekPlan(){const by={};S.watch.forEach(w=>{const h=weekOffers().filter(
 function renderKracher(){
   const r=ranked(),k=r[0];if(!k)return"";
   const vd=verdict(k),st=steps(k),inL=S.list.includes(k.id);
-  const top=S.useApp?r.filter(o=>o!==k&&((o.x||[]).length||o.ap||couponsFor(o).length)).slice(0,5):[];
-  const rest=r.filter(o=>o!==k&&!top.includes(o)).slice(0,8-top.length);
+  // Abwechslung (Kevin: zu viel Edeka mit App): höchstens 2 je Markt pro Abschnitt, Rest füllt nur auf, wenn sonst zu wenig da ist
+  const pickDiv=(list,n,cap)=>{const c={},out=[];list.forEach(o=>{if(out.length<n&&(c[o.s]||0)<cap){c[o.s]=(c[o.s]||0)+1;out.push(o)}});
+    list.forEach(o=>{if(out.length<n&&!out.includes(o))out.push(o)});return out};
+  const top=S.useApp?pickDiv(r.filter(o=>o!==k&&((o.x||[]).length||o.ap||couponsFor(o).length)),5,2):[];
+  const rest=pickDiv(r.filter(o=>o!==k&&!top.includes(o)),8-top.length,2);
   const lows=r.filter(o=>verdict(o).t==="low").slice(0,5),fakes=weekOffers().filter(o=>verdict(o).t==="fake").slice(0,5);
   const plan=weekPlan();
   const drow=o=>`<div class="drow" data-detail="${esc(o.id)}"><div class="mini" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}</div>
