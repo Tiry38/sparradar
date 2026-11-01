@@ -412,34 +412,6 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .cpf-n{font-size:.8rem;color:var(--muted)}
 #cpFindAll{margin-top:10px}
 .cphow ol{margin:6px 0 0;padding-left:20px;display:grid;gap:8px;line-height:1.45}
-.cpbig{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-.cpbig .btn.cpfind{margin:0}
-@media(max-width:480px){.cpbig{grid-template-columns:1fr}}
 .cpf-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;font-size:.9rem}
 .cpf-act .mktbtn,.rs .mktbtn.ks{background:transparent;border:1.5px solid var(--save);border-radius:999px;padding:6px 12px;font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;color:inherit}
 .rs .mktbtn.ks{margin-left:auto}
-.cpnew .cpn-g{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center;margin:8px 0 12px}
-.cpnew .cpn-g img{width:110px;max-height:140px;object-fit:contain;border-radius:10px;background:#fff;border:1px solid var(--line)}
-.cpnew .ok{color:#15803d}
-.cpnew label small{font-weight:400;color:var(--muted)}
-.cpn-q{margin:12px 0 6px}
-.cpn-s{display:flex;flex-wrap:wrap;gap:8px}
-.cpn-s .chip{font-size:1rem;padding:10px 14px}
-.btn.sm.has{color:#15803d;border-color:#86efac}
-.kasse .ks-dots{display:flex;justify-content:center;gap:6px;margin:4px 0 10px}
-.kasse .ks-dots i{width:10px;height:10px;border-radius:50%;background:var(--line);font-style:normal;font-size:0}
-.kasse .ks-dots i.d{background:#86efac}.kasse .ks-dots i.on{background:#16a34a;transform:scale(1.3)}
-.kasse .ks-dots i.ap{width:auto;height:auto;background:none;font-size:.8rem;opacity:.5}.kasse .ks-dots i.ap.on{opacity:1;transform:none}
-.kasse .ks-step{text-align:center;margin:0 0 10px}
-.kasse .ks-card{background:#fff;color:#000;border-radius:16px;padding:12px;display:grid;gap:10px;justify-items:center;box-shadow:0 2px 14px rgba(0,0,0,.12)}
-.kasse .ks-card svg{width:100%;height:auto;max-height:42vh}
-.kasse .ks-card img{max-width:100%;max-height:52vh;object-fit:contain}
-.kasse .ks-t{text-align:center;display:grid;gap:2px}.kasse .ks-t span{color:#444}
-.kasse .ks-next,.kasse .ks-app{width:100%;justify-content:center;font-size:1.15rem;padding:16px;margin-top:14px}
-.kasse .ks-a{display:flex;justify-content:space-between;margin-top:8px}
-.kasse .ks-tip{font-size:.8rem;color:var(--muted);text-align:center}
-.kasse .ks-fin{display:grid;gap:10px;text-align:center;justify-items:center;padding:8px 0}
-.kasse .ks-fin .btn{width:100%;justify-content:center}
-.kasse .ks-ok{width:56px;height:56px;border-radius:50%;background:#16a34a;color:#fff;font-size:2rem;display:grid;place-items:center}
-.kasse .ks-sum .sv{color:#15803d}
-.kasse .ks-n{display:block;font-family:var(--f-display);font-size:1.5rem;font-weight:800;margin-bottom:4px}
