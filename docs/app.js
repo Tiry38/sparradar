@@ -449,7 +449,7 @@ async function load(){
     RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();
     const g=new Date(o.generated);
     const pr=flyerInfo();
-    document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
+    document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote<span id="tick"></span>${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;if(typeof tickShow==="function")tickShow();
     document.getElementById("flyerInfo").innerHTML=pr.rows;
   }catch(e){
     OFFERS=[];
@@ -758,6 +758,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  109:["Oben neben „Stand“ siehst du jetzt, wann SparRadar zuletzt nach neuen Prospekten gesucht hat. „Stand“ ist der letzte komplette Abruf aller Angebote."],
   108:["App-Angebote stehen nicht mehr doppelt da: Der App-Preis steht jetzt nur noch an einer Karte (z. B. Skyr bei Netto)."],
   107:["Oben an jedem Markt steht jetzt eine kleine orange „💸 Zahl“: So viele Angebote mit Geld zurück hat dieser Markt diese Woche."],
   106:["Der Filter „Geld zurück“ (und „Preis-Alarm“) aus „Deine Woche“ ist jetzt schlau: Er gilt nur für das, was du gerade ansiehst. Wechselst du den Markt, die Kategorie oder die Woche oder suchst etwas, geht er von selbst aus – so siehst du nie eine leere Liste."],
@@ -1903,6 +1904,13 @@ async function freshen(){
   }catch(e){}
 }
 setInterval(freshen,5*60*1000);
+// Wann zuletzt nach neuen Prospekten gesucht wurde (Taktgeber, alle 15 min am Wochenende) – „Stand“ ist nur der letzte Abruf mit neuen Daten
+let TICK=0;
+async function tickLoad(){try{const u=await Sync.srv();if(!u)return;const t=(await (await fetch(u+"/tick",{cache:"no-store"})).json()).at;if(t){TICK=t;tickShow()}}catch(e){}}
+function tickShow(){const el=document.getElementById("tick");if(!el||!TICK)return;const d=new Date(TICK),today=new Date().toDateString()===d.toDateString();
+  el.textContent=` · zuletzt nach Neuem gesucht: ${today?"":d.toLocaleDateString("de-DE",{weekday:"short"})+" "}${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`}
+tickLoad();setInterval(tickLoad,5*60*1000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)tickLoad()});
 // Samstag 22 Uhr: offene App wechselt von selbst auf die Angebote ab Montag
 setInterval(()=>{if(shopFrom()!==SHOP)location.reload()},60*1000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(freshen.last||0)>60*1000){freshen.last=Date.now();freshen()}});

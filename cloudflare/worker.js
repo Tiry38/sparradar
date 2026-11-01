@@ -34,6 +34,11 @@ export default {
     if (o && !ORIGINS.includes(o)) return json(req, { error: "origin" }, 403);
 
     if (url.pathname === "/" || url.pathname === "/ping") return json(req, { ok: true, app: "SparRadar-Sync" });
+    // Wann zuletzt nach neuen Prospekten gesucht wurde (zeigt die App oben neben „Stand“)
+    if (url.pathname === "/tick") {
+      const r = await db.prepare("SELECT at FROM sync WHERE id = '__tick'").first();
+      return json(req, { at: r?.at || 0 });
+    }
 
     if (url.pathname === "/new" && req.method === "POST") {
       const day = new Date().toISOString().slice(0, 10);
@@ -92,6 +97,12 @@ export default {
       method: "POST",
       headers: { Authorization: "Bearer " + env.GH_TOKEN, Accept: "application/vnd.github+json", "User-Agent": "SparRadar-Taktgeber", "Content-Type": "application/json" },
       body: JSON.stringify({ ref: "main" }),
-    }).then(r => console.log(f, r.status)))));
+    }).then(async r => {
+      console.log(f, r.status);
+      if (r.ok && (f === "prospekte.yml" || f === "angebote.yml")) {  // Suche gestartet -> Zeit für die App merken
+        const t = Date.now();
+        await env.DB.prepare("INSERT INTO sync (id, data, created, at) VALUES ('__tick', '{}', ?, ?) ON CONFLICT(id) DO UPDATE SET at = excluded.at").bind(t, t).run();
+      }
+    }))));
   },
 };
