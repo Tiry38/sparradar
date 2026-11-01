@@ -415,3 +415,6 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .cpf-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;font-size:.9rem}
 .cpf-act .mktbtn,.rs .mktbtn.ks{background:transparent;border:1.5px solid var(--save);border-radius:999px;padding:6px 12px;font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;color:inherit}
 .rs .mktbtn.ks{margin-left:auto}
+.cpf-ch{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
+.cpf-ch .chip small{opacity:.7;margin-left:2px}
+@media(hover:none) and (pointer:coarse){.cpf-ch{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:16px}.cpf-ch .chip{flex:none}}

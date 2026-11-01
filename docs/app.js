@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  86:["Coupon-Bericht: oben nach Markt filtern – z. B. nur Lidl-Coupons ansehen."],
   85:["Coupons nur noch digital und ganz einfach: suchen, einfügen, in der Markt-App aktivieren – an der Kasse reicht ein Scan der Kundenkarte."],
   84:["Kasse noch einfacher: großer Zähler und klare Tipps."],
   83:["Einstellungen und Willkommens-Infos neu erklärt – Schritt für Schritt, für jeden verständlich.","Am PC bleibt die obere Leiste auch mit großer Schrift (A+) im Bild."],
@@ -1070,9 +1071,12 @@ function cpAppBtns(){const st=[...new Set(S.coupons.filter(c=>c.t==="app"&&cpAct
   if(!ANDROID)return st.length?`<div class="cpf-act"><b>Jetzt in diesen Apps aktivieren:</b> ${st.map(s=>esc(MKT_APP[s].n)).join(", ")}</div>`:"";
   return st.length?`<div class="cpf-act"><b>Jetzt in der App aktivieren:</b>${st.map(s=>`<button class="mktbtn" data-mktapp="${s}">📱 ${esc(MKT_APP[s].n)}</button>`).join("")}</div>`:""}
 function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfind" id="cpFind">🔍 Coupon suchen</button>${cpAppBtns()}`;
-  const f=cpFinds(),tot=f.reduce((a,x)=>a+x.g.d,0);
+  const all=cpFinds(),cnt={};all.forEach(x=>cnt[x.o.s]=(cnt[x.o.s]||0)+1);
+  if(S.cpfS&&!cnt[S.cpfS])S.cpfS=null;
+  const f=S.cpfS?all.filter(x=>x.o.s===S.cpfS):all,tot=f.reduce((a,x)=>a+x.g.d,0);
+  const chips=Object.keys(cnt).length>1?`<div class="cpf-ch">${[["","Alle Märkte",all.length],...Object.keys(STORES).filter(k=>cnt[k]).map(k=>[k,STORES[k].n,cnt[k]])].map(([k,n,c])=>`<button class="chip${(S.cpfS||"")===k?" on":""}" data-cpfs="${k}" aria-pressed="${(S.cpfS||"")===k}">${k?sb(k)+" ":""}${esc(n)} <small>${c}</small></button>`).join("")}</div>`:"";
   return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Bericht</h3><button class="ibtn" id="cpFindX" aria-label="Bericht schließen">${IC.x}</button></div>
-    ${f.length?`<p><b>${f.length} App- &amp; Bonus-Vorteile gefunden – zusammen bis zu ${eur(tot)}.</b> Die größten zuerst. „Einfügen“ legt den Coupon bei dir ab und setzt den Artikel auf den Einkaufszettel.</p>
+    ${chips}${f.length?`<p><b>${f.length} App- &amp; Bonus-Vorteile${S.cpfS?" bei "+esc(sname(S.cpfS)):""} gefunden – zusammen bis zu ${eur(tot)}.</b> Die größten zuerst. „Einfügen“ legt den Coupon bei dir ab und setzt den Artikel auf den Einkaufszettel.</p>
     <div class="rows">${f.map(({o,g,pc})=>`<div class="drow cpf-r"><button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>
       <div class="t">${esc(cpKey(o))}<small>${sb(o.s)} ${esc(sname(o.s))} · ${esc(g.how)}${o.to?" · bis "+fmtDate(o.to):""}</small></div>
       <div class="pr"><b>−${eur(g.d)}</b><small>${pc>=30?"🔥 ":""}${pc} %</small></div><div class="cpf-b"><button class="btn sm" data-cpfadd="${esc(o.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="${esc(o.id)}">Nein</button></div></div>`).join("")}</div>
@@ -1367,6 +1371,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
   if(b.id==="cpFind"){S.cpFind=true;render();return}
+  if(b.dataset.cpfs!=null){S.cpfS=b.dataset.cpfs||null;render();return}
   if(b.id==="cpFindX"){S.cpFind=false;render();return}
   if(b.dataset.cpfadd){cpfAdd(b.dataset.cpfadd);render();return}
   if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set(OFFERS.map(o=>o.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
