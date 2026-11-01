@@ -5,8 +5,8 @@ Läuft mehrmals am Tag (.github/workflows/bilder.yml). Geht alle Artikelnamen du
 Artikel ohne Bild eines:
   1. gleicher Name (Schreibweise egal) in unseren eigenen Daten (Angebote, names-img, Artikelstamm),
   2. gleicher Markenartikel mit anderer Packungsgröße/Sorte (gleiche Marke + gleiche Produktwörter),
-  3. Open-Food-Facts-/Open-Beauty-Facts-Suche (offene Datenbanken, robots.txt erlaubt,
-     ehrlicher User-Agent, Pausen, höchstens MAX_NET Anfragen pro Lauf).
+  3. Bilder aus dem offiziellen Open-Food-/Beauty-Facts-Datenexport (sammelt fetch_catalog.py wöchentlich
+     in docs/data/img-pool.json). Die Such-Schnittstelle wird NICHT genutzt: robots.txt verbietet /cgi und /api.
 Ergebnis: docs/data/img-extra.json {Artikelname: Bild-Adresse}. Fehlversuche merkt sich
 docs/data/img-miss.json (neuer Versuch nach 7 Tagen). Nie fremde Bilder raten: es müssen Marke
 und Produktwörter passen.
@@ -15,16 +15,11 @@ import json
 import os
 import re
 import sys
-import time
-import urllib.parse
-import urllib.request
 from datetime import date, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "docs", "data")
 UA = "SparRadar/1.0 (private Angebotsuebersicht; https://github.com/Tiry38/sparradar)"
-MAX_NET = int(os.environ.get("SR_IMG_MAX", "120"))
-PAUSE = 6.5  # Open Food Facts erlaubt ca. 10 Suchanfragen pro Minute
 OFF_IMG = {"f": "https://images.openfoodfacts.org/images/products/",
            "b": "https://images.openbeautyfacts.org/images/products/"}
 FILL = re.compile(r"^(\d.*|g|kg|ml|l|cl|x|xl|xxl|st|stk|stueck|pack|packung|bigpack|big|cups?|portionen|kapseln|"
@@ -99,37 +94,6 @@ class Pool:
         return bu
 
 
-def off_search(name):
-    """Open Food Facts / Open Beauty Facts: Volltextsuche, erstes Ergebnis mit Bild, dessen Marke + Wörter passen."""
-    t = toks(name)
-    if len(t) < 2:
-        return None
-    for host, key in (("world.openfoodfacts.org", "f"), ("world.openbeautyfacts.org", "b")):
-        q = urllib.parse.urlencode({"search_terms": name, "search_simple": 1, "action": "process", "json": 1,
-                                    "page_size": 10, "fields": "product_name,product_name_de,brands,image_front_small_url,image_small_url"})
-        try:
-            req = urllib.request.Request(f"https://{host}/cgi/search.pl?{q}", headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=40) as r:
-                prods = json.loads(r.read().decode("utf-8", "replace")).get("products", [])
-        except Exception as e:
-            log("   ! Suche", host, str(e)[:60])
-            prods = []
-        time.sleep(PAUSE)
-        p = Pool()
-        for x in prods:
-            url = x.get("image_front_small_url") or x.get("image_small_url")
-            if not url:
-                continue
-            nm = x.get("product_name_de") or x.get("product_name") or ""
-            br = (x.get("brands") or "").split(",")[0].strip()
-            full = nm if norm(br) and norm(br) in norm(nm) else f"{br} {nm}"
-            p.add(full, url)
-        hit = p.find(name)
-        if hit:
-            return hit
-    return None
-
-
 def main():
     today = date.today().isoformat()
     offers = load("offers.json", {})
@@ -153,6 +117,8 @@ def main():
             pool.add(n, cat_url(cimg[i]))
     for n, u in extra.items():
         pool.add(n, u)
+    for n, c in load("img-pool.json", {}).items():  # Datenexport: weitere Artikel mit Bild (nicht im Artikelstamm)
+        pool.add(n, cat_url(c))
 
     need = []
     for n in names:
@@ -174,19 +140,9 @@ def main():
             rest.append(n)
     log("Aus eigenen Daten gefunden:", local)
 
-    cutoff = (date.today() - timedelta(days=7)).isoformat()
-    todo = [n for n in rest if miss.get(n, "") < cutoff]
-    # zuerst Namen aus echten Angeboten, dann der Artikelstamm
-    todo.sort(key=lambda n: n not in names)
-    net = 0
-    for n in todo[:MAX_NET]:
-        u = off_search(n)
-        if u:
-            extra[n] = u; net += 1; miss.pop(n, None)
-            pool.add(n, u)
-        else:
-            miss[n] = today
-    log("Per Suche gefunden:", net, "von", min(len(todo), MAX_NET), "· offen:", len(rest) - net)
+    for n in rest:
+        miss[n] = today
+    log("Noch ohne Bild:", len(rest))
 
     keep = set(names) | set(cat)
     extra = {k: v for k, v in extra.items() if k in keep and isinstance(v, str) and v.startswith("https://")}

@@ -1,0 +1,44 @@
+name: Preisverlauf nachtragen
+# Nur von Hand: alte Angebotspreise (ab Sept.) aus dem Internet-Archiv in docs/data/history.json eintragen.
+# Läuft in Etappen (max. ~5,5 h je Lauf) und startet sich selbst neu, bis alles gelesen ist.
+on:
+  workflow_dispatch: {}
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: preisverlauf
+  cancel-in-progress: false
+jobs:
+  nachtragen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Alte Seiten lesen
+        id: col
+        working-directory: fetcher
+        run: python backfill_history.py --collect /tmp/rows.json | tee /tmp/out.txt; grep -o 'left=[0-9]*' /tmp/out.txt >> $GITHUB_OUTPUT || echo "left=0" >> $GITHUB_OUTPUT
+      - name: Eintragen und speichern
+        run: |
+          git config user.name "SparRadar Bot"
+          git config user.email "actions@users.noreply.github.com"
+          cp fetcher/backfill-state.json /tmp/state.json
+          for i in 1 2 3 4; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            cp /tmp/state.json fetcher/backfill-state.json
+            (cd fetcher && python backfill_history.py --merge /tmp/rows.json)
+            git add docs/data/history.json fetcher/backfill-state.json
+            git diff --cached --quiet && break
+            git commit -qm "Preisverlauf nachgetragen (Internet-Archiv)"
+            git push -q && break
+            sleep 15
+          done
+      - name: Weitermachen, falls noch etwas offen ist
+        if: steps.col.outputs.left != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run preisverlauf.yml --ref main

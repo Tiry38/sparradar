@@ -222,7 +222,7 @@ function cpValue(c,cur){
   if(c.t==="pct"){const d=Math.round(cur*c.v)/100;return c.mx?Math.min(d,c.mx):d}
   if(c.t==="preis")return Math.max(0,cur-c.v);
   if(c.t==="punkte")return c.v/100; // 1 Payback-Punkt = 1 Cent
-  return 0} // t:"app" (vom Coupon-Sucher) = App-Preis/Bonus steht schon im Angebot -> nicht doppelt abziehen
+  return 0} // t:"app" (früher automatisch eingefügt) = App-Preis/Bonus steht schon im Angebot -> nicht doppelt abziehen
 function cpValueTxt(c){return c.lbl?c.lbl:!c.v?"Coupon":c.t==="app"?"−"+eur(c.v)+" mit App":c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
 const cpLabel = c => `${c.prog} ${cpValueTxt(c)}`;
 const fin = o => Math.round(steps(o).reduce((a,s)=>a+s.v,0)*100)/100;
@@ -757,7 +757,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  102:["Geld zurück: Die Zahl bei „Deine Woche“ passt jetzt zum gewählten Markt. Antippen zeigt direkt die Angebote mit Geld zurück.","Im Tab „Coupons“ stehen die Geld-zurück-Aktionen jetzt gleich da – automatisch gefunden und nach Markt sortiert, ohne extra Knopf."],
+  102:["Geld zurück: Die Zahl bei „Deine Woche“ passt jetzt zum gewählten Markt. Antippen zeigt direkt die Angebote mit Geld zurück.","Den Coupon-Finder gibt es nicht mehr – SparRadar findet Geld-zurück-Aktionen automatisch und zeigt sie direkt bei den Angeboten (oranges Abzeichen „💸“)."],
   101:["Neu: Kassenbon eintragen. Im Einkaufszettel „📷 Bon fotografieren“ antippen – oder in der Markt-App (Lidl Plus, REWE, EDEKA, Netto, dm …) beim Bon auf „Teilen“ → SparRadar. Passt alles, ist der Einkauf sofort mit den echten Preisen gespeichert. Der Bon bleibt nur auf deinem Gerät."],
   100:["Einkaufszettel: Beim Eintippen erscheinen jetzt passende Artikel mit Bild – auch alles, was gerade nicht im Angebot ist. Antippen setzt ihn auf den Zettel. Ist er gerade im Angebot, kommt gleich das Angebot mit Preis drauf."],
   99:["Mehr Bilder: Artikel in der Merkliste und in den Vorschlägen bekommen jetzt fast immer ein Produktfoto. SparRadar sucht fehlende Bilder mehrmals am Tag automatisch."],
@@ -770,15 +770,14 @@ const CHANGES={
   92:["Geld zurück siehst du jetzt überall: 💸-Abzeichen am Angebot, „Mitnehmen“ in der Detailansicht und auf dem Einkaufszettel – ohne extra suchen.","Im Tab „Coupons“ siehst du, wie viel du mit Geld zurück schon geholt hast."],
   91:["Geld zurück jetzt mit „💸 Jetzt Geld holen“: SparRadar führt dich Schritt für Schritt – Bon bereitlegen, Aktionsseite öffnen, Name, E-Mail und IBAN mit einem Tipp kopieren, fertig."],
   90:["Offene Geld-zurück-Bons: Der Reiter „Coupons“ leuchtet orange mit 💸, bis du den Bon hochgeladen und „Erledigt“ getippt hast.","Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen."],
-  89:["Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen.","Geld zurück ganz einfach: Nach dem Einkauf zeigt SparRadar oben „💸 Geld zurückholen“ – Bon hochladen antippen, danach „Erledigt“.","Coupon-Finder: jetzt auch „2 kaufen, 1 gratis“ und feste Euro-Beträge vom Hersteller (z. B. 5 € zurück) – aus einer zweiten Übersicht, also deutlich mehr Aktionen."],
-  88:["Die Coupon-Suche heißt jetzt „Coupon-Finder“."],
-  87:["Neu: der Coupon-Finder findet jetzt geheime Geld-zurück-Aktionen der Hersteller (oft 100 % zurück), die in keiner Markt-App stehen. App-Preise siehst du weiter direkt bei den Angeboten.","Nach dem Einkauf erinnert SparRadar dich, den Kassenbon hochzuladen."],
+  89:["Kein Papier-Bon? Digitale Kassenbons aus der Markt-App gehen meist auch: Screenshot machen und hochladen.","Geld zurück ganz einfach: Nach dem Einkauf zeigt SparRadar oben „💸 Geld zurückholen“ – Bon hochladen antippen, danach „Erledigt“.","Geld zurück: jetzt auch „2 kaufen, 1 gratis“ und feste Euro-Beträge vom Hersteller (z. B. 5 € zurück)."],
+  87:["Neu: SparRadar findet jetzt geheime Geld-zurück-Aktionen der Hersteller (oft 100 % zurück), die in keiner Markt-App stehen. App-Preise siehst du weiter direkt bei den Angeboten.","Nach dem Einkauf erinnert SparRadar dich, den Kassenbon hochzuladen."],
   86:["Coupon-Bericht: oben nach Markt filtern – z. B. nur Lidl-Coupons ansehen."],
   85:["Coupons nur noch digital und ganz einfach: suchen, einfügen, in der Markt-App aktivieren – an der Kasse reicht ein Scan der Kundenkarte."],
   84:["Kasse noch einfacher: großer Zähler und klare Tipps."],
   83:["Einstellungen und Willkommens-Infos neu erklärt – Schritt für Schritt, für jeden verständlich.","Am PC bleibt die obere Leiste auch mit großer Schrift (A+) im Bild."],
   82:["Nach dem letzten Haken auf dem Zettel öffnet sich die App des Markts – Kundenkarte zeigen, fertig."],
-  81:["Neu im Tab „Coupons“: Knopf „🔍 Coupon suchen“. Zeigt alle App- und Bonus-Vorteile der Woche (Lidl Plus, Edeka-/Netto-App, Rewe Bonus), die größten zuerst – einfach „Einfügen“ oder „Nein“."],
+  81:["App- und Bonus-Vorteile der Woche (Lidl Plus, Edeka-/Netto-App, Rewe Bonus) stehen direkt bei den Angeboten."],
   80:["Kracher: höchstens 2 Angebote pro Markt je Abschnitt – nicht mehr fast nur Edeka mit App-Preis."],
   79:["Angebote nach Ersparnis: erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tierbedarf und zum Schluss Technik, Kleidung & Co. – innerhalb jeder Gruppe weiter nach dem höchsten Rabatt."],
   78:["Kracher: Jeder Markt mit einem belegten Rabatt bekommt einen Platz. Fehlt ein Markt (oft Rewe, der selten „statt“-Preise druckt), steht kurz dabei, warum."],
@@ -853,7 +852,7 @@ function renderWelcome(){const it=[
   ["🔔","Merkliste","Artikel merken – SparRadar zeigt dir, sobald sie im Angebot sind."],
   ["🛒","Einkaufszettel","Mit ＋ auf den Zettel. Im Laden antippen, was im Wagen liegt. Mit 🎟️ trägst du einen Coupon mit einem Tipp ein."],
   ["👨‍👩‍👦","Geräte verbinden","Mehrere Handys, Tablets oder PCs teilen denselben Einkaufszettel. Ob auch die Merkliste gleich sein soll, wählt jedes Gerät selbst – z. B. eigene Geräte alles, andere Menschen nur den Zettel."],
-  ["🎟️","Coupons","Tab „Coupons“: Der Coupon-Finder zeigt Aktionen, bei denen dir der Hersteller den Kaufpreis zurückzahlt – oft komplett. Einfügen, einkaufen, Kassenbon hochladen."],
+  ["💸","Geld zurück","Das orange Abzeichen „💸 Geld zurück“ an einem Angebot heißt: Der Hersteller zahlt dir etwas zurück – oft den ganzen Preis. Artikel öffnen, „Mitnehmen“, einkaufen, Bon hochladen."],
   ["⚙️","Einstellungen","Ganz unten im Tab „Coupons“: Geräte verbinden, SparRadar teilen. Schrift größer: „A+“ oben rechts."],
   ["💬","Fehler entdeckt?","Stimmt ein Preis nicht oder klemmt etwas? Sag gern der Person Bescheid, von der du SparRadar bekommen hast. Jeder Hinweis hilft!"]];
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Willkommen bei SparRadar">
@@ -1358,7 +1357,7 @@ function cpqSave(id,t,v){const o=byId(id);if(!o||!v)return;
   S.coupons.push({s:o.s,prog:defaultProg(o.s),k:k.replace(/\s+/g," ").trim(),t,v,to:o.to||null});S.cpq=null;save();
   toast(S.useApp?`Coupon gespeichert – du zahlst jetzt ${eur(fin(o))}`:"Coupon gespeichert. „Apps & Coupons einrechnen“ ist ausgeschaltet – in den Einstellungen einschalten.");render()}
 
-// ---------- Coupon-Finder (Kevins Wunsch 01.11.) ----------
+// ---------- Geld zurück vom Hersteller (Kevins Wunsch 01.11.) ----------
 // Zeigt NUR Vorteile, die nicht schon in den Angeboten stehen: Geld-zurück-Aktionen der Hersteller („Gratis testen“).
 // Daten: docs/data/cashback.json (täglicher Abruf einer öffentlichen Übersicht, nur Fakten + Link zur Hersteller-Aktion).
 // App-Preise der Märkte stehen schon bei den Angeboten (📱-Abzeichen) und kommen hier bewusst nicht vor.
@@ -1380,9 +1379,6 @@ const cbShort=a=>a.typ==="nfor"?`${a.need} für ${a.need-1}`:a.typ==="eur"?"zur�
 function cbHitTxt(a,o){const p=fin(o),n=a.need||1,back=cbBack(a,p),pay=Math.max(0,p*n-back);
   if(back>=p*n-.005)return " → mit Geld zurück <b>gratis</b>";
   return n>1?` → ${n} Stück zahlen, ${eur(back)} zurück: <b>je ${eur(pay/n)}</b>`:` → danach nur <b>${eur(pay)}</b>`}
-function cbFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c.cb).filter(Boolean));
-  return (CASHBACK?.items||[]).filter(a=>cbLive(a)&&!no.includes("cb:"+a.id)&&!have.has(a.id)).map(a=>{const os=cbOffers(a),o=os[0]||null;
-    return {a,o,val:o?cbBack(a,fin(o)):(a.typ==="eur"?a.eur:a.max||a.w||0)}}).sort((x,y)=>(!!y.o-!!x.o)||y.val-x.val||String(x.a.kauf||x.a.ende).localeCompare(String(y.a.kauf||y.a.ende)))}
 // Angebot -> passende Geld-zurück-Aktion (für Abzeichen, Detail, Zettel); neu berechnet, wenn sich Angebote/Woche/Daten ändern
 let CBM=null,CBK=[];
 function cbFor(o){if(!CASHBACK?.items)return null;
@@ -1406,30 +1402,12 @@ function cbEarnedHTML(){const d=S.coupons.filter(c=>c.cb&&c.done&&c.amt>0),sum=d
   return `<div class="cbearned">💸 Mit Geld zurück schon geholt: <b>${eur(sum)}</b> <small>(${d.length} Aktion${d.length===1?"":"en"})</small></div>`}
 const cbShopTxt=a=>a.shops?.length?"bei "+a.shops.map(sname).join(", "):"in vielen Märkten";
 const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
-function cpHowHTML(){return `<section class="panel cphow"><h3>Geheime Coupons: Geld zurück vom Hersteller</h3>
-  <p>Viele Hersteller zahlen dir Geld zurück: oft den ganzen Kaufpreis („Gratis testen“), manchmal einen festen Betrag oder „2 kaufen, 1 gratis“. Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag für dich.</p>
-  <ol><li>Unten stehen alle Aktionen – <b>automatisch gefunden und nach Markt sortiert</b>. Bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
+function cpHowHTML(){return `<section class="panel cphow"><h3>💸 Geld zurück vom Hersteller</h3>
+  <p>Viele Hersteller zahlen dir Geld zurück: oft den ganzen Kaufpreis („Gratis testen“), manchmal einen festen Betrag oder „2 kaufen, 1 gratis“. Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag automatisch und zeigt es direkt bei den Angeboten.</p>
+  <ol><li>Bei den Angeboten auf das orange Abzeichen <b>„💸 Geld zurück“</b> achten (oder oben bei „Deine Woche“ antippen). Artikel öffnen und <b>„💸 Mitnehmen“</b> drücken – er landet auf deinem Einkaufszettel.</li>
    <li><b>Ganz normal einkaufen</b> und den <b>Kassenbon aufheben</b> – digitale Bons aus der Markt-App gehen meist auch.</li>
-   <li><b>💸 Geld holen:</b> Nach dem Einkauf auf „Bon hochladen“ tippen, Kassenbon fotografieren (digitaler Bon: Screenshot), Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
+   <li><b>💸 Geld holen:</b> Nach dem Einkauf erscheint hier „Jetzt Geld holen“. Bon hochladen, Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
   <p class="cpf-n">Rabatte, die nur mit der Markt-App gelten, siehst du direkt bei den Angeboten am 📱-Abzeichen. In der Markt-App aktivieren und an der Kasse die Kundenkarte zeigen – ein Scan.</p></section>`}
-function cpFindHTML(){
-  if(!CASHBACK){loadCashback().then(()=>{if(S.tab==="tips")render()});return `${cpHowHTML()}<section class="panel cpf"><p>Geld-zurück-Aktionen werden geladen …</p></section>`}
-  if(S.cpfS===undefined)S.cpfS=S.stores.size===1?[...S.stores][0]:null;
-  const all=cbFinds(),cnt={};all.forEach(x=>(x.a.shops?.length?x.a.shops:["_"]).forEach(s=>cnt[s]=(cnt[s]||0)+1));
-  if(S.cpfS&&!cnt[S.cpfS])S.cpfS=null;
-  const f=S.cpfS?all.filter(x=>!x.a.shops?.length||x.a.shops.includes(S.cpfS)):all,tot=f.reduce((a,x)=>a+x.val,0);
-  const ks=Object.keys(STORES).filter(k=>cnt[k]);
-  const chips=ks.length?`<div class="cpf-ch">${[["","Alle",all.length],...ks.map(k=>[k,STORES[k].n,cnt[k]+(cnt._||0)])].map(([k,n,c])=>`<button class="chip${(S.cpfS||"")===k?" on":""}" data-cpfs="${k}" aria-pressed="${(S.cpfS||"")===k}">${k?sb(k)+" ":""}${esc(n)} <small>${c}</small></button>`).join("")}</div>`:"";
-  return `${cpHowHTML()}<section class="panel cpf" id="cpfBox"><div class="cpf-h"><h3>💸 Geld zurück – automatisch gefunden</h3></div><p class="cpf-n">SparRadar sucht jeden Tag neu und ordnet alles den Märkten zu. Markt antippen = nur dessen Aktionen.</p>
-    ${chips}${f.length?`<p><b>${f.length} Geld-zurück-Aktion${f.length===1?"":"en"} gefunden – zusammen bis zu ${eur(tot)} zurück.</b> Ganz oben: was es gerade auch im Angebot gibt – doppelt gespart.</p>
-    <div class="rows">${f.map(({a,o,val})=>`<div class="drow cpf-r">${o?`<button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>`:`<span class="mini cbico" aria-hidden="true">${CB_ICO[a.cat]||"💸"}</span>`}
-      <div class="t">${esc(a.n)}<small>${esc(cbLbl(a))}${a.max?" (max. "+eur(a.max)+")":""}${a.min?" · ab "+eur(a.min)+" Einkauf":""}${a.gw?" · 🎲 mit Gewinnspiel (freiwillig)":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
-       ${o?`<small class="cbhit">🔥 Gerade im Angebot: ${esc(sname(o.s))} ${eur(fin(o))}${cbHitTxt(a,o)}</small>`:""}</div>
-      <div class="pr"><b>${val?"−"+eur(val):a.typ==="nfor"?"1 gratis":"gratis"}</b><small>${esc(cbShort(a))}</small></div>
-      <div class="cpf-b"><button class="btn sm" data-cbadd="${esc(a.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="cb:${esc(a.id)}">Nein</button><a class="btn ghost sm" href="${esc(a.url)}" target="_blank" rel="noopener nofollow">Aktion ↗</a></div></div>`).join("")}</div>
-    ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}`
-    :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues${S.cpfS?" bei "+esc(sname(S.cpfS)):""}</b>Alle aktuellen Geld-zurück-Aktionen hast du schon eingefügt oder abgelehnt. SparRadar sucht jeden Tag neu.</div>`}
-    <p class="cpf-n">Gefunden in öffentlichen Übersichten von Hersteller-Aktionen (mystipendium.de, sparwelt.de), täglich neu. „Aktion ↗“ öffnet die Seite des Herstellers mit allen Bedingungen. Oft gilt: nur eine Teilnahme pro Person, begrenzte Teilnehmerzahl.</p></section>`}
 function cbAdd(id,quiet,oid){const a=(CASHBACK?.items||[]).find(x=>x.id===id);if(!a)return 0;const o=(oid&&byId(oid))||cbOffers(a)[0],w=cbWords(a);
   const k=o?[w[0],...w.slice(1).filter(x=>cbHit(o,x)).slice(0,1)].join(" "):w.slice(0,2).join(" ");
   const n=a.need||1,val=a.typ==="eur"?{t:"euro",v:Math.round(a.eur/n*100)/100,mx:null}:a.typ==="nfor"?{t:"pct",v:Math.round(1000/n)/10,mx:a.max?Math.round(a.max/n*100)/100:null}:{t:"pct",v:a.pct??100,mx:a.max||null};
@@ -1445,7 +1423,7 @@ function renderCoupons(){
   const popts=PROGS.map(p=>`<option ${p==="Rewe Bonus"?"selected":""}>${p}</option>`).join("");
   const topts=Object.entries(CP_TYPES).map(([k,n])=>`<option value="${k}">${n}</option>`).join("");
   const plus=7;const d=new Date(Date.now()+plus*864e5).toISOString().slice(0,10);
-  return `${cbDueHTML()}${cbEarnedHTML()}${cpFindHTML()}<section class="panel"><h3>Meine Coupons</h3>
+  return `${cbDueHTML()}${cbEarnedHTML()}${cpHowHTML()}<section class="panel"><h3>Meine Coupons</h3>
     <p>Coupon in Lidl Plus, der Rewe-App, bei Payback oder in einer Cashback-App aktiviert? Kurz hier eintragen. SparRadar rechnet ihn dann in alle passenden Angebote, den Kracher und den Einkaufszettel ein. Abgelaufene Coupons verschwinden von selbst.</p>
     <form class="form" id="cpForm">
      <div class="row"><label>Markt<select id="cpStore">${sopts}</select></label><label>Programm<select id="cpProg">${popts}</select></label></div>
@@ -1734,10 +1712,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.cpq!=null){S.cpq=b.dataset.cpq||null;render();return}
   if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
-  if(b.dataset.cpfs!=null){S.cpfS=b.dataset.cpfs||null;render();return}
   if(b.dataset.cbadd){cbAdd(b.dataset.cbadd);render();return}
-  if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set((CASHBACK?.items||[]).map(a=>"cb:"+a.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
-  if(b.id==="cpFindAll"){const f=cbFinds().filter(x=>!S.cpfS||!x.a.shops?.length||x.a.shops.includes(S.cpfS)),n=f.reduce((a,x)=>a+cbAdd(x.a.id,true),0);save();toast(`${n} Geld-zurück-Aktionen eingefügt – Kassenbons aufheben!`);render();return}
   if(b.dataset.cbdone){const c=S.coupons.find(x=>x.id===b.dataset.cbdone);if(c){c.done=TODAY;if(S.sheet==="cbget")S.sheet=null;save();toast("Erledigt – das Geld kommt in ein paar Wochen.");render()}return}
   if(b.dataset.cbtake){if(cbAdd(b.dataset.cbtake,true,b.dataset.cbo)){save();toast("💸 Mitgenommen – nach dem Einkauf zeigt SparRadar dir, wie du das Geld holst.");render()}return}
   if(b.dataset.cbtakeall){const n=S.list.map(byId).filter(Boolean).map(o=>({o,a:cbFor(o)})).filter(x=>x.a&&!cbHave(x.a)).reduce((m,x)=>m+(cbHave(x.a)?0:cbAdd(x.a.id,true,x.o.id)),0);save();toast(`💸 ${n} mitgenommen`);render();return}

@@ -139,6 +139,32 @@ def main():
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(out_img, f, ensure_ascii=False, separators=(",", ":"))
     os.replace(tmp, OUT_IMG)
+    img_pool(allf, out, out_img)
+
+
+def img_pool(allf, out, out_img):
+    """Bilder-Wächter: Für Artikelnamen ohne Bild (names.json + Artikelstamm) im GANZEN Export einen passenden
+    Artikel mit Bild suchen (gleiche Marke + Produktwörter). Ergebnis docs/data/img-pool.json {Name: "f:pfad"}."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from fill_images import Pool
+    try:
+        with open(os.path.join(ROOT, "docs", "data", "names.json"), encoding="utf-8") as f:
+            names = list(json.load(f))
+    except Exception:
+        names = []
+    need = list(dict.fromkeys([n for n in names] + [n for n, i in zip(out, out_img) if not i]))
+    pool = Pool()
+    for _, _, n, img in allf:
+        if img:
+            pool.add(n, img)
+    res = {}
+    for n in need:
+        u = pool.find(n)
+        if u:
+            res[n] = u
+    with open(os.path.join(ROOT, "docs", "data", "img-pool.json"), "w", encoding="utf-8") as f:
+        json.dump(res, f, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+    log("Bilder-Pool:", len(res), "von", len(need), "Artikeln ohne Bild gefunden")
 
 
 if __name__ == "__main__":

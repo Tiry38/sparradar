@@ -861,7 +861,7 @@ def update_history(offers, today):
             rows[-1][1] = min(rows[-1][1], o["p"])
         else:
             rows.append([today, o["p"]])
-        del rows[:-40]
+        del rows[:-90]
     # Einträge, die seit 120 Tagen nicht mehr auftauchen, löschen
     cutoff = (dt.date.fromisoformat(today) - dt.timedelta(days=120)).isoformat()
     hist = {k: v for k, v in hist.items() if v and v[-1][0] >= cutoff}
