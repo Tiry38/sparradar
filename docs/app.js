@@ -124,6 +124,12 @@ const Sync = {
   code(){const c=this.cfg();return c?.srv?"SR-"+c.srv:c?.token||""},
   async write(obj){const c=this.cfg();if(c.srv)return this.sreq("/s/"+c.srv,{method:"PUT",body:JSON.stringify(obj)});
     return this.req("/gists/"+c.gist,{method:"PATCH",body:JSON.stringify({files:{[this.FILE]:{content:JSON.stringify(obj)}}})})},
+  // Umzug GitHub-Gist -> Familien-Code: alles mitnehmen (Listen + Geräte), danach braucht dieses Gerät keinen GitHub-Schlüssel mehr
+  async migrate(){const c=this.cfg();if(!c?.gist)return;const r=await this.load(),sh=this.share();
+    store.set("syncParts",sh);store.set("syncGive",sh); // eigene Geräte: gleiche Auswahl behalten (meist alles)
+    const {id}=await this.sreq("/new",{method:"POST"});
+    await this.sreq("/s/"+id,{method:"PUT",body:JSON.stringify({v:2,updatedAt:Date.now(),parts:r.parts,devices:r.devices})});
+    store.set("sync",{srv:id,from:"gist"});await this.pull();return id},
   async create(parts){const {id}=await this.sreq("/new",{method:"POST"});store.set("sync",{srv:id});if(parts)store.set("syncParts",parts);store.set("syncAt",{});store.set("syncSnaps",{});await this.push();return id},
   async req(path,opt={}){const c=this.cfg();const r=await fetch(this.API+path,{...opt,cache:"no-store",headers:{Authorization:"Bearer "+c.token,Accept:"application/vnd.github+json",...(opt.body?{"Content-Type":"application/json"}:{})}});
     if(r.status===401)throw new Error("Schlüssel ungültig oder abgelaufen");if(!r.ok)throw new Error("GitHub antwortet nicht ("+r.status+")");return r.json()},
@@ -678,6 +684,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  73:["Geräte verbinden: Wer noch mit GitHub-Schlüssel verbunden ist, kann mit einem Tipp auf einen Familien-Code umziehen – sicherer, alles wird mitgenommen."],
   72:["Geräte verbinden ohne GitHub: „Neuen Familien-Code erstellen“ antippen, Code kopieren, an die Familie schicken – fertig."],
   71:["Gespart-Zähler antippen: Einträge einzeln löschen oder alles auf 0 setzen (z. B. nach einem Test)."],
   70:["Im Willkommens-Fenster steht jetzt: Fehler entdeckt? Einfach Kevin schreiben."],
@@ -1051,6 +1058,8 @@ function renderSync(){
      <p id="syncState">${esc(Sync.status||"Verbunden")}</p>
      <p><b>Weiteres Gerät verbinden</b> (beliebig viele, z. B. das Handy von Mama und Stefan, Tablet oder PC): Code kopieren, per WhatsApp schicken und auf dem anderen Gerät hier unter „Geräte verbinden“ einfügen. Wer den Code hat, sieht und ändert eure gemeinsamen Listen – also nur an Familie geben.</p>`})()+`
      <div class="shbox"><b>Was soll das neue Gerät mit euch teilen?</b>${shareChecks(store.get("syncGive",null)||DEF_PICK,"data-give")}<small>Kommt mit im Code – das andere Gerät muss nur noch einfügen. Für deinen eigenen PC: alles anhaken. Für Mama oder Stefan: nur Einkaufszettel.</small></div>
+     ${Sync.cfg()?.gist&&Sync._srv?`<div class="shbox"><b>🔒 Sicherer: auf Familien-Code umziehen</b><small>Dein GitHub-Schlüssel darf mehr als nötig. Ein Familien-Code darf nur deine SparRadar-Listen. Alles wird mitgenommen. Danach den neuen Code auf deinen anderen Geräten einfügen.</small><button class="btn sm" id="syncMigrate" style="margin-top:6px">Jetzt umziehen</button></div>`:""}
+     ${Sync.cfg()?.from==="gist"?`<div class="shbox"><b>✅ Umgezogen auf Familien-Code</b><small>1. Unten „Code kopieren“ und auf deinen anderen Geräten unter „Verbindung trennen“ → Code einfügen. 2. Wenn alle Geräte umgezogen sind, den alten Schlüssel löschen: <a href="https://github.com/settings/tokens" target="_blank" rel="noopener">github.com/settings/tokens</a> → „SparRadar“ → Delete.</small><button class="btn ghost sm" id="syncMigDone" style="margin-top:6px">Erledigt, Hinweis ausblenden</button></div>`:""}
      <div class="links"><button class="btn sm" id="syncCopy">Code kopieren</button><button class="btn ghost sm" id="syncNow">Jetzt abgleichen</button><button class="btn ghost sm" id="syncOff">Verbindung trennen</button></div>`
    :`<p>Damit mehrere Geräte denselben Einkaufszettel haben – deine eigenen (Handy, PC, Tablet) oder die deiner Familie. Ob auch Merkliste und Coupons gleich sein sollen, wählst du selbst.</p>
      <div class="shbox"><b>Was soll mit den anderen Geräten gleich sein?</b>${shareChecks(store.get("syncPick",null)||DEF_PICK,"data-pick")}<small>Eigenes zweites Gerät (z. B. dein PC)? Dann auch Merkliste und Coupons anhaken. Familie: meist nur den Einkaufszettel. Kam der Code mit Auswahl, wird sie beim Einfügen übernommen.</small></div>
@@ -1261,6 +1270,9 @@ document.addEventListener("click",e=>{
   if(b.dataset.share){const sh={...Sync.share()};sh[b.dataset.share]=!sh[b.dataset.share];Sync.setShare(sh);render();Sync.pull().then(()=>{toast(sh[b.dataset.share]?`${Sync.PARTS[b.dataset.share].n} wird jetzt geteilt`:`${Sync.PARTS[b.dataset.share].n} bleibt jetzt nur auf diesem Gerät`);render()});return}
   if(b.dataset.pick){const sh={...(store.get("syncPick",null)||DEF_PICK)};sh[b.dataset.pick]=!sh[b.dataset.pick];store.set("syncPick",sh);render();return}
   if(b.id==="syncCreate"){b.disabled=true;toast("Erstelle Code …");Sync.create(store.get("syncPick",null)||DEF_PICK).then(()=>{toast("Fertig! Jetzt „Code kopieren“ und an die anderen Geräte schicken.");render();setTimeout(()=>document.getElementById("syncPanel")?.scrollIntoView({block:"start",behavior:"smooth"}),80)},e=>{b.disabled=false;toast("Hat nicht geklappt: "+e.message)});return}
+  if(b.id==="syncMigrate"){if(!confirm("Auf Familien-Code umziehen? Merkliste, Zettel, Coupons und Geräte werden mitgenommen."))return;b.disabled=true;toast("Ziehe um …");
+    Sync.migrate().then(()=>{toast("Umgezogen! Jetzt den neuen Code auf deinen anderen Geräten einfügen.");render()},e=>{b.disabled=false;toast("Hat nicht geklappt: "+e.message)});return}
+  if(b.id==="syncMigDone"){const c=Sync.cfg();delete c.from;store.set("sync",c);render();return}
   if(b.id==="syncNow"){Sync.pull().then(()=>toast(Sync.status));return}
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}

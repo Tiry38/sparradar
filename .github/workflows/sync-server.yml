@@ -18,7 +18,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Secrets vorhanden?
         id: chk
         run: |
@@ -31,7 +31,7 @@ jobs:
             echo "::add-mask::$ACC"; echo "CLOUDFLARE_ACCOUNT_ID=$ACC" >> $GITHUB_ENV
           fi
           echo "ok=true" >> $GITHUB_OUTPUT
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         if: steps.chk.outputs.ok == 'true'
         with: { node-version: 20 }
       - name: Datenbank anlegen (falls noch nicht da)
