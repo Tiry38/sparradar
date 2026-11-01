@@ -446,7 +446,7 @@ async function load(){
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
     loadCashback().then(()=>render()); // Geld-zurück-Abzeichen an den Angeboten
-    RAW=o.offers.filter(x=>!x.to||x.to>=SHOP);OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();
+    RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;
@@ -758,6 +758,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  108:["App-Angebote stehen nicht mehr doppelt da: Der App-Preis steht jetzt nur noch an einer Karte (z. B. Skyr bei Netto)."],
   107:["Oben an jedem Markt steht jetzt eine kleine orange „💸 Zahl“: So viele Angebote mit Geld zurück hat dieser Markt diese Woche."],
   106:["Der Filter „Geld zurück“ (und „Preis-Alarm“) aus „Deine Woche“ ist jetzt schlau: Er gilt nur für das, was du gerade ansiehst. Wechselst du den Markt, die Kategorie oder die Woche oder suchst etwas, geht er von selbst aus – so siehst du nie eine leere Liste."],
   105:["Die Kacheln „Geld zurück“ und „Preis-Alarm“ bei „Deine Woche“ sind jetzt Schalter: antippen = Filter an (grün), nochmal antippen = Filter aus. Wechselst du den Markt, bleibt die grüne Kachel sichtbar, damit du den Filter jederzeit ausschalten kannst."],
@@ -1651,6 +1652,13 @@ function quickCheck(){if(!QUICK||QUICK.at===viewKey())return;
 function quickToggle(k){const on=!S.flt[k];S.flt[k]=on?1:0;
   if(on)QUICK={keys:new Set([...(QUICK&&QUICK.at===viewKey()?QUICK.keys:[]),k]),at:viewKey()};else if(QUICK)QUICK.keys.delete(k);
   S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});return on}
+// kaufDA liefert manche App-Angebote doppelt (Normalpreis mit App-Preis + App-Preis als Normalpreis) -> nur eine Karte
+function appTwins(l){const k=x=>[x.s,norm(x.n),x.b||"",x.from||"",x.to||""].join("|"),m=new Map(),drop=new Set();
+  l.forEach(x=>{const g=m.get(k(x));g?g.push(x):m.set(k(x),[x])});
+  for(const g of m.values())for(const a of g){if(!a.ap||drop.has(a))continue;
+    for(const t of g)if(t!==a&&!t.ap&&!drop.has(t)&&Math.abs(t.p-a.ap)<.005&&(!t.o||Math.abs(t.o-a.p)<.005)){drop.add(t);
+      if(t.img&&t.img!==a.img)a.ims=[...new Set([...(a.ims||[]),t.img])];}}
+  return drop.size?l.filter(x=>!drop.has(x)):l}
 function render(){quickCheck();
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));

@@ -823,7 +823,32 @@ def merge(offers):
                 cur[f] = o[f]
         if o.get("x") and not cur.get("x"):
             cur["x"] = o["x"]
-    return list(by.values())
+    return app_twins(list(by.values()))
+
+
+def app_twins(offers):
+    """kaufDA liefert manche App-Angebote doppelt: einmal Normalpreis mit App-Preis (ap), einmal der App-Preis
+    als normaler Preis (statt = Normalpreis). Die zweite Karte ist falsch (Preis gilt nur mit App) -> raus,
+    ihr Bild wandert als weiteres Bild zum echten Angebot (Kevin 01.11.: Skyr doppelt)."""
+    by = {}
+    for o in offers:
+        by.setdefault((o["s"], norm(o["n"])[:30], o.get("b"), o.get("from"), o.get("to")), []).append(o)
+    drop = set()
+    for grp in by.values():
+        for a in grp:
+            if not a.get("ap") or id(a) in drop:
+                continue
+            for t in grp:
+                if t is a or t.get("ap") or id(t) in drop or abs(t["p"] - a["ap"]) > 0.005:
+                    continue
+                if t.get("o") and abs(t["o"] - a["p"]) > 0.005:
+                    continue
+                drop.add(id(t))
+                if t.get("img") and t["img"] != a.get("img"):
+                    a["ims"] = list(dict.fromkeys((a.get("ims") or []) + [t["img"]]))
+                if a.get("gp") and a["gp"] == t.get("gp") and a["ap"]:
+                    a["gp"] = {**a["gp"], "v": round(a["gp"]["v"] * a["p"] / a["ap"], 2)}  # Grundpreis galt dem App-Preis
+    return [o for o in offers if id(o) not in drop]
 
 
 def drop_previews(offers):
