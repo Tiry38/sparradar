@@ -406,7 +406,11 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .cpf-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .cpf-r .mini{border:0;padding:0;cursor:pointer}
 .cpf-r .pr small{display:block;color:var(--muted)}
-.cpf-b{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.cpf-b{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.cbico{display:grid;place-items:center;font-size:26px;background:color-mix(in srgb,var(--accent,#1f9d55) 12%,transparent)}
+.cbhit{display:block;margin-top:3px;color:var(--ok,#1f9d55);font-weight:600}
+.cbhit b{color:inherit}
+.cblink{display:inline-block;margin-top:6px}
 .cpf-b .btn{justify-content:center}
 @media(min-width:560px){.drow.cpf-r{grid-template-columns:auto minmax(0,1fr) auto auto}.cpf-b{grid-column:auto;display:flex;align-self:center}}
 .cpf-n{font-size:.8rem;color:var(--muted)}
@@ -418,3 +422,5 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .cpf-ch{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
 .cpf-ch .chip small{opacity:.7;margin-left:2px}
 @media(hover:none) and (pointer:coarse){.cpf-ch{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:16px}.cpf-ch .chip{flex:none}}
+
+.tp-cb{display:flex;justify-content:center;width:100%;margin-top:8px;text-align:center;white-space:normal}

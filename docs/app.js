@@ -197,18 +197,18 @@ function steps(o){if(!o.p)return [{l:"Bonus-Aktion",v:0,t:"base"}]; // Rewe-Bonu
   if(o.o)st.push({l:"Angebot",v:o.p-o.o,t:"of"});
   if(S.useApp){if(o.ap)st.push({l:o.s==="lidl"?"Lidl Plus App-Preis":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App-Preis":"App-Preis"),v:o.ap-o.p,t:"app"});(o.x||[]).forEach(([t,l,v])=>st.push({l,v:-v,t}))
     // eigene Coupons: werden in der eingetragenen Reihenfolge auf den jeweils aktuellen Preis angewendet
-    couponsFor(o).forEach(c=>{const cur=st.reduce((a,s)=>a+s.v,0),d=cpValue(c,cur);if(d>0.004)st.push({l:cpLabel(c),v:-d,t:c.t==="punkte"||c.prog==="Cashback-App"?"cb":"coupon"})})}
+    couponsFor(o).forEach(c=>{const cur=st.reduce((a,s)=>a+s.v,0),d=cpValue(c,cur);if(d>0.004)st.push({l:cpLabel(c),v:-d,t:c.t==="punkte"||c.prog==="Cashback-App"||c.prog==="Geld zurück"?"cb":"coupon"})})}
   return st}
 
 // ---------- Meine Coupons ----------
-const PROGS = ["Lidl Plus","Rewe Bonus","Payback","Netto App","Edeka App","dm App","Cashback-App","Hersteller-Coupon","Sonstiges"];
+const PROGS = ["Lidl Plus","Rewe Bonus","Payback","Netto App","Edeka App","dm App","Cashback-App","Geld zurück","Hersteller-Coupon","Sonstiges"];
 const CP_TYPES = {euro:"€ Rabatt / Guthaben",pct:"% Rabatt",preis:"Coupon-Preis (zahlst nur …)",punkte:"Payback-Extrapunkte"};
 const defaultProg = s => ({lidl:"Lidl Plus",rewe:"Rewe Bonus",netto:"Payback",edeka:"Payback",dm:"dm App",all:"Cashback-App"})[s]||"Sonstiges";
 const cpActive = c => !c.to || c.to>=TODAY;
 const couponsFor = o => S.coupons.filter(c=>cpActive(c)&&c.k&&(c.s==="all"||c.s===o.s)&&c.k.split(/\s+/).every(w=>matches(o,w)));
 function cpValue(c,cur){
   if(c.t==="euro")return c.v;
-  if(c.t==="pct")return Math.round(cur*c.v)/100;
+  if(c.t==="pct"){const d=Math.round(cur*c.v)/100;return c.mx?Math.min(d,c.mx):d}
   if(c.t==="preis")return Math.max(0,cur-c.v);
   if(c.t==="punkte")return c.v/100; // 1 Payback-Punkt = 1 Cent
   return 0} // t:"app" (vom Coupon-Sucher) = App-Preis/Bonus steht schon im Angebot -> nicht doppelt abziehen
@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  87:["Coupon-Suche neu: findet jetzt geheime Geld-zurück-Aktionen der Hersteller (oft 100 % zurück), die in keiner Markt-App stehen. App-Preise siehst du weiter direkt bei den Angeboten.","Nach dem Einkauf erinnert SparRadar dich, den Kassenbon hochzuladen."],
   86:["Coupon-Bericht: oben nach Markt filtern – z. B. nur Lidl-Coupons ansehen."],
   85:["Coupons nur noch digital und ganz einfach: suchen, einfügen, in der Markt-App aktivieren – an der Kasse reicht ein Scan der Kundenkarte."],
   84:["Kasse noch einfacher: großer Zähler und klare Tipps."],
@@ -949,10 +950,13 @@ function tripPop(t,auto){
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
    <div class="tp-n">${n} Artikel · bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</div>
    <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>
+   ${tripCb(t).map(c=>`<a class="btn ghost sm tp-cb" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">💸 Geld zurück: ${esc(c.n||c.k)} – Bon hochladen ↗</a>`).join("")}
    ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${auto&&store.get("openMktApp",true)?`${esc(MKT_APP[ms].n)} öffnet sich – Kundenkarte an der Kasse zeigen`:`${esc(MKT_APP[ms].n)}-App öffnen`}</button>`:""}`;
-  el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms?15000:auto?9000:6000);
+  el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms||tripCb(t).length?15000:auto?9000:6000);
   if(ms&&auto&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),350);
   try{if(TOUCH())navigator.vibrate?.([30,60,30])}catch(e){}}
+// Geld-zurück-Coupons, die zu einem Artikel des Einkaufs passen -> Link „Bon hochladen“
+function tripCb(t){return S.coupons.filter(c=>c.cb&&c.url&&cpActive(c)&&t.items.some(x=>(c.s==="all"||c.s===x.s)&&c.k.split(/\s+/).every(w=>norm((x.b+" "+x.n)).includes(norm(w))))).slice(0,3)}
 function hideTripPop(){const el=document.getElementById("tripPop");if(el)el.hidden=true}
 const monKey=d=>d.slice(0,7),monName=k=>new Date(k+"-15").toLocaleDateString("de-DE",{month:"long",year:"numeric"});
 function storeSplit(ts){const m={};ts.forEach(t=>t.items.forEach(x=>m[x.s]=(m[x.s]||0)+x.p));const ex=ts.reduce((a,t)=>a+t.extra.reduce((b,x)=>b+x.p,0),0);if(ex>0)m._=ex;return Object.entries(m).sort((a,b)=>b[1]-a[1])}
@@ -1049,43 +1053,54 @@ function cpqSave(id,t,v){const o=byId(id);if(!o||!v)return;
   toast(S.useApp?`Coupon gespeichert – du zahlst jetzt ${eur(fin(o))}`:"Coupon gespeichert. „Apps & Coupons einrechnen“ ist ausgeschaltet – in den Einstellungen einschalten.");render()}
 
 // ---------- Coupon-Sucher (Kevins Wunsch 01.11.) ----------
-// Sucht in den aktuellen Prospekten nach Vorteilen, die nur mit App/Bonus gelten (Lidl Plus, Edeka-/Netto-App, Rewe Bonus).
-// Nur echte Händlerangaben, nichts erfunden. Persönliche App-Coupons sieht SparRadar nicht (Login, keine Schnittstelle).
-const cpProgOf=o=>o.s==="rewe"?"Rewe Bonus":o.s==="lidl"?"Lidl Plus":o.s==="edeka"?"Edeka App":o.s==="netto"?"Netto App":o.s==="dm"?"dm App":"Sonstiges";
-function cpGain(o){if(!o.p)return null;
-  if(o.ap&&o.ap<o.p){if(o.ap<o.p*.45)return null; // unplausibel (z. B. 16,90 -> 6,99) -> lieber weglassen
-    return{d:o.p-o.ap,how:"App-Preis "+eur(o.ap)+" statt "+eur(o.p)}}
-  const b=(o.x||[]).filter(x=>x[0]==="bonus").reduce((a,x)=>a+x[2],0);
-  if(b>0)return{d:b,how:eur(b)+" Bonus-Guthaben"};
-  if(o.ao&&o.o&&o.o>o.p)return{d:o.o-o.p,how:"nur mit "+o.ao+": "+eur(o.p)+" statt "+eur(o.o)};
-  return null}
-const cpKey=o=>((o.b&&!norm(o.n).includes(norm(o.b))?o.b+" ":"")+o.n).replace(/\s+/g," ").trim();
-function cpFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c.oid).filter(Boolean));
-  return weekOffers().map(o=>({o,g:cpGain(o)})).filter(({o,g})=>g&&!no.includes(o.id)&&!have.has(o.id)&&(g.d>=.3||g.d/o.p>=.15))
-    .map(x=>({...x,pc:Math.round(x.g.d/(x.o.p+(x.o.ap?0:x.g.d))*100)})).sort((a,b)=>b.g.d-a.g.d||b.pc-a.pc).slice(0,40)}
-function cpHowHTML(){return `<section class="panel cphow"><h3>So sparst du mit Coupons am meisten</h3>
-  <ol><li><b>🔍 Coupon suchen</b> antippen. Du siehst die größten App-Rabatte der Woche. Bei allem, was du kaufen willst: <b>„Einfügen“</b>. Es landet auf deinem Einkaufszettel.</li>
-   <li><b>📱 In der App aktivieren:</b> Die eingefügten Coupons einmal in der App des Markts (z. B. Lidl Plus) aktivieren. Am Android-Handy öffnet sie ein Tipp auf den Knopf unter dem Bericht.</li>
-   <li><b>🧾 An der Kasse</b> nur die Kundenkarte in der App zeigen. <b>Ein Scan – alle Coupons sind drin.</b> Am Handy öffnet sich die App sogar von selbst, sobald du den letzten Artikel auf dem Zettel abhakst.</li></ol></section>`}
-function cpAppBtns(){const st=[...new Set(S.coupons.filter(c=>c.t==="app"&&cpActive(c)).map(c=>c.s))].filter(s=>MKT_APP[s]);
-  if(!ANDROID)return st.length?`<div class="cpf-act"><b>Jetzt in diesen Apps aktivieren:</b> ${st.map(s=>esc(MKT_APP[s].n)).join(", ")}</div>`:"";
-  return st.length?`<div class="cpf-act"><b>Jetzt in der App aktivieren:</b>${st.map(s=>`<button class="mktbtn" data-mktapp="${s}">📱 ${esc(MKT_APP[s].n)}</button>`).join("")}</div>`:""}
-function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfind" id="cpFind">🔍 Coupon suchen</button>${cpAppBtns()}`;
-  const all=cpFinds(),cnt={};all.forEach(x=>cnt[x.o.s]=(cnt[x.o.s]||0)+1);
+// Zeigt NUR Vorteile, die nicht schon in den Angeboten stehen: Geld-zurück-Aktionen der Hersteller („Gratis testen“).
+// Daten: docs/data/cashback.json (täglicher Abruf einer öffentlichen Übersicht, nur Fakten + Link zur Hersteller-Aktion).
+// App-Preise der Märkte stehen schon bei den Angeboten (📱-Abzeichen) und kommen hier bewusst nicht vor.
+let CASHBACK=null;
+function loadCashback(){if(CASHBACK)return Promise.resolve(CASHBACK);
+  return fetch("data/cashback.json?"+(META.generated||Date.now())).then(r=>r.ok?r.json():{items:[]}).catch(()=>({items:[]})).then(j=>(CASHBACK=j))}
+const CB_FILL=/^(gratis|testen|probieren|produkt|produkte|und|oder|mit|der|die|das|von|für|neu|aktion|sorten?)$/i;
+const cbWords=a=>(a.n||"").split(/[\s\-–\/&+]+/).map(w=>w.replace(/[^\wäöüßÄÖÜ]/g,"")).filter(w=>w.length>2&&!CB_FILL.test(w));
+const cbHit=(o,w)=>new RegExp("(^|[^a-z0-9äöüß])"+norm(w).replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).test(hay(o));
+const cbLive=a=>(!a.ab||a.ab<=SHOP_END())&&(!a.kauf||a.kauf>=TODAY)&&(!a.ende||a.ende>=TODAY);
+function SHOP_END(){const o=weekOffers().map(o=>o.to).filter(Boolean).sort();return o.at(-1)||TODAY}
+// Passende Angebote: Marke + (wenn vorhanden) ein weiteres Wort aus dem Aktionsnamen, nur in den genannten Märkten
+function cbOffers(a){const w=cbWords(a);if(!w.length)return [];const [br,...rest]=w;
+  return weekOffers().filter(o=>o.p>0&&cbHit(o,br)&&rest.slice(0,2).every(x=>cbHit(o,x))&&(!a.shops?.length||a.shops.includes(o.s))).sort((x,y)=>fin(x)-fin(y))}
+const cbBack=(a,price)=>{const p=a.pct??100;let d=price*p/100;if(a.max)d=Math.min(d,a.max);return Math.round(d*100)/100};
+function cbFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c.cb).filter(Boolean));
+  return (CASHBACK?.items||[]).filter(a=>cbLive(a)&&!no.includes("cb:"+a.id)&&!have.has(a.id)).map(a=>{const os=cbOffers(a),o=os[0]||null;
+    return {a,o,val:o?cbBack(a,fin(o)):(a.max||a.w||0)}}).sort((x,y)=>(!!y.o-!!x.o)||y.val-x.val||String(x.a.kauf||x.a.ende).localeCompare(String(y.a.kauf||y.a.ende)))}
+const cbShopTxt=a=>a.shops?.length?"bei "+a.shops.map(sname).join(", "):"in vielen Märkten";
+const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
+function cpHowHTML(){return `<section class="panel cphow"><h3>Geheime Coupons: Geld zurück vom Hersteller</h3>
+  <p>Viele Hersteller zahlen dir den Kaufpreis zurück („Gratis testen“). Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag für dich.</p>
+  <ol><li><b>🔍 Coupon suchen</b> antippen und bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
+   <li><b>Ganz normal einkaufen</b> und den <b>Kassenbon aufheben</b>.</li>
+   <li><b>💸 Geld holen:</b> Nach dem Einkauf auf „Bon hochladen“ tippen, Kassenbon fotografieren, Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
+  <p class="cpf-n">Rabatte, die nur mit der Markt-App gelten, siehst du direkt bei den Angeboten am 📱-Abzeichen. In der Markt-App aktivieren und an der Kasse die Kundenkarte zeigen – ein Scan.</p></section>`}
+function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfind" id="cpFind">🔍 Coupon suchen</button>`;
+  if(!CASHBACK)return `<section class="panel cpf"><p>Suche Coupons …</p></section>`;
+  const all=cbFinds(),cnt={};all.forEach(x=>(x.a.shops?.length?x.a.shops:["_"]).forEach(s=>cnt[s]=(cnt[s]||0)+1));
   if(S.cpfS&&!cnt[S.cpfS])S.cpfS=null;
-  const f=S.cpfS?all.filter(x=>x.o.s===S.cpfS):all,tot=f.reduce((a,x)=>a+x.g.d,0);
-  const chips=Object.keys(cnt).length>1?`<div class="cpf-ch">${[["","Alle Märkte",all.length],...Object.keys(STORES).filter(k=>cnt[k]).map(k=>[k,STORES[k].n,cnt[k]])].map(([k,n,c])=>`<button class="chip${(S.cpfS||"")===k?" on":""}" data-cpfs="${k}" aria-pressed="${(S.cpfS||"")===k}">${k?sb(k)+" ":""}${esc(n)} <small>${c}</small></button>`).join("")}</div>`:"";
+  const f=S.cpfS?all.filter(x=>!x.a.shops?.length||x.a.shops.includes(S.cpfS)):all,tot=f.reduce((a,x)=>a+x.val,0);
+  const ks=Object.keys(STORES).filter(k=>cnt[k]);
+  const chips=ks.length?`<div class="cpf-ch">${[["","Alle",all.length],...ks.map(k=>[k,STORES[k].n,cnt[k]+(cnt._||0)])].map(([k,n,c])=>`<button class="chip${(S.cpfS||"")===k?" on":""}" data-cpfs="${k}" aria-pressed="${(S.cpfS||"")===k}">${k?sb(k)+" ":""}${esc(n)} <small>${c}</small></button>`).join("")}</div>`:"";
   return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Bericht</h3><button class="ibtn" id="cpFindX" aria-label="Bericht schließen">${IC.x}</button></div>
-    ${chips}${f.length?`<p><b>${f.length} App- &amp; Bonus-Vorteile${S.cpfS?" bei "+esc(sname(S.cpfS)):""} gefunden – zusammen bis zu ${eur(tot)}.</b> Die größten zuerst. „Einfügen“ legt den Coupon bei dir ab und setzt den Artikel auf den Einkaufszettel.</p>
-    <div class="rows">${f.map(({o,g,pc})=>`<div class="drow cpf-r"><button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>
-      <div class="t">${esc(cpKey(o))}<small>${sb(o.s)} ${esc(sname(o.s))} · ${esc(g.how)}${o.to?" · bis "+fmtDate(o.to):""}</small></div>
-      <div class="pr"><b>−${eur(g.d)}</b><small>${pc>=30?"🔥 ":""}${pc} %</small></div><div class="cpf-b"><button class="btn sm" data-cpfadd="${esc(o.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="${esc(o.id)}">Nein</button></div></div>`).join("")}</div>
-    ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}${cpAppBtns()}`
-    :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues</b>Alle App- und Bonus-Vorteile dieser Woche hast du schon eingefügt oder abgelehnt.</div>`}
-    <p class="cpf-n">Quelle: die aktuellen Prospekte (App-Preise, Rewe Bonus). Persönliche Coupons in Lidl Plus, Payback &amp; Co. sieht nur deine App – dafür braucht es dein Login, das SparRadar bewusst nicht nutzt. Wichtig: Den Coupon vor dem Einkauf in der App aktivieren.</p></section>`}
-function cpfAdd(id,quiet){const o=byId(id),g=o&&cpGain(o);if(!g)return 0;
-  S.coupons.push({s:o.s,prog:cpProgOf(o),k:cpKey(o),t:"app",v:Math.round(g.d*100)/100,to:o.to||null,oid:o.id});
-  if(!S.list.includes(o.id))S.list.push(o.id);if(!quiet){save();toast(`Eingefügt: ${cpKey(o)} – vor dem Einkauf in der ${cpProgOf(o)} aktivieren`)}return 1}
+    ${chips}${f.length?`<p><b>${f.length} Geld-zurück-Aktion${f.length===1?"":"en"} gefunden – zusammen bis zu ${eur(tot)} zurück.</b> Ganz oben: was es gerade auch im Angebot gibt – doppelt gespart.</p>
+    <div class="rows">${f.map(({a,o,val})=>`<div class="drow cpf-r">${o?`<button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>`:`<span class="mini cbico" aria-hidden="true">${CB_ICO[a.cat]||"💸"}</span>`}
+      <div class="t">${esc(a.n)}<small>${a.pct??100} % Geld zurück${a.max?" (max. "+eur(a.max)+")":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
+       ${o?`<small class="cbhit">🔥 Gerade im Angebot: ${esc(sname(o.s))} ${eur(fin(o))}${cbBack(a,fin(o))>=fin(o)-.005?" → mit Geld zurück <b>gratis</b>":" → danach nur "+eur(fin(o)-cbBack(a,fin(o)))}</small>`:""}</div>
+      <div class="pr"><b>−${eur(val)}</b><small>${a.pct??100} %</small></div>
+      <div class="cpf-b"><button class="btn sm" data-cbadd="${esc(a.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="cb:${esc(a.id)}">Nein</button><a class="btn ghost sm" href="${esc(a.url)}" target="_blank" rel="noopener nofollow">Aktion ↗</a></div></div>`).join("")}</div>
+    ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}`
+    :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues</b>Alle aktuellen Geld-zurück-Aktionen hast du schon eingefügt oder abgelehnt. SparRadar sucht jeden Tag neu.</div>`}
+    <p class="cpf-n">Gefunden in einer öffentlichen Übersicht von Hersteller-Aktionen, täglich neu. „Aktion ↗“ öffnet die Seite des Herstellers mit allen Bedingungen. Oft gilt: nur eine Teilnahme pro Person, begrenzte Teilnehmerzahl.</p></section>`}
+function cbAdd(id,quiet){const a=(CASHBACK?.items||[]).find(x=>x.id===id);if(!a)return 0;const o=cbOffers(a)[0],w=cbWords(a);
+  const k=o?[w[0],...w.slice(1).filter(x=>cbHit(o,x)).slice(0,1)].join(" "):w.slice(0,2).join(" ");
+  S.coupons.push({id:"cb-"+a.id,s:o?o.s:(a.shops?.length===1?a.shops[0]:"all"),prog:"Geld zurück",k,t:"pct",v:a.pct??100,mx:a.max||null,to:a.ende||a.kauf||null,cb:a.id,url:a.url,n:a.n});
+  if(o&&!S.list.includes(o.id))S.list.push(o.id);
+  if(!quiet){save();toast(o?`Eingefügt und auf dem Zettel: ${a.n}. Kassenbon aufheben!`:`Eingefügt: ${a.n}. Beim Kauf Kassenbon aufheben!`)}return 1}
 
 function renderCoupons(){
   const act=S.coupons.map((c,i)=>({c,i})).filter(x=>cpActive(x.c));
@@ -1104,7 +1119,8 @@ function renderCoupons(){
     </form>
     ${act.length?`<div class="rows">${act.map(({c,i})=>{const n=wo.filter(o=>couponsFor(o).includes(c)).length;
       return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#2B3034"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#2B3034">%</span>`:sb(c.s,true)}</div>
-       <div class="t">${esc(c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?"bis "+fmtDate(c.to):"ohne Ende"}</small>
+       <div class="t">${esc(c.cb&&c.n?c.n:c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?(c.cb?"Bon einsenden bis ":"bis ")+fmtDate(c.to):"ohne Ende"}</small>
+        ${c.cb&&c.url?`<a class="btn sm cblink" href="${esc(c.url)}" target="_blank" rel="noopener nofollow">🧾 Bon hochladen ↗</a>`:""}
         <div class="pills"><span class="pill ${n?"cb":""}">${n?`passt zu ${n} Angebot${n===1?"":"en"}`:"gerade kein passendes Angebot"}</span></div></div>
        <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`
       :'<div class="empty" style="padding:16px"><b>Noch keine Coupons</b>Trag oben deinen ersten aktivierten Coupon ein.</div>'}
@@ -1370,12 +1386,12 @@ document.addEventListener("click",e=>{
   if(b.dataset.cpq!=null){S.cpq=b.dataset.cpq||null;render();return}
   if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
-  if(b.id==="cpFind"){S.cpFind=true;render();return}
+  if(b.id==="cpFind"){S.cpFind=true;render();loadCashback().then(render);return}
   if(b.dataset.cpfs!=null){S.cpfS=b.dataset.cpfs||null;render();return}
   if(b.id==="cpFindX"){S.cpFind=false;render();return}
-  if(b.dataset.cpfadd){cpfAdd(b.dataset.cpfadd);render();return}
-  if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set(OFFERS.map(o=>o.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
-  if(b.id==="cpFindAll"){const n=cpFinds().reduce((a,x)=>a+cpfAdd(x.o.id,true),0);save();toast(`${n} Coupons eingefügt und auf den Zettel gesetzt – vor dem Einkauf in den Apps aktivieren`);render();return}
+  if(b.dataset.cbadd){cbAdd(b.dataset.cbadd);render();return}
+  if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set((CASHBACK?.items||[]).map(a=>"cb:"+a.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
+  if(b.id==="cpFindAll"){const f=cbFinds().filter(x=>!S.cpfS||!x.a.shops?.length||x.a.shops.includes(S.cpfS)),n=f.reduce((a,x)=>a+cbAdd(x.a.id,true),0);save();toast(`${n} Geld-zurück-Aktionen eingefügt – Kassenbons aufheben!`);render();return}
   if(b.dataset.delcp){const c=S.coupons.splice(+b.dataset.delcp,1)[0];save();toast(`Coupon „${c.k}“ gelöscht`);render();return}
   if(b.dataset.cpshow){const c=S.coupons[+b.dataset.cpshow];S.tab="offers";S.q=c.k;document.getElementById("q").value=c.k;S.stores=new Set(c.s==="all"?[]:[c.s]);S.cats.clear();S.limit=60;render();scrollTo({top:0});return}
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}

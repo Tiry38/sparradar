@@ -40,7 +40,7 @@ def main():
             continue
         f = {txt(k): txt(v) for k, v in re.findall(r"<strong>(.*?)</strong>\s*:(.*?)</li>", blk, re.S)}
         t = re.sub(r"\*NEU\*", "", txt(title.group(1))).strip()
-        if re.search(r"garantie", t + f.get("Cashback", ""), re.I):
+        if re.search(r"garantie", t + f.get("Cashback", "") + link.group(1), re.I):
             continue  # Zufriedenheits-Garantie = nur bei Nichtgefallen, kein echter Rabatt
         cb = f.get("Cashback", "")
         pct = re.search(r"(\d+)\s*%", cb)
@@ -49,6 +49,12 @@ def main():
         kauf = date(f.get("Aktionszeitraum")) ; ende = date(f.get("Einsendeschluss")) or kauf
         if (kauf and kauf < today) or (ende and ende < today):
             continue
+        if not kauf and not ende:
+            continue  # ohne Datum nicht prüfbar, ob die Aktion noch läuft (meist Cashback-Apps mit eigenem Konto)
+        if re.search(r"https://[^/]+\.at(/|$)|/aut/", link.group(1)):
+            continue  # Aktion für Österreich
+        if re.search(r"exklusiv\s+(bei|in)\b", f.get("Aktionsprodukt", "") + " " + f.get("Teilnahme", ""), re.I) and re.search(OTHER, (f.get("Aktionsprodukt", "") + " " + f.get("Teilnahme", "")).lower()):
+            continue  # nur bei einem Markt, den es hier nicht gibt
         how = f.get("Teilnahme", "")
         ab = date((re.search(r"\bvom\s+(\d{1,2}\.\d{1,2}\.\d{4})", how) or [None, None])[1])
         low = how.lower()
@@ -56,8 +62,11 @@ def main():
         if not shops and re.search(OTHER, low) and not re.search(r"im handel|überall|alle(n)? (händler|märkte|geschäfte)|deutsche[nm]? (lebensmittel)?handel", low):
             continue  # nur bei Märkten, die es hier nicht gibt
         name = re.sub(r"\s+(gratis|kostenlos)\s+(testen|probieren)\b.*$", "", t, flags=re.I).strip()
+        iid = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60]
+        if any(x["id"] == iid for x in items):
+            continue  # gleiche Aktion steht doppelt in der Übersicht
         items.append({
-            "id": re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:60],
+            "id": iid,
             "n": name, "prod": f.get("Aktionsprodukt", "")[:300], "cat": cat.group(1) if cat else "",
             "pct": int(pct.group(1)) if pct else None, "max": float(mx.group(1).replace(",", ".")) if mx else None,
             "w": float(wert.group(1).replace(",", ".")) if wert else None,
