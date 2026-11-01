@@ -501,6 +501,9 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .wk-c{--wkc:color-mix(in oklab,#F08A24 24%,transparent)}
 .wk-l{--wkc:color-mix(in oklab,#1E9E5A 20%,transparent)}
 .wk-p{--wkc:color-mix(in oklab,#3B6FD9 20%,transparent)}
+.wk.on{border:2px solid #1E9E5A;background:color-mix(in oklab,#1E9E5A 14%,var(--surface));padding:10px 12px}
+.wk.on i{background:#1E9E5A}
+.wk small.wkon{color:#1E9E5A;font-weight:700}
 @media (hover:hover) and (pointer:fine){.wkrow{flex-wrap:wrap;overflow:visible}.wk{flex:1 1 220px;width:auto;max-width:340px}.wk:hover{transform:translateY(-2px)}}
 /* Preis-Alarm */
 .alarm{display:flex;align-items:center;gap:6px;font-size:.76rem;font-weight:800;color:#2459C7;background:color-mix(in oklab,#3B6FD9 13%,transparent);border-radius:9px;padding:5px 8px;width:fit-content;max-width:100%}

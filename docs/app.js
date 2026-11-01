@@ -590,9 +590,10 @@ function weekHTML(hitCount){const t=[];
     t.push(`<button class="wk wk-l" data-go="list"><i>🛒</i><b>${items.length+nx} Artikel auf dem Zettel</b><small>${eur(items.reduce((a,o)=>a+lineP(o),0))}${sv>=.5?` · ${eur(sv)} günstiger möglich`:""}</small></button>`)}
   const wo=weekOffers().filter(o=>!S.stores.size||S.stores.has(o.s)),bei=S.stores.size===1?" bei "+sname([...S.stores][0]):"";
   const low=wo.filter(o=>lowSince(o)).length;
-  if(low)t.push(`<button class="wk wk-p" data-golow="1"><i>📉</i><b>${low} ${low===1?"Preis-Alarm":"Preis-Alarme"}${bei}</b><small>so günstig wie seit Wochen nicht</small></button>`);
+  const ON='<small class="wkon">✓ Filter an – nochmal antippen = aus</small>';
+  if(low||S.flt.low)t.push(`<button class="wk wk-p${S.flt.low?" on":""}" data-golow="1" aria-pressed="${!!S.flt.low}"><i>📉</i><b>${low?`${low} ${low===1?"Preis-Alarm":"Preis-Alarme"}${bei}`:`Kein Preis-Alarm${bei}`}</b>${S.flt.low?ON:"<small>so günstig wie seit Wochen nicht</small>"}</button>`);
   const cbn=wo.filter(o=>cbFor(o)).length;
-  if(cbn)t.push(`<button class="wk wk-c" data-gocb="1"><i>💸</i><b>${cbn} ${cbn===1?"Angebot":"Angebote"} mit Geld zurück${bei}</b><small>Antippen zeigt ${cbn===1?"es":"sie"} – Hersteller zahlt dir etwas zurück</small></button>`);
+  if(cbn||S.flt.cb)t.push(`<button class="wk wk-c${S.flt.cb?" on":""}" data-gocb="1" aria-pressed="${!!S.flt.cb}"><i>💸</i><b>${cbn?`${cbn} ${cbn===1?"Angebot":"Angebote"} mit Geld zurück${bei}`:`Kein Angebot mit Geld zurück${bei}`}</b>${S.flt.cb?ON:`<small>Antippen zeigt ${cbn===1?"es":"sie"} – Hersteller zahlt dir etwas zurück</small>`}</button>`);
   if(!t.length)return "";
   return `<section class="wkbox" aria-label="Deine Woche"><h3>Deine Woche</h3><div class="wkrow">${t.join("")}</div></section>`}
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
@@ -757,6 +758,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  105:["Die Kacheln „Geld zurück“ und „Preis-Alarm“ bei „Deine Woche“ sind jetzt Schalter: antippen = Filter an (grün), nochmal antippen = Filter aus. Wechselst du den Markt, bleibt die grüne Kachel sichtbar, damit du den Filter jederzeit ausschalten kannst."],
   104:["„Meine Coupons“ ist jetzt einfacher: oben steht in 3 Schritten, wie du einen Coupon direkt beim Artikel einträgst. Das lange Formular ist eingeklappt – nur noch für Coupons, die für eine ganze Marke gelten."],
   103:["Einkaufszettel = Kassenpreis: Die Summe zeigt jetzt genau, was du an der Kasse zahlst. App-Preise zählen erst, wenn du beim Artikel „Aktiviert ✓“ antippst – SparRadar sagt dir dabei, was in welcher App zu tun ist.","Rewe-Bonus-Guthaben, Payback und Geld zurück werden nicht mehr von der Summe abgezogen (die kommen ja erst später). Sie stehen als „Kommt später zurück“ beim Artikel."],
   102:["Geld zurück: Die Zahl bei „Deine Woche“ passt jetzt zum gewählten Markt. Antippen zeigt direkt die Angebote mit Geld zurück.","Den Coupon-Finder gibt es nicht mehr – SparRadar findet Geld-zurück-Aktionen automatisch und zeigt sie direkt bei den Angeboten (oranges Abzeichen „💸“)."],
@@ -1749,8 +1751,8 @@ document.addEventListener("click",e=>{
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();scrollTo({top:0});return}
   if(b.dataset.go){S.tab=b.dataset.go;render();scrollTo({top:0});return}
-  if(b.dataset.gocb){S.flt.cb=1;store.set("flt",S.flt);S.limit=60;render();document.querySelector(".meta")?.scrollIntoView({block:"start"});toast("Filter: nur Angebote mit Geld zurück");return}
-  if(b.dataset.golow){S.flt.low=1;store.set("flt",S.flt);S.limit=60;render();document.querySelector(".meta")?.scrollIntoView({block:"start"});toast("Filter: nur Preis-Alarme und Tiefstpreise");return}
+  if(b.dataset.gocb){const on=!S.flt.cb;if(on)S.flt.cb=1;else delete S.flt.cb;store.set("flt",S.flt);S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});toast(on?"Filter an: nur Angebote mit Geld zurück":"Filter aus: alle Angebote");return}
+  if(b.dataset.golow){const on=!S.flt.low;if(on)S.flt.low=1;else delete S.flt.low;store.set("flt",S.flt);S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});toast(on?"Filter an: nur Preis-Alarme und Tiefstpreise":"Filter aus: alle Angebote");return}
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
