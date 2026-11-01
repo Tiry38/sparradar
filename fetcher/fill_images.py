@@ -160,13 +160,25 @@ class Pool:
         if len(t) >= 2:
             self.brand.setdefault(t[0], []).append((set(t[1:]), t[1], url))
 
-    def find(self, name):
+    def find(self, name, loose=False):
+        """loose=True: notfalls gleiche Marke + gleiche Produktlinie in anderer Sorte (z. B. IronMaxx SqueeBarista
+        Dark Chocolate für Caramel – gleiche Packung). Nur wenn die Produktlinie ein echtes Wort ist (>= 5 Zeichen)."""
         k = norm(name)
         if k in self.exact:
             return self.exact[k]
         t = toks(name)
         if len(t) < 2:
             return None
+        if loose:
+            if len(t[1]) < 5:
+                return None
+            best, bu = -1, None
+            for ws, first, url in self.brand.get(t[0], ()):
+                if first == t[1]:
+                    sc = len(set(t[1:]) & ws) - 0.01 * len(ws)
+                    if sc > best:
+                        best, bu = sc, url
+            return bu
         want = set(t[1:])
         best, bu = 0, None
         for ws, first, url in self.brand.get(t[0], ()):
@@ -262,6 +274,18 @@ def main():
                 if im:  # Bild über das Archiv laden (Original-Adresse kann schon gelöscht sein)
                     extra[n] = f"https://web.archive.org/web/{ts}im_/{im}"; found += 1; log("   + (Archiv)", n, "->", im[:90])
             tried.add(n)
+        # Durchgang 3: gleiche Marke + Produktlinie, andere Sorte (eigene Daten, dann Aldi-/Lidl-Produktseiten)
+        for n in todo:
+            if n in extra:
+                continue
+            u = pool.find(n, loose=True)
+            if not u and net < MAX_NET:
+                page = shops.find(n, loose=True)
+                if page:
+                    html = http(page); net += 1; time.sleep(PAUSE)
+                    u = page_img(html)
+            if u:
+                extra[n] = u; found += 1; log("   ~ (gleiche Produktlinie)", n, "->", u[:90])
         for n in tried:
             if n not in extra:
                 miss[n] = today + "+n"

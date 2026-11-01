@@ -159,7 +159,7 @@ def img_pool(allf, out, out_img):
             pool.add(n, img)
     res = {}
     for n in need:
-        u = pool.find(n)
+        u = pool.find(n) or pool.find(n, loose=True)  # notfalls gleiche Marke + Produktlinie, andere Sorte
         if u:
             res[n] = u
     with open(os.path.join(ROOT, "docs", "data", "img-pool.json"), "w", encoding="utf-8") as f:
