@@ -1522,9 +1522,10 @@ function pinTabs(){const desk=matchMedia("(min-width:721px)").matches,was=TABS.c
   if(pin){if(!was){TABS_PH.style.height=TABS.offsetHeight+"px";TABS_PH.style.display="block"}TABS.style.left=TABS_PH.offsetLeft+"px";TABS.style.width=TABS_PH.offsetWidth+"px"}
   else if(was){TABS_PH.style.display="";TABS.style.left=TABS.style.width=""}
   if(pin!==was)TABS.classList.toggle("pinned",pin)}
-addEventListener("scroll",pinTabs,{passive:true});addEventListener("resize",()=>{TABS.classList.remove("pinned");TABS_PH.style.display="";TABS.style.left=TABS.style.width="";pinTabs()});
+addEventListener("scroll",pinTabs,{passive:true});function repin(){TABS.classList.remove("pinned");TABS_PH.style.display="";TABS.style.left=TABS.style.width="";pinTabs()}
+addEventListener("resize",repin);
 function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));document.documentElement.style.zoom=ZOOM[i]>1?ZOOM[i]:"";
-  const b=document.getElementById("zoomBtn");b.textContent=ZOOM_UI[i][0];b.setAttribute("aria-label",ZOOM_UI[i][1]);b.setAttribute("aria-pressed",i>0);return i}
+  const b=document.getElementById("zoomBtn");b.textContent=ZOOM_UI[i][0];b.setAttribute("aria-label",ZOOM_UI[i][1]);b.setAttribute("aria-pressed",i>0);if(window.repin)repin();return i}
 // Versteckter Zugang zu den Einstellungen: SparRadar-Logo oben links ca. 1 Sekunde gedrückt halten
 // (oder 5× schnell antippen). Bewusst ohne sichtbaren Knopf.
 (()=>{const el=document.querySelector(".logo");let t=null,taps=0,tt=null;
