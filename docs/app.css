@@ -511,6 +511,18 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .alarm.big{font-size:.86rem;font-weight:600;padding:10px 12px;border-radius:12px;margin:0 0 8px;width:auto}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .alarm{color:#9DBBFF}}
 :root[data-theme="dark"] .alarm{color:#9DBBFF}
+.alarm.cheap{color:#B45309;background:color-mix(in oklab,#F59E0B 18%,transparent)}
+.alarm.cheap .btn{margin-left:6px;vertical-align:middle}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .alarm.cheap{color:#FCD34D}}
+:root[data-theme="dark"] .alarm.cheap{color:#FCD34D}
+.cheapbox p{margin:0;line-height:1.45}
+.cheapico{font-size:2rem;line-height:1}
+.cheapcmp{display:grid;gap:6px;width:100%}
+.cheapcmp span{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:12px;background:color-mix(in oklab,currentColor 6%,transparent);text-align:left}
+.cheapcmp em{font-style:normal;flex:1;min-width:0}
+.cheapcmp b{font-size:1.05rem}
+.cheapcmp .win{background:color-mix(in oklab,#1E9E5A 16%,transparent);outline:2px solid #1E9E5A}
+.cheapbox .factions .btn{white-space:normal}
 /* Markt-Farbe als feiner Streifen oben an jeder Karte */
 .grid>.card .thumb{border-top:3px solid var(--sc,transparent)}
 /* Zettel: Laufweg + Günstiger einkaufen */

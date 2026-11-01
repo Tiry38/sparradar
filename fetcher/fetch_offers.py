@@ -885,7 +885,60 @@ def app_twins(offers):
         for f in ("gp", "o", "ou", "ap", "inf"):
             if not a.get(f) and o.get(f):
                 a[f] = o[f]
+    variant_twins([o for o in offers if id(o) not in drop], drop)
     return [o for o in offers if id(o) not in drop]
+
+
+VARIANT_UNION = re.compile(r"\s(oder|und|&)\s|/|,", re.I)
+
+
+def variant_twins(offers, drop):
+    """Sorten-Doppel (Kevin 01.11.: Landliebe „Butter“ + „Butter oder Streichzart“, Müller „Joghurt mit der Ecke“ zweimal
+    mit vertauschten Sorten-Bildern): gleicher Markt, Marke, Preis, statt-/App-Preis, Zeitraum, gleiche Menge und ein Name
+    steckt ganz im anderen -> eine Karte. Ein Name mit „oder/und//“ bleibt (nennt alle Sorten), sonst der allgemeinere
+    kürzere. Gleiche Artikel bei verschiedenen Märkten bleiben getrennt (App zeigt dafür den Achtung-Hinweis)."""
+    words = lambda o: set(re.findall(r"[a-z0-9]+", norm_words(o["n"])))
+    gp_ok = lambda a, b: not a.get("gp") or not b.get("gp") or (
+        a["gp"].get("u") == b["gp"].get("u") and abs(a["gp"]["v"] - b["gp"]["v"]) / a["gp"]["v"] < 0.02)
+    by = {}
+    for o in offers:
+        if o.get("b") and o.get("p"):
+            by.setdefault((o["s"], norm(o["b"]), o["p"], o.get("o"), o.get("ap"), o.get("from"), o.get("to")), []).append(o)
+    for g in by.values():
+        if len(g) < 2:
+            continue
+        ws = [words(o) for o in g]
+        par = list(range(len(g)))
+
+        def root(i):
+            while par[i] != i:
+                par[i] = par[par[i]]
+                i = par[i]
+            return i
+        for i in range(len(g)):
+            for j in range(i + 1, len(g)):
+                if ws[i] and ws[j] and (ws[i] <= ws[j] or ws[j] <= ws[i]) and gp_ok(g[i], g[j]):
+                    par[root(i)] = root(j)
+        cl = {}
+        for i in range(len(g)):
+            cl.setdefault(root(i), []).append(i)
+        for ix in cl.values():
+            if len(ix) < 2:
+                continue
+            un = [i for i in ix if VARIANT_UNION.search(g[i]["n"])]
+            keep = max(un, key=lambda i: len(ws[i])) if un else min(ix, key=lambda i: (len(ws[i]), len(g[i]["n"])))
+            a = g[keep]
+            for i in ix:
+                if i == keep:
+                    continue
+                o = g[i]
+                drop.add(id(o))
+                im = [x for x in [o.get("img")] + (o.get("ims") or []) if x and x != a.get("img")]
+                if im:
+                    a["ims"] = list(dict.fromkeys((a.get("ims") or []) + im))
+                for f in ("gp", "ou", "inf", "d"):
+                    if not a.get(f) and o.get(f):
+                        a[f] = o[f]
 
 
 def norm_words(s):

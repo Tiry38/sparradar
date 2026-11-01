@@ -359,6 +359,27 @@ function cmpPrice(o){
   if(c.length){const v=c[0].v,d=fin(o)-v;
     r={s:`${sname(c[0].x.s)}: ${eur(v)}`,hi:d>.009,l:d>.009?`Derselbe Artikel kostet bei ${sname(c[0].x.s)} gerade ${eur(v)} – dort ${eur(d)} günstiger.`:`Derselbe Artikel kostet bei ${sname(c[0].x.s)} gerade ${eur(v)} – hier bist du gleich günstig oder günstiger.`}}
   CMP.set(o.id,r);return r}
+// Achtung-Hinweis (Kevin 01.11., Almighurt Lidl 0,39 € / Aldi 0,29 €): genau derselbe Artikel (gleiche Marke, gleiche Wörter,
+// gleiche Menge) kostet in derselben Woche bei einem anderen Markt mindestens 5 Cent weniger. Beide Angebote bleiben sichtbar;
+// gewarnt wird auf der Karte, in der Detailansicht und beim Setzen auf den Einkaufszettel (askCheaper).
+const CHEAP=new Map();
+function cheaper(o){
+  if(!o||!o.p||o.bo)return null;const ck=o.id+"|"+S.useApp;
+  if(CHEAP.has(ck))return CHEAP.get(ck);
+  const nx=isNextWk(o),pool=OFFERS.filter(x=>isNextWk(x)===nx&&!x.bo);
+  const x=sameElsewhere(o,pool).filter(r=>Math.abs(r.f-1)<.05&&fin(r.x)>0&&fin(r.x)<fin(o)-.04).map(r=>r.x).sort((a,b)=>fin(a)-fin(b))[0];
+  const r=x?{x,d:r2(fin(o)-fin(x)),app:S.useApp&&x.ap&&x.ap<x.p?appName(x):""}:null;
+  CHEAP.set(ck,r);return r}
+const cheapTxt = (c,o) => `Genau diesen Artikel gibt es bei ${sname(c.x.s)} für ${eur(fin(c.x))}${c.app?" (mit "+c.app+")":""} – ${eur(c.d)} weniger als bei ${sname(o.s)}.`;
+const sshort = s => sname(s).split(" ")[0];
+function askCheaper(o,c){
+  let el=document.getElementById("cheapAsk");
+  if(!el){el=document.createElement("div");el.id="cheapAsk";el.className="exitask";document.body.appendChild(el)}
+  el.innerHTML=`<div class="exitbox cheapbox" role="alertdialog" aria-label="Achtung: woanders billiger"><span class="cheapico">⚠️</span><h3>Achtung: woanders billiger</h3>
+   <p>${esc(cheapTxt(c,o))}</p>
+   <div class="cheapcmp"><span><em>${esc(sname(o.s))}</em><b>${eur(fin(o))}</b></span><span class="win"><em>${esc(sname(c.x.s))} ✓</em><b>${eur(fin(c.x))}</b></span></div>
+   <div class="factions"><button class="btn ghost" data-cheap="${esc(o.id)}">Trotzdem ${esc(sshort(o.s))}</button><button class="btn" data-cheap="${esc(c.x.id)}">${esc(sshort(c.x.s))} nehmen</button></div></div>`;
+  el.hidden=false}
 function thumb(o,big){return `<div class="thumb" style="--cc:${CC[o.c]||CC.sonstiges}">${imgTag(o)}${big?"":sb(o.s)}${cbFor(o)?`<span class="cbtag" title="Geld zurück vom Hersteller – Details antippen">💸${appName(o)?"":" Geld zurück"}</span>`:""}${appName(o)?`<span class="apptag" title="App-Angebot: ${esc(o.ao?"Preis gilt nur mit "+o.ao:"günstiger mit "+appName(o))}">📱 ${esc(appName(o))}</span>`:""}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:perk(o)?`<span class="off pk" title="Vorteil ohne „statt“-Preis – Details antippen">${perk(o).b}</span>`:""}</div>`}
 
 document.addEventListener("load",e=>{const i=e.target;if(i.tagName==="IMG"&&i.closest(".thumb")&&i.naturalWidth&&Math.max(i.naturalWidth,i.naturalHeight)<LOWPX)i.classList.add("lowres")},true);
@@ -479,7 +500,7 @@ async function load(){
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;
     loadCashback().then(()=>render()); // Geld-zurück-Abzeichen an den Angeboten
-    RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();CMP.clear();
+    RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();CMP.clear();CHEAP.clear();twinFix();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote<span id="tick"></span>${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;if(typeof tickShow==="function")tickShow();
@@ -594,7 +615,7 @@ const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColo
 
 // ---------- Ansichten ----------
 function card(o,bestIds){
-  const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o);
+  const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o),ch=cheaper(o);
   // App-Preis direkt beim Preis: „Lidl Plus App-Preis 1,49 €“; mehrere Vorteile zusammen = „Mit Kombi“
   const combo=cl.length?`<div class="combo"><div class="top">${IC.layers} ${cl.length===1?esc(cl[0]):"Mit Kombi"}<b>${eur(fin(o))}</b></div>${cl.length>1?`<div class="src">${cl.map(esc).join(" + ")}</div>`:""}</div>`:"";
   const ls=lowSince(o);
@@ -605,7 +626,7 @@ function card(o,bestIds){
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
      <div class="was">${o.o?`<s>${wasLbl(o)} ${eur(o.o)}</s>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:perk(o)?`<span class="perk">▼ ${perk(o).s}</span>`:cmpPrice(o)?`<span class="cmpp${cmpPrice(o).hi?" hi":""}" title="${esc(cmpPrice(o).l)}">${esc(cmpPrice(o).s)}</span>`:""}<span class="gp">${unitTxt(o)}</span>${bestIds.has(o.id)?'<br><span class="best">Bester Grundpreis</span>':""}</div></div>
-   ${ls?`<div class="alarm" title="${esc(ls.l)}">📉 ${esc(ls.s)}</div>`:`<div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>`}
+   ${ch?`<div class="alarm cheap" title="${esc(cheapTxt(ch,o))}">⚠️ Bei ${esc(sshort(ch.x.s))} ${eur(ch.d)} billiger</div>`:ls?`<div class="alarm" title="${esc(ls.l)}">📉 ${esc(ls.s)}</div>`:`<div class="hist ${vd.t}" title="${esc(vd.l)}">${spark(o)}${vd.s}</div>`}
    ${combo}
    <div class="card-foot"><span class="valid${o.to===TODAY||o.to===TOMORROW?" last":""}${o.from&&o.from>SHOP?" soon":""}">${validTxt(o)}</span>
      <button class="ibtn" data-fav="${esc(o.id)}" aria-pressed="${fav}" aria-label="${fav?"Von Merkliste entfernen":"Auf Merkliste setzen"}" title="Merken">${IC.star}</button>
@@ -762,6 +783,7 @@ function renderDetail(){
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
      <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:cmpPrice(o)?`<div class="cmpp${cmpPrice(o).hi?" hi":""}">${esc(cmpPrice(o).l)}</div>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}</div></div>
     ${st.length>1?`<div class="stack">${st.map((x,i)=>i===0?`<div><span>${esc(x.l)}</span><span>${eur(x.v)}</span></div>`:`<div class="neg"><span>− ${esc(x.l)}</span><span>${eur(x.v)}</span></div>`).join("")}<div class="res"><span>Du zahlst effektiv</span><span>${eur(fin(o))}</span></div></div>`:""}
+    ${cheaper(o)?`<div class="alarm big cheap">⚠️ <span><b>Achtung:</b> ${esc(cheapTxt(cheaper(o),o))} <button class="btn ghost sm" data-detail="${esc(cheaper(o).x.id)}">Ansehen</button></span></div>`:""}
     ${cbDetail(o)}${cpQuick(o)}
     ${o.rk?`<div class="rk ${o.rk.t}"><h4>${o.rk.t==="warn"?"⚠️ Rabatt widerlegt":o.rk.t==="fix"?"🔧 Rabatt korrigiert":o.rk.t==="open"?"🔍 Rabatt noch nicht bestätigt":"✅ Rabatt bestätigt"}</h4><ul>${o.rk.l.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}
     ${o.ous&&o.o?`<div class="rk perkbox"><h4>🏷️ Kostet eigentlich ${eur(o.o)}</h4><p>Das ist die UVP (Preisempfehlung des Herstellers). ${esc(sname(o.s))} nennt im Prospekt keinen „statt“-Preis – die UVP stammt von ${esc(sname(o.ous))} für denselben Markenartikel in gleicher Menge.</p></div>`:""}
@@ -791,6 +813,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  117:["⚠️ Achtung-Hinweis: Gibt es genau denselben Artikel bei einem anderen Markt billiger, steht das auf der Karte. Setzt du den teureren auf den Einkaufszettel, fragt SparRadar nach, welchen du nehmen willst.","Doppelte Karten im selben Markt (z. B. Butter und „Butter oder Streichzart“) sind jetzt eine Karte mit allen Bildern."],
   116:["Auf jeder Karte steht jetzt, was der Artikel beim letzten Mal gekostet hat – z. B. „Letztes Mal 1,29 €“ oder „Letztes Mal billiger“. Tippst du den Artikel an, siehst du alle früheren Preise mit Datum."],
   115:["Jetzt hat fast jedes Angebot einen Vergleichspreis: Gibt es keinen „statt“-Preis, zeigt die Karte jetzt den Preis desselben Artikels bei einem anderen Markt (orange, wenn er dort günstiger ist)."],
   114:["Doppelte Karten desselben Artikels (z. B. Milch zweimal mit gleichem Preis) stehen jetzt nur noch einmal da. Fehlt im Prospekt der Preis pro Liter/Kilo, rechnet SparRadar ihn aus der Packungsgröße aus."],
@@ -1664,6 +1687,7 @@ function navSync(){const want=(S.tab!=="offers"?1:0)+(S.sheet?1:0)+(S.lightbox?1
   if(NAV>want){const n=NAV-want;NAV=want;IGNORE_POP++;history.go(-n)}}
 addEventListener("popstate",()=>{
   if(IGNORE_POP>0){IGNORE_POP--;return}
+  const ca=document.getElementById("cheapAsk");if(ca&&!ca.hidden){ca.hidden=true;history.pushState(NAV?{sr:NAV}:{sr:"guard"},"");return}
   if(NAV===0){askExit();return}   // ganz am Anfang angekommen: fragen, ob die App geschlossen werden soll
   NAV=Math.max(0,NAV-1);
   if(S.lightbox)S.lightbox=null;else if(S.sheet)S.sheet=null;else if(S.tab!=="offers"){S.tab="offers";scrollTo({top:0})}
@@ -1694,16 +1718,36 @@ function quickToggle(k){const on=!S.flt[k];S.flt[k]=on?1:0;
   if(on)QUICK={keys:new Set([...(QUICK&&QUICK.at===viewKey()?QUICK.keys:[]),k]),at:viewKey()};else if(QUICK)QUICK.keys.delete(k);
   S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});return on}
 // kaufDA liefert manche App-Angebote doppelt (Normalpreis mit App-Preis + App-Preis als Normalpreis) -> nur eine Karte
+const TWIN=new Map(); // entfernte Doppel-Karte -> behaltene Karte (Zettel-Einträge wandern mit, twinFix)
+function twinFix(){if(!TWIN.size)return;let ch=0;
+  S.list=S.list.map(id=>{const t=TWIN.get(id);if(!t)return id;ch=1;if(S.qty[id]&&!S.qty[t])S.qty[t]=S.qty[id];delete S.qty[id];S.checked=S.checked.map(c=>c===id?t:c);return t});
+  if(ch){S.list=[...new Set(S.list)];save()}}
 function appTwins(l){const k=x=>[x.s,norm(x.n),x.b||"",x.from||"",x.to||""].join("|"),m=new Map(),drop=new Set();
   l.forEach(x=>{const g=m.get(k(x));g?g.push(x):m.set(k(x),[x])});
   for(const g of m.values())for(const a of g){if(!a.ap||drop.has(a))continue;
-    for(const t of g)if(t!==a&&!t.ap&&!drop.has(t)&&Math.abs(t.p-a.ap)<.005&&(!t.o||Math.abs(t.o-a.p)<.005)){drop.add(t);
+    for(const t of g)if(t!==a&&!t.ap&&!drop.has(t)&&Math.abs(t.p-a.ap)<.005&&(!t.o||Math.abs(t.o-a.p)<.005)){drop.add(t);TWIN.set(t.id,a.id);
       if(t.img&&t.img!==a.img)a.ims=[...new Set([...(a.ims||[]),t.img])];}}
   // gleicher Artikel, nur anders aufgeteilt („Die Frische Milch“ + „1,8% Fett …“ / „Die Frische Milch 1,8% Fett“ + „…“) -> eine Karte
   const seen=new Map();for(const o of l){if(drop.has(o))continue;
     const key=[o.s,o.b||"",o.p,o.from||"",o.to||"",(`${o.n} ${o.d||""}`.toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").match(/[a-z0-9]+/g)||[]).sort().join(" ")].join("|"),a=seen.get(key);
-    if(!a){seen.set(key,o);continue}drop.add(o);if(o.img&&o.img!==a.img)a.ims=[...new Set([...(a.ims||[]),o.img])];
+    if(!a){seen.set(key,o);continue}drop.add(o);TWIN.set(o.id,a.id);if(o.img&&o.img!==a.img)a.ims=[...new Set([...(a.ims||[]),o.img])];
     for(const f of["gp","o","ou","ap","inf"])if(!a[f]&&o[f])a[f]=o[f]}
+  // Sorten-Doppel (Kevin 01.11.: Landliebe „Butter“ + „Butter oder Streichzart“, Müller „Joghurt mit der Ecke“ zweimal mit
+  // vertauschten Sorten-Bildern): gleicher Markt, Marke, Preis, statt-/App-Preis, Zeitraum, gleiche Menge und ein Name steckt
+  // ganz im anderen -> eine Karte. Ein Name mit „oder/und//“ bleibt (nennt alle Sorten), sonst der allgemeinere kürzere.
+  // Gleicher Artikel bei verschiedenen Märkten bleibt immer getrennt (dafür gibt es den Achtung-Hinweis, cheaper()).
+  const W=x=>new Set(String(x.n).toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").match(/[a-z0-9]+/g)||[]),
+    sub=(a,b)=>[...a].every(w=>b.has(w)),gpOk=(a,b)=>!a.gp||!b.gp||(a.gp.u===b.gp.u&&Math.abs(a.gp.v-b.gp.v)/a.gp.v<.02),UNI=/\s(oder|und|&)\s|\/|,/i,grp=new Map();
+  l.forEach(o=>{if(drop.has(o)||!o.b||!o.p)return;const k=[o.s,norm(o.b),o.p,o.o||"",o.ap||"",o.from||"",o.to||""].join("|");grp.has(k)?grp.get(k).push(o):grp.set(k,[o])});
+  for(const g of grp.values()){if(g.length<2)continue;
+    const ws=g.map(W),par=g.map((_,i)=>i),f=i=>par[i]===i?i:(par[i]=f(par[i])),cl=new Map();
+    for(let i=0;i<g.length;i++)for(let j=i+1;j<g.length;j++)if(ws[i].size&&ws[j].size&&(sub(ws[i],ws[j])||sub(ws[j],ws[i]))&&gpOk(g[i],g[j]))par[f(i)]=f(j);
+    g.forEach((o,i)=>{const r=f(i);cl.has(r)?cl.get(r).push(i):cl.set(r,[i])});
+    for(const ix of cl.values()){if(ix.length<2)continue;
+      const un=ix.filter(i=>UNI.test(g[i].n)),keep=un.length?un.sort((a,b)=>ws[b].size-ws[a].size)[0]:ix.slice().sort((a,b)=>ws[a].size-ws[b].size||g[a].n.length-g[b].n.length)[0],a=g[keep];
+      for(const i of ix){if(i===keep)continue;const o=g[i];drop.add(o);TWIN.set(o.id,a.id);
+        const im=[o.img,...(o.ims||[])].filter(x=>x&&x!==a.img);if(im.length)a.ims=[...new Set([...(a.ims||[]),...im])];
+        for(const k of["gp","ou","inf","d"])if(!a[k]&&o[k])a[k]=o[k]}}}
   return drop.size?l.filter(x=>!drop.has(x)):l}
 function render(){quickCheck();
   document.getElementById("filters").hidden=S.tab!=="offers";
@@ -1748,6 +1792,7 @@ document.addEventListener("click",e=>{
   if(e.target.id==="sheet"){S.sheet=null;render();return}
   if(e.target.id==="exitNo"||e.target.id==="exitAsk"){closeExit(true);return}
   if(e.target.id==="exitYes"){closeExit(false);return}
+  if(e.target.id==="cheapAsk"){e.target.hidden=true;return}
   // Vollbild: Produktbild schließt bei Tipp, Prospektseite nur über ✕ (dort wird gescrollt und gezoomt)
   if(e.target.closest("#lbClose")||(e.target.closest("#lightbox")&&!e.target.closest("#lightbox.pg"))){S.lightbox=null;render();return}
   const b=e.target.closest("button");
@@ -1800,7 +1845,8 @@ document.addEventListener("click",e=>{
   if(b.id==="appSw"){S.useApp=!S.useApp;save();render();return}
   if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
   if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
-  if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
+  if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{const c=cheaper(byId(id));if(c&&!S.list.includes(c.x.id)){askCheaper(byId(id),c);return}S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
+  if(b.dataset.cheap){const id=b.dataset.cheap,n=byId(id);document.getElementById("cheapAsk").hidden=true;if(!S.list.includes(id))S.list.push(id);toast(n?`${sname(n.s)}: auf den Einkaufszettel gesetzt`:"Auf den Einkaufszettel gesetzt");save();render();return}
   if(b.dataset.wsel!=null&&b.dataset.wsel!==""){const i=+b.dataset.wsel;S.wsel=S.wsel===i?null:i;render();return}
   if(b.dataset.cpqlist){const id=b.dataset.cpqlist,o=byId(id);S.detail=id;S.dImg=0;S.sheet="detail";S._shown=null;S.cpq=o&&couponsFor(o).length?null:id;render();
     setTimeout(()=>document.querySelector("#sheet .cpq")?.scrollIntoView({block:"center",behavior:"smooth"}),80);return}
