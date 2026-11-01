@@ -419,9 +419,10 @@ const fltOk=o=>{const F=S.flt;
   if(F.noapp&&(o.ap||o.ao||(o.x||[]).length))return false;
   if(F.app&&!appName(o))return false;
   if(F.low&&verdict(o).t!=="low"&&!lowSince(o))return false;
+  if(F.cb&&!cbFor(o))return false;
   return true};
 const fltCount=()=>Object.values(S.flt).filter(Boolean).length;
-const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis"};
+const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis",cb:"💸 Geld zurück"};
 // App-Angebot? (Preis nur mit App = ao, oder extra App-Preis = ap) -> Name der App fürs Abzeichen
 const appName = o => (o.ao||"").replace(/-App$/," App")||(o.ap&&o.ap<o.p?(o.s==="lidl"?"Lidl Plus":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App":"App")):"");
 const fltSummary=()=>[].concat(S.flt.min?[`ab ${S.flt.min} %`]:[],S.flt.max?[`bis ${eur(S.flt.max)}`]:[],Object.keys(FLT_LABEL).filter(k=>S.flt[k]).map(k=>FLT_LABEL[k]));
@@ -459,6 +460,7 @@ async function load(){
   const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
   render();  if(OFFERS.length)checkNews();
   checkWhatsNew(); // nur wenn kein anderes Fenster offen ist, sonst beim nächsten Öffnen
+  bonFromShare(); // Kassenbon über „Teilen“ aus einer anderen App
   Sync.pull(); // Listen vom anderen Gerät holen (nur wenn verbunden)
   Sync.srv().then(u=>{if(u&&S.sheet==="settings"&&!Sync.ready())render()}); // „Familien-Code erstellen“ nur zeigen, wenn der Speicher eingerichtet ist
 }
@@ -586,10 +588,11 @@ function weekHTML(hitCount){const t=[];
   const items=S.list.map(byId).filter(Boolean).filter(o=>!S.checked.includes(o.id)),nx=S.extra.filter(x=>!S.checked.includes(x.id)).length;
   if(items.length+nx){const pl=planOf(items),sv=pl?pl.save:0;
     t.push(`<button class="wk wk-l" data-go="list"><i>🛒</i><b>${items.length+nx} Artikel auf dem Zettel</b><small>${eur(items.reduce((a,o)=>a+lineP(o),0))}${sv>=.5?` · ${eur(sv)} günstiger möglich`:""}</small></button>`)}
-  const low=weekOffers().filter(o=>lowSince(o)).length;
-  if(low)t.push(`<button class="wk wk-p" data-golow="1"><i>📉</i><b>${low} ${low===1?"Preis-Alarm":"Preis-Alarme"}</b><small>so günstig wie seit Wochen nicht</small></button>`);
-  const cbn=weekOffers().filter(o=>cbFor(o)).length;
-  if(cbn&&!due)t.push(`<button class="wk wk-c" data-go="tips"><i>💸</i><b>${cbn} mit Geld zurück</b><small>Hersteller zahlt dir etwas zurück</small></button>`);
+  const wo=weekOffers().filter(o=>!S.stores.size||S.stores.has(o.s)),bei=S.stores.size===1?" bei "+sname([...S.stores][0]):"";
+  const low=wo.filter(o=>lowSince(o)).length;
+  if(low)t.push(`<button class="wk wk-p" data-golow="1"><i>📉</i><b>${low} ${low===1?"Preis-Alarm":"Preis-Alarme"}${bei}</b><small>so günstig wie seit Wochen nicht</small></button>`);
+  const cbn=wo.filter(o=>cbFor(o)).length;
+  if(cbn)t.push(`<button class="wk wk-c" data-gocb="1"><i>💸</i><b>${cbn} ${cbn===1?"Angebot":"Angebote"} mit Geld zurück${bei}</b><small>Antippen zeigt ${cbn===1?"es":"sie"} – Hersteller zahlt dir etwas zurück</small></button>`);
   if(!t.length)return "";
   return `<section class="wkbox" aria-label="Deine Woche"><h3>Deine Woche</h3><div class="wkrow">${t.join("")}</div></section>`}
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
@@ -754,6 +757,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  102:["Geld zurück: Die Zahl bei „Deine Woche“ passt jetzt zum gewählten Markt. Antippen zeigt direkt die Angebote mit Geld zurück.","Im Tab „Coupons“ stehen die Geld-zurück-Aktionen jetzt gleich da – automatisch gefunden und nach Markt sortiert, ohne extra Knopf."],
+  101:["Neu: Kassenbon eintragen. Im Einkaufszettel „📷 Bon fotografieren“ antippen – oder in der Markt-App (Lidl Plus, REWE, EDEKA, Netto, dm …) beim Bon auf „Teilen“ → SparRadar. Passt alles, ist der Einkauf sofort mit den echten Preisen gespeichert. Der Bon bleibt nur auf deinem Gerät."],
   100:["Einkaufszettel: Beim Eintippen erscheinen jetzt passende Artikel mit Bild – auch alles, was gerade nicht im Angebot ist. Antippen setzt ihn auf den Zettel. Ist er gerade im Angebot, kommt gleich das Angebot mit Preis drauf."],
   99:["Mehr Bilder: Artikel in der Merkliste und in den Vorschlägen bekommen jetzt fast immer ein Produktfoto. SparRadar sucht fehlende Bilder mehrmals am Tag automatisch."],
   98:["Neu oben bei den Angeboten: „Deine Woche“ – Merklisten-Treffer, Zettel, Geld-zurück-Bons und Preis-Alarme auf einen Blick.","Einkaufszettel sortiert nach dem Weg durch den Markt: Obst zuerst, Tiefkühl zuletzt.","„Günstiger einkaufen“ zeigt, was du ohne Umweg sparst und ob sich ein Abstecher zu einem anderen Markt lohnt – mit einem Tipp alles tauschen.","📉 Preis-Alarm: so günstig wie seit Wochen nicht (erscheint, sobald genug Preisverlauf da ist).","Am Handy 2 Angebote nebeneinander mit größeren Bildern, jede Karte mit der Farbe ihres Markts.","Merkliste genauer: „Butter“ meldet keine Buttermilch und keinen Butter-Spekulatius mehr, „Kaffee“ keinen Kaffeevollautomaten, „Käse“ keinen Leberkäse."],
@@ -1101,7 +1106,7 @@ function tripsHTML(){if(!S.trips.length)return "";
    </div>
    ${months.length>1?`<div class="mhist">${months.map(k=>{const ts=S.trips.filter(t=>monKey(t.d)===k);return `<div><span>${esc(monName(k))}</span><span>${ts.length} ×</span><span>${eur(sum(ts,"paid"))}</span><span class="sv">−${eur(sum(ts,"saved")).replace("−","")}</span></div>`}).join("")}</div>`:""}
    <div class="tlist">${S.trips.slice(0,S.tripLimit||10).map(t=>{const st=[...new Set(t.items.map(x=>x.s))];
-     return `<button class="trow" data-tripopen="${t.id}"><span class="td">${fmtDate(t.d)}<small>${new Date(t.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr</small></span><span class="tm">${st.map(x=>sb(x)).join("")}${t.extra.length?`<em>+${t.extra.length}</em>`:""}<small>${t.items.length+t.extra.length} Artikel</small></span><span class="tp">${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></button>`}).join("")}</div>
+     return `<button class="trow" data-tripopen="${t.id}"><span class="td">${t.bon?"🧾 ":""}${fmtDate(t.d)}<small>${new Date(t.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr</small></span><span class="tm">${st.map(x=>sb(x)).join("")}${t.extra.length?`<em>+${t.extra.length}</em>`:""}<small>${t.items.length+t.extra.length} Artikel</small></span><span class="tp">${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></button>`}).join("")}</div>
    ${S.trips.length>(S.tripLimit||10)?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""}
   </section>`}
 function renderTrip(){const t=S.trips.find(x=>x.id===S.tripId);if(!t)return renderKracher();
@@ -1113,13 +1118,13 @@ function renderTrip(){const t=S.trips.find(x=>x.id===S.tripId);if(!t)return rend
    <div class="receipt">${Object.entries(g).map(([s,xs])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}</div>${xs.map(row).join("")}</div>`).join("")}
     ${t.extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Eigene Einträge</div>${t.extra.map(row).join("")}</div>`:""}
     <div class="rtot"><div class="big"><span>BEZAHLT</span><span>${eur(t.paid)}</span></div>${t.saved>0?`<div class="sv"><span>GESPART</span><span>${eur(t.saved)}</span></div>`:""}</div></div>
-   <p class="fhint">Preise laut Angebot (mit eingerechneten Apps &amp; Coupons, wenn eingeschaltet). Eigene Einträge zählen nur, wenn du einen Preis dazugeschrieben hast, z. B. „Brot 1,99“.</p>
+   <p class="fhint">${t.bon?"Preise laut Kassenbon. „Gespart“ = Preisvorteile auf dem Bon und Angebote mit „statt“-Preis.":"Preise laut Angebot (mit eingerechneten Apps &amp; Coupons, wenn eingeschaltet). Eigene Einträge zählen nur, wenn du einen Preis dazugeschrieben hast, z. B. „Brot 1,99“."}</p>
    <div class="factions"><button class="btn ghost" data-tripdel="${t.id}">Löschen</button><button class="btn" data-triprestore="${t.id}">Zurück auf den Zettel</button></div>
   </div>`}
 // Häufig gekauft: aus dem Verlauf mit einem Tipp wieder auf den Zettel (wenn möglich als aktuelles Angebot)
 function freqHTML(){if(!S.trips.length)return "";
   const have=new Set([...S.list.map(byId).filter(Boolean).map(o=>norm(o.n)),...S.extra.map(x=>norm(x.n))]),c={};
-  S.trips.slice(0,60).forEach(t=>[...t.items,...t.extra].forEach(x=>{const k=norm(x.n);if(!k||have.has(k))return;(c[k]=c[k]||{n:x.n,c:0}).c++}));
+  S.trips.slice(0,60).forEach(t=>[...t.items,...t.extra].forEach(x=>{const k=norm(x.n);if(!k||have.has(k)||x.p<0||/pfand|leergut|tasche|t[uü]te|sonstiges|nicht erkannt/i.test(x.n))return;(c[k]=c[k]||{n:x.n,c:0}).c++}));
   const top=Object.values(c).sort((a,b)=>b.c-a.c||a.n.length-b.n.length).slice(0,12);
   if(!top.length)return "";
   return `<div class="freq"><span>Wieder kaufen:</span>${top.map(x=>`<button class="chip plain" data-readd="${esc(x.n)}">${IC.plus}${esc(x.n.length>28?x.n.slice(0,27)+"…":x.n)}</button>`).join("")}</div>`}
@@ -1137,7 +1142,7 @@ function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;
   const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
-  if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${tripsHTML()}`;
+  if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const done=id=>S.checked.includes(id);
   const sortDone=a=>[...a.filter(x=>!done(x.id)),...a.filter(x=>done(x.id))];  // was im Wagen liegt, rutscht nach unten
@@ -1163,7 +1168,177 @@ function renderList(){
    <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    ${todo.length?`<div style="margin-top:12px;font-size:.78rem;color:var(--muted)">* Vor dem Einkauf in der App aktivieren:<br>${todo.map(esc).join(" · ")}</div>`:""}</div>
    <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
-   ${tripsHTML()}`}
+   ${bonBoxHTML()}${tripsHTML()}`}
+
+// ---------- Kassenbon einlesen (Foto, Screenshot, PDF oder per „Teilen“ aus der Markt-App) ----------
+// Alles passiert auf dem Gerät: PDF-Text per pdf.js, Bilder per Texterkennung (tesseract.js). Nichts wird hochgeladen.
+// Ergebnis: ein Einkauf in „Meine Einkäufe“ mit den echten Preisen vom Bon.
+let OCR=null;
+function loadOCR(){if(OCR)return OCR;
+  OCR=new Promise((ok,err)=>{const sc=document.createElement("script");sc.src="vendor/ocr/tesseract.min.js";sc.onerror=()=>err(new Error("Texterkennung konnte nicht geladen werden"));
+    sc.onload=()=>{const base=new URL("vendor/ocr/",location.href).href;
+      Tesseract.createWorker("deu",1,{workerPath:base+"worker.min.js",corePath:base,langPath:base.replace(/\/$/,""),gzip:true,workerBlobURL:false,
+        logger:m=>{if(m.status==="recognizing text"&&BON.st==="work"){BON.pct=Math.round(m.progress*100);const e=document.getElementById("bonPct");if(e)e.textContent=BON.pct+" %"}}}).then(ok,err)};
+    document.head.appendChild(sc)});
+  OCR.catch(()=>{OCR=null});return OCR}
+// Bild für die Texterkennung: Graustufen, lange Bons in Streifen (sonst zu klein), dunkle Screenshots umkehren
+function bonCanvases(file,ps={}){return new Promise((ok,err)=>{const u=URL.createObjectURL(file),im=new Image();
+  im.onload=()=>{URL.revokeObjectURL(u);const W=Math.round(Math.min(2000,Math.max(900,im.width)*(ps.scale||1))),k=W/im.width,H=Math.round(im.height*k),out=[],step=2400;
+    for(let y=0;y<H;y+=step-100){const h=Math.min(step,H-y),cv=document.createElement("canvas");cv.width=W;cv.height=h;const x=cv.getContext("2d");
+      x.fillStyle="#fff";x.fillRect(0,0,W,h);x.imageSmoothingQuality="high";x.drawImage(im,0,-y,W,H);const d=x.getImageData(0,0,W,h),a=d.data,hist=new Array(256).fill(0);let sum=0;
+      for(let i=0;i<a.length;i+=4){const g=Math.round(a[i]*.3+a[i+1]*.59+a[i+2]*.11);a[i]=a[i+1]=a[i+2]=g;sum+=g;hist[g]++}
+      const inv=sum/(a.length/4)<110;
+      if(ps.mode==="bin"){ // Otsu-Schwelle: Papier-Fotos mit Schatten werden klar schwarz/weiß
+        const n=a.length/4;let sAll=0;for(let t=0;t<256;t++)sAll+=t*hist[t];let wB=0,sB=0,best=0,th=128;
+        for(let t=0;t<256;t++){wB+=hist[t];if(!wB)continue;const wF=n-wB;if(!wF)break;sB+=t*hist[t];const mB=sB/wB,mF=(sAll-sB)/wF,v=wB*wF*(mB-mF)**2;if(v>best){best=v;th=t}}
+        for(let i=0;i<a.length;i+=4){let g=a[i]>th?255:0;if(inv)g=255-g;a[i]=a[i+1]=a[i+2]=g}}
+      else if(inv)for(let i=0;i<a.length;i+=4)a[i]=a[i+1]=a[i+2]=255-a[i];
+      x.putImageData(d,0,0);out.push(cv);if(y+h>=H)break}
+    ok(out)};
+  im.onerror=()=>{URL.revokeObjectURL(u);err(new Error("Das Bild konnte nicht geöffnet werden."))};im.src=u})}
+async function pdfText(file){const pdfjs=await import("./vendor/pdf/pdf.min.mjs");pdfjs.GlobalWorkerOptions.workerSrc=new URL("vendor/pdf/pdf.worker.min.mjs",location.href).href;
+  const doc=await pdfjs.getDocument({data:await file.arrayBuffer()}).promise;let out=[];
+  for(let n=1;n<=Math.min(doc.numPages,6);n++){const pg=await doc.getPage(n),tc=await pg.getTextContent(),rows=new Map();
+    tc.items.forEach(it=>{if(!it.str.trim())return;const y=Math.round(it.transform[5]/3)*3;if(!rows.has(y))rows.set(y,[]);rows.get(y).push(it)});
+    [...rows.entries()].sort((a,b)=>b[0]-a[0]).forEach(([,a])=>out.push(a.sort((p,q)=>p.transform[4]-q.transform[4]).map(i=>i.str).join("  ")));
+    if(!tc.items.length){const vp=pg.getViewport({scale:2.5}),cv=document.createElement("canvas");cv.width=vp.width;cv.height=vp.height;
+      await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;const w=await loadOCR();out.push((await w.recognize(cv)).data.text)}}
+  return out.join("\n")}
+const BON_MKT=[["lidl",/\blidl\b|\bl[$i1!|]dl\b|lidl\.de|lidl plus|\bldl-\d|schwarz beteiligung/i],["aldi",/\baldi\b|aldi-?s[uü]d|aldi\.de/i],["rewe",/\brewe\b|rewe\.de|rewe markt/i],
+  ["netto",/\bnetto\b|netto-online|marken-?discount/i],["edeka",/\bedeka\b|edeka\.de|e center|e-center|marktkauf/i],["dm",/\bdm[- ]?drogerie|\bdm\.de\b|dm-drogerie markt|\bmein dm\b/i]];
+const BON_TOT=/^(zu zahlen|zu bezahlen|summe|gesamt(?:summe|betrag)?|total|endsumme|betrag)\b/i;
+const BON_PAY=/^(kartenzahlung|kreditkarte|girocard|ec[- ]?cash|ec[- ]?karte|bar|gegeben|r[uü]ckgeld|visa|mastercard|maestro|v pay|kontaktlos|zahlung)\b/i;
+const BON_SKIP=/^(eur|zwischensumme|mwst|ust|netto|brutto|steuer|steuer-?nr|ust-?id|tse|seriennr|signatur|pr[uü]fwert|bon-?nr|beleg|kasse|filiale|markt|datum|uhrzeit|kunden|payback|deutschlandcard|punkte|bonus|guthaben|lidl plus|vielen dank|danke|[öo]ffnungszeiten|tel\b|telefon|www\.|http)/i;
+const BON_DISC=/preisvorteil|rabatt|nachlass|coupon|gutschein|aktion|ersparnis|abzug|sofort|preisred|reduziert|bonus-?coupon|treuer|mitglieder|app-?preis|vorteil/i;
+const BON_RET=/leergut|pfandr[uü]ck|pfand-?bon|r[uü]ckgabe|retoure|storno/i;
+// Lesefehler der Texterkennung bei Preisen ausbügeln: „1 ,99“ „1.99“ „O,85“ „l,99“ -> 1,99
+function bonClean(l){return l.replace(/[|_“”„»«]/g," ").replace(/\s+/g," ").trim()
+  .replace(/(\d)\s*[,.]\s*(\d{2})(?=\s|$|[A-Z*])/g,"$1,$2")
+  .replace(/(^|\s)[Oo](?=[,.]\d{2}\b)/g,"$10").replace(/(^|\s)[lI|](?=[,.]\d{2}\b)/g,"$11")
+  .replace(/(\d,\d)[Oo](?=\s|$)/g,"$10")}
+function parseBon(raw){
+  const num=s=>parseFloat(String(s).replace(/\s/g,"").replace(",","."));
+  const lines=raw.replace(/\r/g,"").split("\n").map(bonClean).filter(Boolean);
+  const r={items:[],total:0,s:null,d:null,t:null};
+  for(const [k,re] of BON_MKT)if(re.test(raw)){r.s=k;break}
+  const dm=raw.match(/\b(\d{2})\.(\d{2})\.(\d{2}|\d{4})\s+(\d{2}):(\d{2})/)||raw.match(/\b(\d{2})\.(\d{2})\.(20\d{2}|\d{2})\b/);
+  if(dm){const y=dm[3].length===2?"20"+dm[3]:dm[3];if(+dm[2]>=1&&+dm[2]<=12&&+dm[1]>=1&&+dm[1]<=31)r.d=`${y}-${dm[2]}-${dm[1]}`;if(dm[4])r.t=`${dm[4]}:${dm[5]}`}
+  if(!r.t){const tm=raw.match(/uhrzeit:?\s*(\d{2}):(\d{2})/i);if(tm)r.t=`${tm[1]}:${tm[2]}`}
+  // Preis am Zeilenende, danach evtl. Steuerkennzeichen (A, B, 1, 2, *, AW …) oder „-“ für Abzug
+  const PR=/(-\s?)?(\d{1,4},\d{2})\s*(-)?\s*(?:[A-Z]{1,2}|\d|\*)?\s*\*?$/;
+  const QTY=/^(\d{1,3})\s*(?:stk\.?|st\.?|x)?\s*[x×*]\s*(\d{1,4},\d{2})(?:\s*(?:eur|€))?(?:\s+(\d{1,4},\d{2}))?\s*(?:[A-Z]|\d)?$/i;
+  const KG=/^(\d+,\d{1,3})\s*kg\s*[x×*]\s*(\d{1,4},\d{2})\s*(?:eur|€)?\s*\/\s*kg(?:\s+(\d{1,4},\d{2}))?/i;
+  let pend=null,pendQ=null,started=false;
+  const near=(a,b)=>Math.abs(a-b)<.011;
+  for(const l of lines){
+    if(BON_TOT.test(l)){const m=l.match(PR);if(m&&r.items.length){r.total=num(m[2]);break}continue}
+    if(BON_PAY.test(l)&&r.items.length){const m=l.match(PR);if(m&&!r.total)r.total=num(m[2]);break}
+    const last=r.items[r.items.length-1];
+    // Menge auf eigener Zeile (Rewe „2 Stk x 0,79“, Aldi „2 x 0,79 1,58“) – passt zur Zeile davor oder danach
+    let m=l.match(QTY);
+    if(m){const q=+m[1],u=num(m[2]),tot=m[3]?num(m[3]):null;
+      if(pend&&tot!=null){r.items.push({n:pend,q,p:tot,on:true});pend=null;continue}
+      if(last&&near(last.p,r2(q*u))){last.q=q;continue}
+      pendQ={q,u};continue}
+    m=l.match(KG);
+    if(m){if(pend&&m[3]){r.items.push({n:pend,q:1,p:num(m[3]),on:true,kg:num(m[1])});pend=null}else if(last&&!last.kg)last.kg=num(m[1]);continue}
+    m=l.match(PR);
+    if(!m){const t=l.replace(/[^A-Za-zÄÖÜäöüß]/g,"");if(started&&t.length>=3&&!BON_SKIP.test(l))pend=l.replace(/\s+[A-Z]$/,"");continue}
+    let p=num(m[2]);if(m[1]||m[3])p=-Math.abs(p);let name=l.slice(0,m.index).trim();
+    if(!name&&pend){name=pend}pend=null;
+    if(!name||BON_SKIP.test(name)||/^[\d\s%.,xX×*:\/-]+$/.test(name))continue;
+    if(/^(eur|€)$/i.test(name))continue;
+    // Pfand-Rückgabe = eigene Zeile mit Minus; Rabatte gehören zum Artikel davor
+    if(p<0&&BON_RET.test(name)){r.items.push({n:name,q:1,p,on:true});started=true;continue}
+    if((p<0||BON_DISC.test(name))&&last){last.p=r2(last.p-Math.abs(p));last.disc=r2((last.disc||0)+Math.abs(p));continue}
+    if(p<0)continue;
+    let q=1,mm=name.match(/^(.*?)\s+(\d{1,4},\d{2})\s*[x×*]\s*(\d{1,3})$/);   // Lidl: „Weizenbrötchen 0,19 x 2“
+    if(mm&&near(r2(num(mm[2])*+mm[3]),p)){name=mm[1];q=+mm[3]}
+    else if((mm=name.match(/^(.*?)\s+(\d{1,3})\s*(?:stk\.?)?\s*[x×*]\s*(\d{1,4},\d{2})$/i))&&near(r2(num(mm[3])*+mm[2]),p)){name=mm[1];q=+mm[2]}
+    else if((mm=name.match(/^(\d{1,3})\s*[x×*]\s+(.+)$/))){q=+mm[1];name=mm[2]}
+    else if(pendQ&&near(r2(pendQ.q*pendQ.u),p))q=pendQ.q;
+    pendQ=null;
+    name=name.replace(/\s+\d{1,4},\d{2}$/,"").replace(/\s+\d{6,14}$/,"").replace(/^[^A-Za-zÄÖÜäöü0-9]+/,"").replace(/\s+[A-Z]$/,"").trim();
+    if(name.replace(/[^A-Za-zÄÖÜäöüß]/g,"").length<2)continue;
+    r.items.push({n:name,q,p,on:true});started=true;
+  }
+  if(!r.total){const t=raw.match(/(?:summe|zu zahlen|gesamt|betrag)[^\n\d-]{0,20}(\d{1,4}[,.]\d{2})/i);if(t)r.total=num(t[1])}
+  r.sum=r2(r.items.reduce((a,x)=>a+x.p,0));return r}
+// Wie gut ist ein Leseergebnis? Summe passt = sicher richtig, sonst möglichst kleine Abweichung und viele Artikel
+const bonScore=r=>!r.items.length?-1e9:(r.total&&Math.abs(r.sum-r.total)<.011?1e6:0)+r.items.length*10-(r.total?Math.abs(r.sum-r.total)*100:50);
+// Bon-Artikel einem Angebot desselben Markts zuordnen (gleicher Preis + Wortanfang passt) -> „gespart“ wird echt
+function bonMatch(x,s){const u=r2(x.p/(x.q||1)),w=(x.n.toLowerCase().match(/[a-zäöüß]{3,}/g)||[]).map(t=>t.slice(0,3));if(!w.length)return null;
+  return [...OFFERS,...OLD.values()].find(o=>o.s===s&&[o.p,o.ap].some(v=>v&&Math.abs(v-u)<.005)&&(o.n+" "+(o.b||"")).toLowerCase().match(/[a-zäöüß]{3,}/g)?.some(t=>w.includes(t.slice(0,3))))||null}
+const BON={st:null};
+// Intelligenter Scan: mehrere Durchgänge mit anderer Bildaufbereitung, bis die Summe zum Bon passt. Bestes Ergebnis gewinnt.
+async function bonOCR(file){const w=await loadOCR(),passes=[{mode:"gray",psm:"4"},{mode:"bin",psm:"6",scale:1.5},{mode:"bin",psm:"4",scale:2},{mode:"gray",psm:"6",scale:1.3}];
+  let best=null;
+  for(let i=0;i<passes.length;i++){const ps=passes[i];BON.pass=i+1;BON.pct=0;const e=document.getElementById("bonPass");if(e)e.textContent=i?`Durchgang ${i+1}: anders aufbereitet, damit alles passt …`:"";
+    await w.setParameters({tessedit_pageseg_mode:ps.psm,preserve_interword_spaces:"1"});
+    const cvs=await bonCanvases(file,ps),parts=[];for(const c of cvs)parts.push((await w.recognize(c)).data.text);
+    const raw=parts.join("\n"),r=parseBon(raw);r.raw=raw;
+    if(!best||bonScore(r)>bonScore(best))best=r;
+    if(best.total&&best.items.length&&Math.abs(best.sum-best.total)<.011)break}
+  return best}
+async function bonRead(file,text){BON.st="work";BON.pct=0;BON.pass=1;BON.err="";BON.r=null;S.sheet="bon";render();
+  try{let r;
+    if(file){const ty=(file.type||"").toLowerCase(),nm=(file.name||"").toLowerCase();
+      if(ty.includes("pdf")||nm.endsWith(".pdf")){const raw=await pdfText(file);r=parseBon(raw);r.raw=raw}
+      else if(ty.startsWith("text")||nm.endsWith(".txt")){const raw=await file.text();r=parseBon(raw);r.raw=raw}
+      else r=await bonOCR(file)}
+    else{r=parseBon(text||"");r.raw=text}
+    if(!r.s){const c={};r.items.forEach(x=>{const o=OFFERS.find(o=>[o.p,o.ap].some(v=>v&&Math.abs(v-x.p/(x.q||1))<.005)&&bonMatch(x,o.s));if(o)c[o.s]=(c[o.s]||0)+1});
+      r.s=Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||store.get("bonStore",null)}
+    if(!r.items.length)throw new Error("Auf dem Bon wurden keine Artikel mit Preisen erkannt. Tipp: Bon gerade und ganz aufs Bild, gutes Licht – oder in der Markt-App „Teilen“ nutzen (dort ist der Bon gestochen scharf).");
+    BON.r=r;BON.st="ok";BON.more=false;if(r.s&&bonOk(r)){bonSave();return}}catch(e){BON.st="err";BON.err=e.message||String(e)}
+  if(S.sheet==="bon")render()}
+function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
+  if(r.total){const d=r2(r.total-r.items.filter(x=>x.on).reduce((a,x)=>a+x.p,0));if(Math.abs(d)>=.01)r.items.push({n:"Sonstiges (nicht erkannt)",q:1,p:d,on:true})}
+  const d=r.d&&/^\d{4}-\d\d-\d\d$/.test(r.d)?r.d:TODAY,at=new Date(d+"T"+(r.t||"12:00")+":00").toISOString();
+  const items=r.items.filter(x=>x.on).map((x,i)=>{const o=bonMatch(x,r.s),q=x.q||1;
+    const reg=o&&o.o>x.p/q+.004?r2(o.o*q):r2(x.p+(x.disc||0));
+    return {id:"bon-"+Date.now().toString(36)+i,n:x.n,b:"",s:r.s,q,p:r2(x.p),r:Math.max(r2(x.p),reg),...(o?{o:o.n}:{})}});
+  if(!items.length)return;
+  const t={id:"t"+Date.now(),d,at,bon:1,items,extra:[]};
+  t.paid=r2(items.reduce((a,x)=>a+x.p,0));t.saved=r2(items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
+  // Gleicher Tag + gleicher Markt schon als Einkauf vom Zettel? Der Bon ist genauer und ersetzt ihn.
+  const dup=S.trips.find(x=>!x.bon&&x.d===d&&x.items.some(i=>i.s===r.s));
+  if(dup)S.trips=S.trips.filter(x=>x!==dup);
+  S.trips.unshift(t);S.trips.sort((a,b)=>b.at.localeCompare(a.at));S.trips=S.trips.slice(0,400);
+  save();BON.st=null;S.tripId=t.id;S.sheet="trip";render();toast(dup?"✓ Bon gespeichert – ersetzt den Einkauf vom Zettel":"✓ Bon gespeichert: "+items.length+" Artikel, "+eur(t.paid))}
+// Geteilter Bon (Teilen-Menü -> SparRadar): liegt kurz im Service-Worker-Speicher
+async function bonFromShare(){if(!/[?&]bon=1/.test(location.search))return;history.replaceState(null,"",location.pathname);
+  try{const c=await caches.open("sr-share"),f=await c.match("bon-file"),t=await c.match("bon-text");
+    let file=null,text="";if(f){const b=await f.blob();file=new File([b],decodeURIComponent(f.headers.get("X-Name")||"bon"),{type:b.type})}
+    if(t)text=await t.text();await Promise.all((await c.keys()).map(k=>c.delete(k)));
+    S.tab="list";if(file||text.trim().length>40)bonRead(file,file?"":text);else{BON.st="err";BON.err="Es kam keine Datei an. Teile den Bon bitte als Bild oder PDF – oder mach einen Screenshot und lade ihn hier hoch.";S.sheet="bon";render()}}
+  catch(e){BON.st="err";BON.err="Der geteilte Bon konnte nicht gelesen werden.";S.sheet="bon";render()}}
+const bonBoxHTML=()=>`<div class="bonbox"><b>🧾 Einkauf vom Kassenbon eintragen</b><div class="bonbtns"><button class="btn" data-bonpick="cam">📷 Bon fotografieren</button><button class="btn ghost" data-bonpick="file">Bild oder PDF wählen</button></div><small>SparRadar liest den Bon und trägt alles mit den echten Preisen ein. Noch einfacher: in der Markt-App beim Bon auf „Teilen“ → SparRadar.</small></div>`;
+const bonOk=r=>r&&r.total&&Math.abs(r2(r.items.filter(x=>x.on).reduce((a,x)=>a+x.p,0))-r.total)<.011;
+function renderBon(){const r=BON.r,close=`<button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button>`;
+  const head=`<div class="sheet-h"><span class="newsico">🧾</span><h2>Kassenbon einlesen</h2>${close}</div>`;
+  const how=`<div class="bonhow"><b>So geht's</b><ol><li><b>Papier-Bon:</b> „📷 Bon fotografieren“ antippen. Bon flach hinlegen, ganz aufs Bild.</li><li><b>Bon in der Markt-App</b> (Lidl Plus, REWE, EDEKA, Netto, dm …): Bon öffnen → <b>Teilen</b> → <b>SparRadar</b>.<br><small>Steht SparRadar dort nicht? Dann einen Screenshot vom Bon machen und mit „Bild oder PDF wählen“ hochladen.</small></li></ol><p class="fhint">Der Bon wird nur auf deinem Gerät gelesen und nirgends hochgeladen.</p></div>`;
+  const pick=`<div class="bonbtns"><button class="btn" data-bonpick="cam">📷 Bon fotografieren</button><button class="btn ghost" data-bonpick="file">Bild oder PDF wählen</button></div>`;
+  if(BON.st==="work")return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kassenbon einlesen">${head}<div class="bonwork"><div class="spin"></div><b>Bon wird gelesen …</b><span id="bonPct">${BON.pct?BON.pct+" %":""}</span><small id="bonPass">${BON.pass>1?`Durchgang ${BON.pass}: anders aufbereitet, damit alles passt …`:""}</small><small>Bitte kurz warten. Beim ersten Mal dauert es etwas länger.</small></div></div>`;
+  if(BON.st==="err"||!r)return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kassenbon einlesen">${head}${BON.err?`<p class="bonerr">${esc(BON.err)}</p>`:""}${pick}${how}</div>`;
+  const on=r.items.filter(x=>x.on),sum=r2(on.reduce((a,x)=>a+x.p,0)),ok=bonOk(r),diff=r.total?r2(r.total-sum):0;
+  const det=BON.more||!r.s;
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kassenbon prüfen">${head}
+   <p class="bonlead">${ok?"✓ Alles erkannt.":r.total?`Fast alles erkannt. Die fehlenden <b>${eur(Math.abs(diff))}</b> trägt SparRadar beim Speichern als „Sonstiges“ ein – dann stimmt die Summe.`:"Bitte kurz ansehen und speichern."}</p>
+   <div class="bonmeta">${r.s?`${sb(r.s)}<b>${esc(sname(r.s))}</b>`:""}<span>${fmtDate(r.d||TODAY)}</span>${r.s?`<button class="linkbtn" data-bonmore="1">${det?"fertig":"ändern"}</button>`:""}</div>
+   ${det?`${!r.s?`<p class="bonerr">In welchem Markt warst du? Bitte antippen:</p>`:""}<div class="chips bonmk">${Object.keys(STORES).map(s=>`<button class="chip${r.s===s?" on":""}" data-bonstore="${s}" aria-pressed="${r.s===s}">${sb(s)}${esc(sname(s))}</button>`).join("")}</div>
+   <label class="bondate">Einkauf vom <input type="date" id="bonDate" value="${esc(r.d||TODAY)}"></label>`:""}
+   <div class="factions"><button class="btn big" data-bonsave="1"${r.s&&on.length?"":" disabled"}>✓ Speichern</button></div>
+   <details class="bondet"><summary>${on.length} Artikel · ${eur(r.total||sum)} – ansehen oder ändern</summary>
+    <div class="receipt"><div class="rgroup">${r.items.map((x,i)=>`<div class="rline${x.on?"":" off"}"><button type="button" class="bonn" data-bonedit="${i}" title="Antippen zum Ändern">${x.q>1?x.q+"× ":""}${esc(x.n)}${x.disc?` <small class="sv">−${eur(x.disc).replace("−","")} Vorteil</small>`:""}</button><span>${eur(x.p)}</span><button data-bonx="${i}" aria-label="${x.on?"Zeile entfernen":"Zeile wieder aufnehmen"}">${x.on?IC.x:IC.plus}</button></div>`).join("")}</div>
+     <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${r.total?`<div class="${ok?"sv":"bonwarn"}"><span>${ok?"✓ passt zum Bon":"Bon sagt"}</span><span>${eur(r.total)}</span></div>`:""}</div></div>
+    <p class="fhint">Zeile antippen = Name, Menge oder Preis ändern. ✕ = Zeile weglassen.</p></details>
+  </div>`}
+let bonInput=null;
+function bonPick(cam){if(!bonInput){bonInput=document.createElement("input");bonInput.type="file";bonInput.hidden=true;
+    bonInput.addEventListener("change",()=>{const f=bonInput.files[0];bonInput.value="";if(f)bonRead(f)});document.body.appendChild(bonInput)}
+  bonInput.accept=cam?"image/*":"image/*,application/pdf,.pdf,text/plain";if(cam)bonInput.setAttribute("capture","environment");else bonInput.removeAttribute("capture");
+  bonInput.click()}
 
 // ---------- Coupon mit einem Tipp (direkt am Angebot) ----------
 // Kevins Wunsch: so einfach, dass es jeder schafft. Markt, Artikel und Gültigkeit kommen vom Angebot, man wählt nur den Wert.
@@ -1233,18 +1408,19 @@ const cbShopTxt=a=>a.shops?.length?"bei "+a.shops.map(sname).join(", "):"in viel
 const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
 function cpHowHTML(){return `<section class="panel cphow"><h3>Geheime Coupons: Geld zurück vom Hersteller</h3>
   <p>Viele Hersteller zahlen dir Geld zurück: oft den ganzen Kaufpreis („Gratis testen“), manchmal einen festen Betrag oder „2 kaufen, 1 gratis“. Das steht in keiner Markt-App und in keinem Prospekt – SparRadar sucht es jeden Tag für dich.</p>
-  <ol><li><b>🔍 Coupon-Finder</b> antippen und bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
+  <ol><li>Unten stehen alle Aktionen – <b>automatisch gefunden und nach Markt sortiert</b>. Bei allem, was du willst, <b>„Einfügen“</b> drücken. Der Artikel landet auf deinem Einkaufszettel.</li>
    <li><b>Ganz normal einkaufen</b> und den <b>Kassenbon aufheben</b> – digitale Bons aus der Markt-App gehen meist auch.</li>
    <li><b>💸 Geld holen:</b> Nach dem Einkauf auf „Bon hochladen“ tippen, Kassenbon fotografieren (digitaler Bon: Screenshot), Kontonummer eingeben – fertig. Das Geld kommt in ein paar Wochen aufs Konto.</li></ol>
   <p class="cpf-n">Rabatte, die nur mit der Markt-App gelten, siehst du direkt bei den Angeboten am 📱-Abzeichen. In der Markt-App aktivieren und an der Kasse die Kundenkarte zeigen – ein Scan.</p></section>`}
-function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfind" id="cpFind">🔍 Coupon-Finder starten</button>`;
-  if(!CASHBACK)return `<section class="panel cpf"><p>Coupon-Finder sucht …</p></section>`;
+function cpFindHTML(){
+  if(!CASHBACK){loadCashback().then(()=>{if(S.tab==="tips")render()});return `${cpHowHTML()}<section class="panel cpf"><p>Geld-zurück-Aktionen werden geladen …</p></section>`}
+  if(S.cpfS===undefined)S.cpfS=S.stores.size===1?[...S.stores][0]:null;
   const all=cbFinds(),cnt={};all.forEach(x=>(x.a.shops?.length?x.a.shops:["_"]).forEach(s=>cnt[s]=(cnt[s]||0)+1));
   if(S.cpfS&&!cnt[S.cpfS])S.cpfS=null;
   const f=S.cpfS?all.filter(x=>!x.a.shops?.length||x.a.shops.includes(S.cpfS)):all,tot=f.reduce((a,x)=>a+x.val,0);
   const ks=Object.keys(STORES).filter(k=>cnt[k]);
   const chips=ks.length?`<div class="cpf-ch">${[["","Alle",all.length],...ks.map(k=>[k,STORES[k].n,cnt[k]+(cnt._||0)])].map(([k,n,c])=>`<button class="chip${(S.cpfS||"")===k?" on":""}" data-cpfs="${k}" aria-pressed="${(S.cpfS||"")===k}">${k?sb(k)+" ":""}${esc(n)} <small>${c}</small></button>`).join("")}</div>`:"";
-  return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Finder</h3><button class="ibtn" id="cpFindX" aria-label="Coupon-Finder schließen">${IC.x}</button></div>
+  return `${cpHowHTML()}<section class="panel cpf" id="cpfBox"><div class="cpf-h"><h3>💸 Geld zurück – automatisch gefunden</h3></div><p class="cpf-n">SparRadar sucht jeden Tag neu und ordnet alles den Märkten zu. Markt antippen = nur dessen Aktionen.</p>
     ${chips}${f.length?`<p><b>${f.length} Geld-zurück-Aktion${f.length===1?"":"en"} gefunden – zusammen bis zu ${eur(tot)} zurück.</b> Ganz oben: was es gerade auch im Angebot gibt – doppelt gespart.</p>
     <div class="rows">${f.map(({a,o,val})=>`<div class="drow cpf-r">${o?`<button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>`:`<span class="mini cbico" aria-hidden="true">${CB_ICO[a.cat]||"💸"}</span>`}
       <div class="t">${esc(a.n)}<small>${esc(cbLbl(a))}${a.max?" (max. "+eur(a.max)+")":""}${a.min?" · ab "+eur(a.min)+" Einkauf":""}${a.gw?" · 🎲 mit Gewinnspiel (freiwillig)":""} · ${esc(cbShopTxt(a))}${a.kauf?" · kaufen bis "+fmtDate(a.kauf):""}${a.ab&&a.ab>TODAY?" · ab "+fmtDate(a.ab):""}</small>
@@ -1252,7 +1428,7 @@ function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<button class="btn cpfi
       <div class="pr"><b>${val?"−"+eur(val):a.typ==="nfor"?"1 gratis":"gratis"}</b><small>${esc(cbShort(a))}</small></div>
       <div class="cpf-b"><button class="btn sm" data-cbadd="${esc(a.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="cb:${esc(a.id)}">Nein</button><a class="btn ghost sm" href="${esc(a.url)}" target="_blank" rel="noopener nofollow">Aktion ↗</a></div></div>`).join("")}</div>
     ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}`
-    :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues</b>Alle aktuellen Geld-zurück-Aktionen hast du schon eingefügt oder abgelehnt. SparRadar sucht jeden Tag neu.</div>`}
+    :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues${S.cpfS?" bei "+esc(sname(S.cpfS)):""}</b>Alle aktuellen Geld-zurück-Aktionen hast du schon eingefügt oder abgelehnt. SparRadar sucht jeden Tag neu.</div>`}
     <p class="cpf-n">Gefunden in öffentlichen Übersichten von Hersteller-Aktionen (mystipendium.de, sparwelt.de), täglich neu. „Aktion ↗“ öffnet die Seite des Herstellers mit allen Bedingungen. Oft gilt: nur eine Teilnahme pro Person, begrenzte Teilnehmerzahl.</p></section>`}
 function cbAdd(id,quiet,oid){const a=(CASHBACK?.items||[]).find(x=>x.id===id);if(!a)return 0;const o=(oid&&byId(oid))||cbOffers(a)[0],w=cbWords(a);
   const k=o?[w[0],...w.slice(1).filter(x=>cbHit(o,x)).slice(0,1)].join(" "):w.slice(0,2).join(" ");
@@ -1483,7 +1659,7 @@ function render(){
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip,cbget:renderCbGet}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip,cbget:renderCbGet,bon:renderBon}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -1538,11 +1714,11 @@ document.addEventListener("click",e=>{
   if(b.id==="syncOff"){if(confirm("Verbindung auf diesem Gerät trennen? Deine Listen bleiben hier gespeichert.")){Sync.disconnect();render()}return}
   if(b.dataset.sort){S.sort=b.dataset.sort;render();return}
   if(b.dataset.toggleapp){S.useApp=!S.useApp;save();render();return}
-  if(b.dataset.freset){S.stores.clear();S.cats.clear();S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
+  if(b.dataset.freset){S.stores.clear();S.cats.clear();S.sort="off";S.limit=60;S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0,cb:0};store.set("flt",S.flt);render();return}
   if(b.dataset.fmin!=null){S.flt.min=+b.dataset.fmin;S.limit=60;store.set("flt",S.flt);render();return}
   if(b.dataset.fmax!=null){S.flt.max=+b.dataset.fmax;S.limit=60;store.set("flt",S.flt);render();return}
   if(b.dataset.fflag){const k=b.dataset.fflag;S.flt[k]=S.flt[k]?0:1;S.limit=60;store.set("flt",S.flt);render();return}
-  if(b.dataset.fclear){S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0};store.set("flt",S.flt);render();return}
+  if(b.dataset.fclear){S.flt={min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0,cb:0};store.set("flt",S.flt);render();return}
   if(b.dataset.fdone){S.sheet=null;render();scrollTo({top:0});return}
   if(b.id==="closeSheet"){S.sheet=null;render();return}
   if(b.id==="more"){S.limit+=60;render();return}
@@ -1558,9 +1734,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.cpq!=null){S.cpq=b.dataset.cpq||null;render();return}
   if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
-  if(b.id==="cpFind"){S.cpFind=true;render();loadCashback().then(render);return}
   if(b.dataset.cpfs!=null){S.cpfS=b.dataset.cpfs||null;render();return}
-  if(b.id==="cpFindX"){S.cpFind=false;render();return}
   if(b.dataset.cbadd){cbAdd(b.dataset.cbadd);render();return}
   if(b.dataset.cpfno){const no=store.get("cpNo",[]),ids=new Set((CASHBACK?.items||[]).map(a=>"cb:"+a.id));store.set("cpNo",[...no.filter(i=>ids.has(i)),b.dataset.cpfno]);render();return}
   if(b.id==="cpFindAll"){const f=cbFinds().filter(x=>!S.cpfS||!x.a.shops?.length||x.a.shops.includes(S.cpfS)),n=f.reduce((a,x)=>a+cbAdd(x.a.id,true),0);save();toast(`${n} Geld-zurück-Aktionen eingefügt – Kassenbons aufheben!`);render();return}
@@ -1576,6 +1750,7 @@ document.addEventListener("click",e=>{
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();scrollTo({top:0});return}
   if(b.dataset.go){S.tab=b.dataset.go;render();scrollTo({top:0});return}
+  if(b.dataset.gocb){S.flt.cb=1;store.set("flt",S.flt);S.limit=60;render();document.querySelector(".meta")?.scrollIntoView({block:"start"});toast("Filter: nur Angebote mit Geld zurück");return}
   if(b.dataset.golow){S.flt.low=1;store.set("flt",S.flt);S.limit=60;render();document.querySelector(".meta")?.scrollIntoView({block:"start"});toast("Filter: nur Preis-Alarme und Tiefstpreise");return}
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
@@ -1596,6 +1771,15 @@ document.addEventListener("click",e=>{
   if(b.dataset.mktauto){store.set("openMktApp",!store.get("openMktApp",true));render();return}
   if(b.dataset.tripfinish){finishTrip([...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)].filter(x=>S.checked.includes(x)),false);return}
   if(b.dataset.triprestore){restoreTrip(b.dataset.triprestore);return}
+  if(b.dataset.bonpick){bonPick(b.dataset.bonpick==="cam");return}
+  if(b.dataset.bonmore&&BON.r){BON.more=!BON.more;render();return}
+  if(b.dataset.bonx!=null&&BON.r){const x=BON.r.items[+b.dataset.bonx];if(x)x.on=!x.on;render();return}
+  if(b.dataset.bondiff&&BON.r){const r=BON.r,sum=r2(r.items.filter(x=>x.on).reduce((a,x)=>a+x.p,0));r.items.push({n:"Nicht erkannt",q:1,p:r2(r.total-sum),on:true});render();return}
+  if(b.dataset.bonedit!=null&&BON.r){const x=BON.r.items[+b.dataset.bonedit];if(!x)return;
+    const v=prompt("Artikel ändern (Menge x Name Preis), z. B. „2x Joghurt 1,98“:",(x.q>1?x.q+"x ":"")+x.n+" "+String(x.p.toFixed(2)).replace(".",","));
+    if(v!=null){if(!v.trim()){x.on=false}else{const e=parseExtra(v);x.n=e.n;x.q=e.q||1;if(e.p)x.p=e.p;x.on=true}render()}return}
+  if(b.dataset.bonstore&&BON.r){BON.r.s=b.dataset.bonstore;render();return}
+  if(b.dataset.bonsave){const dv=document.getElementById("bonDate")?.value;if(BON.r&&dv)BON.r.d=dv;bonSave();return}
   if(b.dataset.tripopen){S.tripId=b.dataset.tripopen;S.sheet="trip";hideTripPop();render();return}
   if(b.dataset.savedopen){S.sheet="saved";render();return}
   if(b.dataset.saveddel){const x=S.saved[+b.dataset.saveddel];if(x){x.off=1;save();render();toast(`„${x.n}“ zählt nicht mehr`)}return}
