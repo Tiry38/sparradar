@@ -36,13 +36,21 @@ FILL = re.compile(r"^(\d.*|g|kg|ml|l|cl|x|xl|xxl|st|stk|stueck|pack|packung|bigp
 
 PAUSE = 2.0
 MAX_NET = int(os.environ.get("SR_IMG_MAX", "250"))
+# Zeitbudget für die Netz-Suche: danach wird gespeichert (Workflow-Limit 170 min; am 01.11. lief ein Lauf
+# ins Limit, weil das Archiv Verbindungen ablehnte -> alles Gefundene war verloren)
+MAX_MIN = float(os.environ.get("SR_IMG_MINUTES", "120"))
+T0 = time.time()
 SITEMAPS = {"aldi": "https://www.aldi-sued.de/sitemap_products.xml", "lidl": "https://www.lidl.de/static/sitemap.xml"}
 
 
-def http(u, limit=None):
+def time_up():
+    return (time.time() - T0) / 60 > MAX_MIN
+
+
+def http(u, limit=None, timeout=60):
     try:
         req = urllib.request.Request(u, headers={"User-Agent": UA, "Accept-Encoding": "gzip"})
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             b = r.read()
             if r.headers.get("Content-Encoding") == "gzip" or u.endswith(".gz"):
                 b = gzip.decompress(b)
@@ -94,8 +102,10 @@ def wayback_aldi(name):
         return None, None
     q = urllib.parse.urlencode({"url": f"www.aldi-sued.de/produkt/{t[0]}-{t[1]}", "matchType": "prefix", "output": "json",
                                 "fl": "timestamp,original", "filter": "statuscode:200", "collapse": "urlkey", "limit": "30"})
-    txt = http("https://web.archive.org/cdx/search/cdx?" + q)
+    txt = http("https://web.archive.org/cdx/search/cdx?" + q, timeout=20)
     time.sleep(PAUSE)
+    if txt is None:
+        return "err", None  # Archiv hat nicht geantwortet (nicht als „gesucht“ merken)
     try:
         rows = json.loads(txt)[1:] if txt and txt.strip() else []
     except Exception:
@@ -254,7 +264,7 @@ def main():
         found, tried = 0, set()
         # Durchgang 1: aktuelle Produktseiten (Sitemap-Treffer)
         for n in todo:
-            if net >= MAX_NET:
+            if net >= MAX_NET or time_up():
                 break
             page = shops.find(n)
             if page:
@@ -267,22 +277,32 @@ def main():
             if n in extra:
                 continue
             u = pool.find(n, loose=True)
-            if not u and net < MAX_NET:
+            if not u and net < MAX_NET and not time_up():
                 page = shops.find(n, loose=True)
                 if page:
                     html = http(page); net += 1; time.sleep(PAUSE)
                     u = page_img(html)
             if u:
                 extra[n] = u; found += 1; log("   ~ (gleiche Produktlinie)", n, "->", u[:90])
+        store(extra, miss, names, cat)  # Zwischenstand: Treffer der Aldi-/Lidl-Seiten sind sicher
+        log(f"Aldi-/Lidl-Produktseiten: {found} Bilder ({net} Abrufe, {(time.time() - T0) / 60:.0f} min)")
         # Durchgang 3 (teuer, zuletzt): gelöschte Aldi-Seiten im Internet-Archiv
+        fails = 0
         for n in todo:
-            if net >= MAX_NET:
+            if net >= MAX_NET or time_up():
                 break
             if n in extra:
                 continue
             ts, orig = wayback_aldi(n); net += 1
+            if ts == "err":
+                fails += 1
+                if fails >= 8:  # Archiv lehnt gerade ab (01.11.: „Connection refused“ über Stunden) -> nächster Lauf
+                    log("Internet-Archiv antwortet gerade nicht – Archiv-Suche beendet")
+                    break
+                continue
+            fails = 0
             if ts:
-                html = http(f"https://web.archive.org/web/{ts}id_/{orig}"); net += 1; time.sleep(PAUSE)
+                html = http(f"https://web.archive.org/web/{ts}id_/{orig}", timeout=20); net += 1; time.sleep(PAUSE)
                 im = page_img(html)
                 if im:  # Bild über das Archiv laden (Original-Adresse kann schon gelöscht sein)
                     extra[n] = f"https://web.archive.org/web/{ts}im_/{im}"; found += 1; log("   + (Archiv)", n, "->", im[:90])
@@ -297,13 +317,18 @@ def main():
         miss.setdefault(n, today)
     log("Noch ohne Bild:", len(rest))
 
+    extra = store(extra, miss, names, cat)
+    left = sum(1 for n in need if n not in extra)
+    log(f"img-extra.json: {len(extra)} Bilder · noch ohne Bild: {left}")
+
+
+def store(extra, miss, names, cat):
     keep = set(names) | set(cat)
     extra = {k: v for k, v in extra.items() if k in keep and isinstance(v, str) and v.startswith("https://")}
     miss = {k: v for k, v in miss.items() if k in keep and k not in extra}
     save("img-extra.json", extra)
     save("img-miss.json", miss)
-    left = sum(1 for n in need if n not in extra)
-    log(f"img-extra.json: {len(extra)} Bilder · noch ohne Bild: {left}")
+    return extra
 
 
 if __name__ == "__main__":
