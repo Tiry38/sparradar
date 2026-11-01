@@ -142,7 +142,7 @@ const Sync = {
   // beide Seiten geändert: nichts verlieren, alles zusammenführen
   merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
     return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
-      coupons:u(a.coupons||[],b.coupons||[],c=>[c.s,c.k,c.t,c.v,c.to].join("|")),
+      coupons:u(a.coupons||[],b.coupons||[],c=>[c.id||"",c.s,c.k,c.t,c.v,c.to].join("|")),
       extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])],saved:(()=>{const m=new Map();[...(a.saved||[]),...(b.saved||[])].forEach(e=>{const k=e.id+"|"+e.d,o=m.get(k);m.set(k,o&&(o.off||e.off)?{...e,off:1}:e)});return [...m.values()]})(), // gelöscht (off) bleibt gelöscht
       trips:u(a.trips||[],b.trips||[],x=>x.id).sort((x,y)=>(y.at||"").localeCompare(x.at||"")),qty:{...(a.qty||{}),...(b.qty||{})}}},
   mergeP(p,remote,local){return this.pick({...this.merge(remote,local)},p)},
@@ -205,14 +205,14 @@ const PROGS = ["Lidl Plus","Rewe Bonus","Payback","Netto App","Edeka App","dm Ap
 const CP_TYPES = {euro:"€ Rabatt / Guthaben",pct:"% Rabatt",preis:"Coupon-Preis (zahlst nur …)",punkte:"Payback-Extrapunkte"};
 const defaultProg = s => ({lidl:"Lidl Plus",rewe:"Rewe Bonus",netto:"Payback",edeka:"Payback",dm:"dm App",all:"Cashback-App"})[s]||"Sonstiges";
 const cpActive = c => !c.to || c.to>=TODAY;
-const couponsFor = o => S.coupons.filter(c=>cpActive(c)&&(c.s==="all"||c.s===o.s)&&c.k.split(/\s+/).every(w=>matches(o,w)));
+const couponsFor = o => S.coupons.filter(c=>cpActive(c)&&c.k&&(c.s==="all"||c.s===o.s)&&c.k.split(/\s+/).every(w=>matches(o,w)));
 function cpValue(c,cur){
   if(c.t==="euro")return c.v;
   if(c.t==="pct")return Math.round(cur*c.v)/100;
   if(c.t==="preis")return Math.max(0,cur-c.v);
   if(c.t==="punkte")return c.v/100; // 1 Payback-Punkt = 1 Cent
   return 0} // t:"app" (vom Coupon-Sucher) = App-Preis/Bonus steht schon im Angebot -> nicht doppelt abziehen
-function cpValueTxt(c){return c.t==="app"?"−"+eur(c.v)+" mit App":c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
+function cpValueTxt(c){return !c.v?"Coupon":c.t==="app"?"−"+eur(c.v)+" mit App":c.t==="euro"?"−"+eur(c.v):c.t==="pct"?`−${String(c.v).replace(".",",")} %`:c.t==="preis"?"für "+eur(c.v):`${c.v} Extra-°P`}
 const cpLabel = c => `${c.prog} ${cpValueTxt(c)}`;
 const fin = o => Math.round(steps(o).reduce((a,s)=>a+s.v,0)*100)/100;
 const offPct = o => {const r=ref(o);return r>0?Math.max(0,Math.round((1-fin(o)/r)*100)):0};
@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  82:["Coupons an der Kasse: Papier-Coupon einfach fotografieren – SparRadar liest den Strichcode. Hakst du den letzten Artikel ab, kommen deine Coupons groß nacheinander, am Ende öffnet ein Tipp die Markt-App mit deiner Karte."],
   81:["Neu im Tab „Coupons“: Knopf „🔍 Coupon suchen“. Zeigt alle App- und Bonus-Vorteile der Woche (Lidl Plus, Edeka-/Netto-App, Rewe Bonus), die größten zuerst – einfach „Einfügen“ oder „Nein“."],
   80:["Kracher: höchstens 2 Angebote pro Markt je Abschnitt – nicht mehr fast nur Edeka mit App-Preis."],
   79:["Angebote nach Ersparnis: erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tierbedarf und zum Schluss Technik, Kleidung & Co. – innerhalb jeder Gruppe weiter nach dem höchsten Rabatt."],
@@ -935,8 +936,59 @@ function tripStore(t){const c={};t.items.forEach(x=>c[x.s]=(c[x.s]||0)+1);const 
 function openMktApp(s){const a=MKT_APP[s];if(!a)return;const play=`https://play.google.com/store/apps/details?id=${a.pkg}`;
   // Chrome/Web-App: intent-Link öffnet die App, fehlt sie, kommt der Play Store. Alte APK-Hülle kennt nur normale Links -> Play Store mit „Öffnen“.
   location.href=IN_APK?play:`intent://#Intent;package=${a.pkg};action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=${encodeURIComponent(play)};end`}
+// ---------- Kasse: eigene Coupons nacheinander groß zeigen, am Ende die Markt-App (Kevins Wunsch 01.11.) ----------
+// Papier-/Prospekt-Coupons: Foto machen, SparRadar liest den Strichcode heraus und zeigt ihn an der Kasse gestochen scharf.
+// Das Foto bleibt nur auf diesem Gerät (sr_cpImg), der Strichcode (c.code) wird mit den Coupons geteilt.
+const cpImgKey=c=>c.id||[c.s,c.k,c.t,c.v,c.to].join("|");
+let CPIMG=null;const cpImgs=()=>CPIMG||(CPIMG=store.get("cpImg",{}));
+const cpImgOf=c=>cpImgs()[cpImgKey(c)]||"";
+const cpHasCode=c=>!!(c.code||cpImgOf(c));
+const kasseCps=s=>S.coupons.filter(c=>cpActive(c)&&(c.s===s||c.s==="all")&&cpHasCode(c));
+function kasseStore(t){const c={};t.items.forEach(x=>c[x.s]=(c[x.s]||0)+1);return Object.keys(c).sort((a,b)=>c[b]-c[a]).find(s=>kasseCps(s).length)||null}
+function openKasse(s,tid){S.kasse={s,i:0,t:tid||null};S.sheet="kasse";S._shown=null;hideTripPop();render();wakeOn()}
+const BC_FMT={ean_13:"EAN13",ean_8:"EAN8",upc_a:"UPC",upc_e:"UPCE",code_128:"CODE128",code_39:"CODE39",itf:"ITF"};
+function loadJsBarcode(){return window.JsBarcode?Promise.resolve():new Promise((ok,err)=>{const x=document.createElement("script");x.src="vendor/jsbarcode.min.js";x.onload=ok;x.onerror=err;document.head.appendChild(x)})}
+function drawKasse(){const el=document.getElementById("ksSvg"),c=S.sheet==="kasse"&&kasseCps(S.kasse.s)[S.kasse.i];if(!el||!c||!c.code)return;
+  loadJsBarcode().then(()=>{const o={width:3,height:120,margin:18,fontSize:20,background:"#fff",lineColor:"#000"};
+    try{JsBarcode(el,c.code,{...o,format:c.fmt||"CODE128"})}catch(e){try{JsBarcode(el,c.code,{...o,format:"CODE128"})}catch(e2){}}}).catch(()=>{})}
+// Foto verkleinern (Speicher), Strichcode suchen: BarcodeDetector (Chrome Android), sonst ZXing
+async function cpPhoto(file){
+  const img=await new Promise((ok,err)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=err;i.src=URL.createObjectURL(file)});
+  const sc=Math.min(1,1100/Math.max(img.naturalWidth,img.naturalHeight)),cv=document.createElement("canvas");
+  cv.width=Math.round(img.naturalWidth*sc);cv.height=Math.round(img.naturalHeight*sc);cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+  const data=cv.toDataURL("image/jpeg",.72);let code="",fmt="";
+  // Für die Erkennung das Original nehmen (feine Striche)
+  const big=document.createElement("canvas"),bs=Math.min(1,2400/Math.max(img.naturalWidth,img.naturalHeight));big.width=Math.round(img.naturalWidth*bs);big.height=Math.round(img.naturalHeight*bs);big.getContext("2d").drawImage(img,0,0,big.width,big.height);
+  if("BarcodeDetector" in window){try{const f=(await BarcodeDetector.getSupportedFormats()).filter(x=>BC_FMT[x]);
+    if(f.length){const r=await new BarcodeDetector({formats:f}).detect(big);if(r[0]){code=r[0].rawValue;fmt=BC_FMT[r[0].format]||"CODE128"}}}catch(e){}}
+  if(!code){try{await loadZXing();const F=ZXing.BarcodeFormat,h=new Map(),map={[F.EAN_13]:"EAN13",[F.EAN_8]:"EAN8",[F.UPC_A]:"UPC",[F.UPC_E]:"UPCE",[F.CODE_128]:"CODE128",[F.CODE_39]:"CODE39",[F.ITF]:"ITF"};
+    h.set(ZXing.DecodeHintType.POSSIBLE_FORMATS,Object.keys(map).map(Number));h.set(ZXing.DecodeHintType.TRY_HARDER,true);
+    const r=new ZXing.MultiFormatReader();r.setHints(h);const res=r.decode(new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(new ZXing.HTMLCanvasElementLuminanceSource(big))),h);
+    code=res.getText();fmt=map[res.getBarcodeFormat()]||"CODE128"}catch(e){}}
+  return{data,code,fmt}}
+function cpImgSave(c,data){const m=cpImgs();m[cpImgKey(c)]=data;const keep=new Set(S.coupons.map(cpImgKey));Object.keys(m).forEach(k=>{if(!keep.has(k))delete m[k]});
+  CPIMG=m;try{localStorage.setItem("sr_cpImg",JSON.stringify(m));return true}catch(e){toast("Speicher voll – lösch alte Coupons.");return false}}
+function renderKasse(){const k=S.kasse||{},cps=kasseCps(k.s),n=cps.length,i=Math.min(k.i||0,n),last=i>=n,c=cps[i],app=MKT_APP[k.s],t=k.t&&S.trips.find(x=>x.id===k.t);
+  const img=c&&!c.code?cpImgOf(c):"";
+  return `<div class="sheet kasse" role="dialog" aria-modal="true" aria-label="Coupons an der Kasse">
+   <div class="sheet-h">${sb(k.s,true)}<h2>Kasse ${esc(sname(k.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <div class="ks-dots" aria-hidden="true">${cps.map((_,j)=>`<i class="${j<i?"d":j===i?"on":""}"></i>`).join("")}${app?`<i class="${last?"on":""} ap">📱</i>`:""}</div>
+   ${!last?`<p class="ks-step">Coupon <b>${i+1} von ${n}</b> · zeig ihn an der Kasse, der Code wird vom Bildschirm gescannt.</p>
+    <div class="ks-card">${c.code?`<svg id="ksSvg" role="img" aria-label="Strichcode ${esc(c.code)}"></svg>`:`<img src="${img}" alt="Foto vom Coupon">`}
+     <div class="ks-t"><b>${esc(c.k||"Coupon")}</b><span>${esc(cpValueTxt(c))}${c.to?" · bis "+fmtDate(c.to):""}</span></div></div>
+    <button class="btn ks-next" data-ksnext="1">✓ Gescannt – ${i+1<n?"nächster Coupon":app?`weiter zur ${esc(app.n)}-App`:"fertig"}</button>
+    <div class="ks-a">${i?'<button class="linkbtn" data-ksback="1">‹ Zurück</button>':"<span></span>"}<button class="linkbtn" data-ksnext="1">Überspringen ›</button></div>
+    <p class="ks-tip">💡 Bildschirm hell drehen. Klappt das Scannen nicht, kann die Kasse die Nummer unter dem Strichcode eintippen.</p>`
+   :`<div class="ks-fin"><div class="ks-ok">✓</div>${n?`<b>${n===1?"Coupon":"Alle "+n+" Coupons"} gezeigt.</b>`:""}
+    ${app?`<p>Zum Schluss deine <b>${esc(app.n)}-Karte</b> zeigen. Darin stecken <b>alle Coupons, die du in der App aktiviert hast – ein Code für alles.</b></p>
+     ${ANDROID?`<button class="btn ks-app" data-mktapp="${k.s}">📱 ${esc(app.n)} öffnen</button>`:`<p>Öffne jetzt die ${esc(app.n)}-App auf deinem Handy.</p>`}`:"<p>Fertig – viel Spaß beim Sparen!</p>"}
+    ${t?`<p class="ks-sum">Einkauf gespeichert: bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</p><div class="ks-a"><button class="linkbtn" data-triprestore="${t.id}">Zurück auf den Zettel</button><button class="linkbtn" data-tripopen="${t.id}">Bericht ansehen</button></div>`:""}
+    <button class="btn ghost" data-ksdone="1">Fertig</button></div>`}</div>`}
+
 let tpT;
-function tripPop(t,auto){let el=document.getElementById("tripPop");
+function tripPop(t,auto){
+  const ks=auto?kasseStore(t):null; // eigene Coupons für diesen Markt -> erst die Coupons, am Ende die App
+  if(ks){openKasse(ks,t.id);try{navigator.vibrate?.([30,60,30])}catch(e){}return}let el=document.getElementById("tripPop");
   if(!el){el=document.createElement("div");el.id="tripPop";el.className="trippop";el.setAttribute("role","status");document.body.appendChild(el)}
   const n=t.items.length+t.extra.length,ms=ANDROID?tripStore(t):null;
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
@@ -1015,7 +1067,7 @@ function renderList(){
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineP(o),0),r=os.reduce((a,o)=>a+lineR(o),0);return `<div class="rsub"><span>Summe ${os.length} Artikel${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
   return `${addRow}${freqHTML()}${cartHTML(items,extra)}${savedHTML()}${goneHTML()}${swapTips(items)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}</div>
-   ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
+   ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${kasseCps(s).length?`<button class="mktbtn ks" data-kasse="${s}" title="Deine Coupons an der Kasse nacheinander zeigen">🧾 Kasse · ${kasseCps(s).length} Coupon${kasseCps(s).length===1?"":"s"}</button>`:ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
      ${sortDone(os).map(o=>line(o.id,o.n,eur(lineP(o)),comboLabels(o).length?" *":"")).join("")}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
    ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):"")).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${eur(sum)}</span></div>${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
@@ -1056,16 +1108,30 @@ const cpKey=o=>((o.b&&!norm(o.n).includes(norm(o.b))?o.b+" ":"")+o.n).replace(/\
 function cpFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c.oid).filter(Boolean));
   return weekOffers().map(o=>({o,g:cpGain(o)})).filter(({o,g})=>g&&!no.includes(o.id)&&!have.has(o.id)&&(g.d>=.3||g.d/o.p>=.15))
     .map(x=>({...x,pc:Math.round(x.g.d/(x.o.p+(x.o.ap?0:x.g.d))*100)})).sort((a,b)=>b.g.d-a.g.d||b.pc-a.pc).slice(0,40)}
-function cpFindHTML(){if(!S.cpFind)return `<button class="btn cpfind" id="cpFind">🔍 Coupon suchen</button>`;
+function cpHowHTML(){return `<section class="panel cphow"><h3>So sparst du mit Coupons am meisten</h3>
+  <ol><li><b>🔍 Coupon suchen</b> – SparRadar zeigt die größten App- und Bonus-Rabatte der Woche. „Einfügen“ = landet auf deinem Zettel. Danach einmal auf „📱 App öffnen“ tippen und den Coupon dort aktivieren.</li>
+   <li><b>📷 Papier-Coupon fotografieren</b> – aus Prospekt, Zeitung oder von der Packung. SparRadar liest den Strichcode, du musst nichts abtippen.</li>
+   <li><b>🧾 An der Kasse</b> – hakst du den letzten Artikel auf dem Zettel ab, kommen deine Coupons groß nacheinander. Zeigen, „Gescannt“ tippen, am Ende öffnet ein Tipp die Markt-App mit deiner Karte (darin stecken alle App-Coupons).</li></ol></section>`}
+function cpNewHTML(){const nw=S.cpNew;if(!nw)return "";const def=S.stores.size===1?[...S.stores][0]:"";
+  return `<section class="panel cpnew"><div class="cpf-h"><h3>📷 Neuer Coupon</h3><button class="ibtn" data-cpnewx="1" aria-label="Abbrechen">${IC.x}</button></div>
+   <div class="cpn-g"><img src="${nw.data}" alt="Foto vom Coupon"><p>${nw.code?`<b class="ok">✓ Strichcode erkannt</b><br><small>${esc(nw.code)} – wird an der Kasse gestochen scharf gezeigt.</small>`:`<b>Strichcode nicht lesbar</b><br><small>Kein Problem: An der Kasse wird das Foto gezeigt. Tipp: Für ein schärferes Bild nah ran und gerade halten.</small>`}</p></div>
+<div class="form">   <div class="row"><label>Für welchen Artikel? <small>(freiwillig)</small><input id="cpnK" placeholder="z. B. Jacobs Kaffee" autocomplete="off"></label><label>Wert in € <small>(freiwillig)</small><input id="cpnV" inputmode="decimal" placeholder="z. B. 1,00"></label></div>
+   <label>Gültig bis <small>(freiwillig)</small><input id="cpnTo" type="date"></label></div>
+   <p class="cpn-q"><b>Bei welchem Markt einlösen?</b> Antippen = gespeichert.</p>
+   <div class="cpn-s">${Object.entries(STORES).map(([k,st])=>`<button class="chip${k===def?" on":""}" data-cpnewsave="${k}">${sb(k)} ${esc(st.n)}</button>`).join("")}<button class="chip" data-cpnewsave="all">Alle Märkte</button></div>
+   <p class="cpf-n">Mit Artikel und Wert rechnet SparRadar den Coupon auch in die Preise ein. Das Foto bleibt nur auf diesem Gerät.</p></section>`}
+function cpAppBtns(){if(!ANDROID)return "";const st=[...new Set(S.coupons.filter(c=>c.t==="app"&&cpActive(c)).map(c=>c.s))].filter(s=>MKT_APP[s]);
+  return st.length?`<div class="cpf-act"><b>Jetzt in der App aktivieren:</b>${st.map(s=>`<button class="mktbtn" data-mktapp="${s}">📱 ${esc(MKT_APP[s].n)}</button>`).join("")}</div>`:""}
+function cpFindHTML(){if(!S.cpFind)return `${cpHowHTML()}<div class="cpbig"><button class="btn cpfind" id="cpFind">🔍 Coupon suchen</button><button class="btn ghost cpfind" data-cpphoto="new">📷 Coupon fotografieren</button></div>${cpAppBtns()}${cpNewHTML()}`;
   const f=cpFinds(),tot=f.reduce((a,x)=>a+x.g.d,0);
   return `<section class="panel cpf"><div class="cpf-h"><h3>🔍 Coupon-Bericht</h3><button class="ibtn" id="cpFindX" aria-label="Bericht schließen">${IC.x}</button></div>
     ${f.length?`<p><b>${f.length} App- &amp; Bonus-Vorteile gefunden – zusammen bis zu ${eur(tot)}.</b> Die größten zuerst. „Einfügen“ legt den Coupon bei dir ab und setzt den Artikel auf den Einkaufszettel.</p>
     <div class="rows">${f.map(({o,g,pc})=>`<div class="drow cpf-r"><button class="mini" style="--cc:${CC[o.c]||CC.sonstiges}" data-detail="${esc(o.id)}" aria-label="Details">${imgTag(o)}</button>
       <div class="t">${esc(cpKey(o))}<small>${sb(o.s)} ${esc(sname(o.s))} · ${esc(g.how)}${o.to?" · bis "+fmtDate(o.to):""}</small></div>
-      <div class="pr"><b>−${eur(g.d)}</b><small>${pc} %</small></div><div class="cpf-b"><button class="btn sm" data-cpfadd="${esc(o.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="${esc(o.id)}">Nein</button></div></div>`).join("")}</div>
-    ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}`
+      <div class="pr"><b>−${eur(g.d)}</b><small>${pc>=30?"🔥 ":""}${pc} %</small></div><div class="cpf-b"><button class="btn sm" data-cpfadd="${esc(o.id)}">Einfügen</button><button class="btn ghost sm" data-cpfno="${esc(o.id)}">Nein</button></div></div>`).join("")}</div>
+    ${f.length>1?`<button class="btn ghost" id="cpFindAll">Alle ${f.length} einfügen</button>`:""}${cpAppBtns()}`
     :`<div class="empty" style="padding:16px"><b>Gerade nichts Neues</b>Alle App- und Bonus-Vorteile dieser Woche hast du schon eingefügt oder abgelehnt.</div>`}
-    <p class="cpf-n">Quelle: die aktuellen Prospekte (App-Preise, Rewe Bonus). Persönliche Coupons in Lidl Plus, Payback &amp; Co. sieht nur deine App – dafür braucht es dein Login, das SparRadar bewusst nicht nutzt. Wichtig: Den Coupon vor dem Einkauf in der App aktivieren.</p></section>`}
+    ${cpNewHTML()}<p class="cpf-n">Quelle: die aktuellen Prospekte (App-Preise, Rewe Bonus). Persönliche Coupons in Lidl Plus, Payback &amp; Co. sieht nur deine App – dafür braucht es dein Login, das SparRadar bewusst nicht nutzt. Wichtig: Den Coupon vor dem Einkauf in der App aktivieren.</p></section>`}
 function cpfAdd(id,quiet){const o=byId(id),g=o&&cpGain(o);if(!g)return 0;
   S.coupons.push({s:o.s,prog:cpProgOf(o),k:cpKey(o),t:"app",v:Math.round(g.d*100)/100,to:o.to||null,oid:o.id});
   if(!S.list.includes(o.id))S.list.push(o.id);if(!quiet){save();toast(`Eingefügt: ${cpKey(o)} – vor dem Einkauf in der ${cpProgOf(o)} aktivieren`)}return 1}
@@ -1085,11 +1151,13 @@ function renderCoupons(){
      <div class="row"><label>Art<select id="cpType">${topts}</select></label><label>Wert<input id="cpVal" required inputmode="decimal" placeholder="z. B. 1,00 oder 20"></label></div>
      <div class="row"><label>Gültig bis<input id="cpTo" type="date" value="${d}"></label><label style="align-self:end"><button class="btn" type="submit">${IC.plus}Coupon speichern</button></label></div>
     </form>
+    ${(()=>{const st=[...new Set(act.filter(x=>cpHasCode(x.c)).map(x=>x.c.s))].flatMap(s=>s==="all"?Object.keys(STORES):[s]);const u=[...new Set(st)];
+      return u.length?`<div class="cpf-act"><b>🧾 An der Kasse zeigen:</b>${u.map(s=>`<button class="mktbtn" data-kasse="${s}">${esc(sname(s))} (${kasseCps(s).length})</button>`).join("")}</div>`:""})()}
     ${act.length?`<div class="rows">${act.map(({c,i})=>{const n=wo.filter(o=>couponsFor(o).includes(c)).length;
       return `<div class="drow"><div class="mini" style="--cc:${(STORES[c.s]||{}).c||"#2B3034"};display:grid;place-items:center">${c.s==="all"?`<span class="sb lg" style="--c:#2B3034">%</span>`:sb(c.s,true)}</div>
        <div class="t">${esc(c.k)}<small>${esc(c.s==="all"?"Alle Märkte":sname(c.s))} · ${esc(c.prog)} · ${c.to?"bis "+fmtDate(c.to):"ohne Ende"}</small>
         <div class="pills"><span class="pill ${n?"cb":""}">${n?`passt zu ${n} Angebot${n===1?"":"en"}`:"gerade kein passendes Angebot"}</span></div></div>
-       <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`
+       <div class="pr"><b>${esc(cpValueTxt(c))}</b><div style="display:flex;gap:6px;justify-content:flex-end;margin-top:4px">${c.t==="app"?"":`<button class="btn ghost sm${cpHasCode(c)?" has":""}" data-cpphoto="${i}" title="${cpHasCode(c)?"Code wird an der Kasse gezeigt – neu fotografieren":"Coupon fotografieren, damit er an der Kasse kommt"}">${cpHasCode(c)?"✓ Code":"📷"}</button>`}${n?`<button class="btn ghost sm" data-cpshow="${i}">Zeigen</button>`:""}<button class="ibtn" data-delcp="${i}" aria-label="Coupon ${esc(c.k)} löschen">${IC.x}</button></div></div></div>`}).join("")}</div>`
       :'<div class="empty" style="padding:16px"><b>Noch keine Coupons</b>Trag oben deinen ersten aktivierten Coupon ein.</div>'}
     ${S.useApp?"":`<p style="color:var(--alert)">„Apps &amp; Coupons einrechnen“ ist ausgeschaltet. Coupons werden gerade nicht berücksichtigt.</p>`}
    </section>`}
@@ -1281,11 +1349,11 @@ function render(){
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,kasse:renderKasse,detail:renderDetail,trip:renderTrip}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
-  Scan.sync();
+  Scan.sync();drawKasse();
   navSync();
 }
 
@@ -1351,6 +1419,17 @@ document.addEventListener("click",e=>{
   if(b.dataset.cpq!=null){S.cpq=b.dataset.cpq||null;render();return}
   if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
   if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
+  if(b.dataset.ksnext){S.kasse.i++;render();return}
+  if(b.dataset.ksback){S.kasse.i=Math.max(0,S.kasse.i-1);render();return}
+  if(b.dataset.ksdone){S.sheet=null;render();return}
+  if(b.dataset.kasse){openKasse(b.dataset.kasse);return}
+  if(b.dataset.cpphoto!=null){S.cpPhotoFor=b.dataset.cpphoto;const f=document.getElementById("cpPhotoIn");f.value="";f.click();return}
+  if(b.dataset.cpnewsave){const nw=S.cpNew;if(!nw)return;const k=(document.getElementById("cpnK")?.value||"").replace(/\s+/g," ").trim(),v=parseFloat((document.getElementById("cpnV")?.value||"").replace(",","."))||0,
+      to=document.getElementById("cpnTo")?.value||null,st=b.dataset.cpnewsave;
+    const c={id:"c"+Date.now().toString(36),s:st,prog:defaultProg(st),k,t:"euro",v:k?v:0,to};if(nw.code){c.code=nw.code;c.fmt=nw.fmt}
+    S.coupons.push(c);if(!nw.code)cpImgSave(c,nw.data);else cpImgSave(c,nw.data);S.cpNew=null;save();
+    toast(`Coupon gespeichert – er erscheint an der Kasse bei ${st==="all"?"jedem Markt":sname(st)}`);render();return}
+  if(b.dataset.cpnewx){S.cpNew=null;render();return}
   if(b.id==="cpFind"){S.cpFind=true;render();return}
   if(b.id==="cpFindX"){S.cpFind=false;render();return}
   if(b.dataset.cpfadd){cpfAdd(b.dataset.cpfadd);render();return}
@@ -1421,7 +1500,12 @@ document.addEventListener("submit",e=>{
     toast(n?`Coupon gespeichert, passt zu ${n} Angebot${n===1?"":"en"}`:"Coupon gespeichert. Gerade passt kein Angebot dazu.");render();return}
 });
 // Programm passend zum gewählten Markt vorschlagen
-document.addEventListener("change",e=>{if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
+document.addEventListener("change",async e=>{if(e.target.id==="cpPhotoIn"){const f=e.target.files?.[0];if(!f)return;toast("Foto wird gelesen …");
+    let r;try{r=await cpPhoto(f)}catch(err){toast("Foto konnte nicht gelesen werden.");return}
+    const w=S.cpPhotoFor;if(w&&w!=="new"){const c=S.coupons[+w];if(!c)return;if(r.code){c.code=r.code;c.fmt=r.fmt}cpImgSave(c,r.data);save();
+      toast(r.code?"✓ Strichcode erkannt – wird an der Kasse gezeigt":"Foto gespeichert – wird an der Kasse gezeigt (Strichcode nicht lesbar, das Foto geht aber auch)");render();return}
+    S.cpNew=r;S.tab="tips";render();setTimeout(()=>document.querySelector(".cpnew")?.scrollIntoView({block:"start",behavior:"smooth"}),60);return}
+  if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render();showSugg("qSugg",S.q,"q")});
 document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.target.value,"q"));
 document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");
