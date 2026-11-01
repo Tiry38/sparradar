@@ -684,6 +684,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  75:["Am PC bleibt die Leiste mit Angebote, Merkliste, Einkaufszettel und Coupons beim Runterscrollen oben stehen."],
   74:["Den Knopf zur Markt-App gibt es jetzt auch für Aldi Süd, Netto und dm."],
   73:["Geräte verbinden: Wer noch mit GitHub-Schlüssel verbunden ist, kann mit einem Tipp auf einen Familien-Code umziehen – sicherer, alles wird mitgenommen."],
   72:["Geräte verbinden ohne GitHub: „Neuen Familien-Code erstellen“ antippen, Code kopieren, an die Familie schicken – fertig."],
@@ -1374,6 +1375,14 @@ document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",
 document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key==="Enter"&&e.target.id==="q"){hideSugg();e.target.blur()}});
 // Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
 const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];
+// PC: Reiter-Leiste bleibt beim Scrollen oben angeheftet (Handy: sowieso fest unten). Platzhalter verhindert Springen.
+const TABS=document.querySelector("nav.tabs"),TABS_PH=document.createElement("div");TABS_PH.className="tabs-ph";TABS.before(TABS_PH);
+function pinTabs(){const desk=matchMedia("(min-width:721px)").matches,was=TABS.classList.contains("pinned");
+  const pin=desk&&(was?TABS_PH:TABS).getBoundingClientRect().top<6;
+  if(pin){TABS_PH.style.height=TABS.offsetHeight+"px";TABS_PH.style.display="block";TABS.style.left=TABS_PH.offsetLeft+"px";TABS.style.width=TABS_PH.offsetWidth+"px"}
+  else if(was){TABS_PH.style.display="";TABS.style.left=TABS.style.width=""}
+  if(pin!==was)TABS.classList.toggle("pinned",pin)}
+addEventListener("scroll",pinTabs,{passive:true});addEventListener("resize",()=>{TABS.classList.remove("pinned");TABS_PH.style.display="";TABS.style.left=TABS.style.width="";pinTabs()});
 function applyZoom(){const i=Math.max(0,ZOOM.indexOf(store.get("zoom",1)));document.documentElement.style.zoom=ZOOM[i]>1?ZOOM[i]:"";
   const b=document.getElementById("zoomBtn");b.textContent=ZOOM_UI[i][0];b.setAttribute("aria-label",ZOOM_UI[i][1]);b.setAttribute("aria-pressed",i>0);return i}
 // Versteckter Zugang zu den Einstellungen: SparRadar-Logo oben links ca. 1 Sekunde gedrückt halten

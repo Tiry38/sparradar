@@ -74,6 +74,7 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Hinweis beim Öffnen:** neue Merklisten-Treffer seit dem letzten Öffnen (`seenHits`) – kein Push, nur in der App.
 - **Vorschläge/Suche:** `BASE_WORDS` + `docs/data/names.json` (alle je gesehenen Artikelnamen, auch Lidl ohne Rabatt). Suche nur in Name, Marke, Markt; Kategoriename nur bei exakter Eingabe.
 - **Kategorien:** mehrere gleichzeitig wählbar (`S.cats` = Set, `catTitle()`), antippen = an/aus, „Alle Kategorien“ = zurücksetzen.
+- **Reiter-Leiste am PC angeheftet** (Kevins Wunsch 01.11.): ab 721 px Breite bleibt `nav.tabs` beim Scrollen oben (`pinTabs()`, Klasse `.pinned` = `position:fixed`, Platzhalter `.tabs-ph` gegen Springen; `position:sticky` geht nicht, weil die Leiste in `header.top` steckt). Am Handy weiter fest unten.
 - **Bedienung:** „A+“-Knopf (3 Schriftstufen per CSS-`zoom`), am Handy Märkte/Kategorien/Sortierung im Fenster „Märkte & Filter“. Look: Farbverläufe in `docs/look.css`.
 - **Sperren nicht umgehen:** rewe.de und netto-online.de blocken automatische Abrufe (403). Diese Sperren nicht umgehen, keine API-Schlüssel aus Websites auslesen (z. B. bei Marktguru). Nur öffentliche Seiten, die robots.txt erlaubt, mit ehrlichem User-Agent, höchstens einmal pro Tag (Ausnahme: zusätzliche Abend-Abrufe Fr/Sa/So) und mit Pausen (`PAUSE`).
 - Das Repository ist öffentlich (nötig für kostenloses GitHub Pages). Keine Passwörter, Tokens oder persönlichen Daten hineinschreiben.
