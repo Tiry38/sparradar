@@ -1,10 +1,14 @@
 name: Bilder-Wächter
 # Mehrmals am Tag: Jeder Artikel (Angebote, Namen, Artikelstamm) soll ein Bild haben.
-# Fehlende Bilder werden in eigenen Daten und bei Open Food Facts / Open Beauty Facts gesucht -> docs/data/img-extra.json
+# Fehlende Bilder: eigene Daten, Open-Food-Facts-Datenexport, Aldi-/Lidl-Produktseiten (Sitemaps), gelöschte Aldi-Seiten im Internet-Archiv -> docs/data/img-extra.json
 on:
   schedule:
     - cron: "23 7,13,19 * * *"
   workflow_dispatch:
+    inputs:
+      max:
+        description: "Höchstens so viele Seiten-Abrufe (Standard 250)"
+        default: "250"
 permissions:
   contents: write
 concurrency:
@@ -13,13 +17,15 @@ concurrency:
 jobs:
   bilder:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 170
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - run: python fetcher/fill_images.py
+        env:
+          SR_IMG_MAX: ${{ github.event.inputs.max || '250' }}
       - name: Speichern
         run: |
           git config user.name "SparRadar Bot"

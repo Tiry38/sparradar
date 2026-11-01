@@ -7,14 +7,22 @@ Artikel ohne Bild eines:
   2. gleicher Markenartikel mit anderer Packungsgröße/Sorte (gleiche Marke + gleiche Produktwörter),
   3. Bilder aus dem offiziellen Open-Food-/Beauty-Facts-Datenexport (sammelt fetch_catalog.py wöchentlich
      in docs/data/img-pool.json). Die Such-Schnittstelle wird NICHT genutzt: robots.txt verbietet /cgi und /api.
+  4. Produktseiten von Aldi Süd und Lidl: deren öffentliche Produkt-Sitemaps (robots.txt nennt sie ausdrücklich)
+     werden einmal gelesen, passende Seite (Marke + Produktwörter im Seitennamen) -> Produktfoto (og:image).
+  5. Gelöschte Aldi-Produktseiten (Aktionsware, HTTP 410) aus dem Internet-Archiv (robots.txt erlaubt es).
+Netz-Abrufe nur mit Pause (PAUSE) und höchstens SR_IMG_MAX Seiten je Lauf (0 = keine Netz-Suche).
 Ergebnis: docs/data/img-extra.json {Artikelname: Bild-Adresse}. Fehlversuche merkt sich
 docs/data/img-miss.json (neuer Versuch nach 7 Tagen). Nie fremde Bilder raten: es müssen Marke
 und Produktwörter passen.
 """
+import gzip
 import json
 import os
 import re
 import sys
+import time
+import urllib.parse
+import urllib.request
 from datetime import date, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +32,84 @@ OFF_IMG = {"f": "https://images.openfoodfacts.org/images/products/",
            "b": "https://images.openbeautyfacts.org/images/products/"}
 FILL = re.compile(r"^(\d.*|g|kg|ml|l|cl|x|xl|xxl|st|stk|stueck|pack|packung|bigpack|big|cups?|portionen|kapseln|"
                   r"und|mit|fuer|der|die|das|von|oder|je|ca|im|in|aus|zum|zur|de|la|le|the|of|bio|neu)$")
+
+
+PAUSE = 2.0
+MAX_NET = int(os.environ.get("SR_IMG_MAX", "250"))
+SITEMAPS = {"aldi": "https://www.aldi-sued.de/sitemap_products.xml", "lidl": "https://www.lidl.de/static/sitemap.xml"}
+
+
+def http(u, limit=None):
+    try:
+        req = urllib.request.Request(u, headers={"User-Agent": UA, "Accept-Encoding": "gzip"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            b = r.read()
+            if r.headers.get("Content-Encoding") == "gzip" or u.endswith(".gz"):
+                b = gzip.decompress(b)
+            return b.decode("utf-8", "replace")
+    except Exception as e:
+        log("   !", u[:90], str(e)[:60])
+        return None
+
+
+def sitemap_urls(u, want, depth=0):
+    """Alle Seiten-Adressen einer Sitemap (auch Sitemap-Index), gefiltert auf Produktseiten (want = Regex)."""
+    x = http(u)
+    time.sleep(PAUSE)
+    if not x:
+        return []
+    locs = re.findall(r"<loc>\s*(.*?)\s*</loc>", x)
+    if "<sitemapindex" in x and depth < 2:
+        out = []
+        for l in locs:
+            if re.search(r"product|produkt|/p/|sitemap", l, re.I):
+                out += sitemap_urls(l, want, depth + 1)
+        return out
+    return [l for l in locs if re.search(want, l)]
+
+
+def slug_name(url):
+    """https://www.aldi-sued.de/produkt/ironmaxx-squeebarista-65-ml-salted-caramel-000000000759556001 -> Wörter"""
+    path = urllib.parse.urlparse(url).path.rstrip("/")
+    parts = [p for p in path.split("/") if p]
+    slug = parts[-2] if len(parts) >= 2 and re.fullmatch(r"p\d+", parts[-1]) else parts[-1]
+    slug = re.sub(r"\.html$", "", slug)
+    return " ".join(w for w in slug.split("-") if not re.fullmatch(r"\d{6,}", w))
+
+
+def page_img(html):
+    for pat in (r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)',
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image',
+                r'"image"\s*:\s*\[?\s*"(https://[^"]+)"'):
+        m = re.search(pat, html or "")
+        if m and m.group(1).startswith("https://"):
+            return m.group(1).replace("&amp;", "&")
+    return None
+
+
+def wayback_aldi(name):
+    """Gelöschte Aldi-Produktseite im Internet-Archiv suchen (Seitenname beginnt mit Marke-Produktlinie)."""
+    t = toks(name)
+    if len(t) < 2:
+        return None, None
+    q = urllib.parse.urlencode({"url": f"www.aldi-sued.de/produkt/{t[0]}-{t[1]}", "matchType": "prefix", "output": "json",
+                                "fl": "timestamp,original", "filter": "statuscode:200", "collapse": "urlkey", "limit": "30"})
+    txt = http("https://web.archive.org/cdx/search/cdx?" + q)
+    time.sleep(PAUSE)
+    try:
+        rows = json.loads(txt)[1:] if txt and txt.strip() else []
+    except Exception:
+        rows = []
+    if not rows:
+        return None, None
+    pool = Pool()
+    for ts, orig in rows:
+        pool.add(slug_name(orig), f"{ts}|{orig}")
+    hit = pool.find(name)
+    if not hit:
+        return None, None
+    ts, orig = hit.split("|", 1)
+    return ts, orig
 
 
 def log(*a):
@@ -140,8 +226,50 @@ def main():
             rest.append(n)
     log("Aus eigenen Daten gefunden:", local)
 
+    # 4./5. Netz-Suche: Aldi-/Lidl-Produktseiten (Sitemaps) und gelöschte Aldi-Seiten im Internet-Archiv.
+    # Erst die, die noch nie probiert wurden oder deren letzter Versuch >= 7 Tage her ist.
+    cutoff = (date.today() - timedelta(days=7)).isoformat()
+    # miss-Wert „JJJJ-MM-TT+n“ = schon im Netz gesucht; ältere Einträge ohne „+n“ kannten die Netz-Quellen noch nicht.
+    todo = [n for n in rest if not str(miss.get(n, "")).endswith("+n") or miss[n][:10] <= cutoff]
+    net = 0
+    if MAX_NET and todo:
+        shops = Pool()
+        for shop, sm in SITEMAPS.items():
+            urls = sitemap_urls(sm, r"/produkt/|/p/[^/]+/p\d+")
+            log(f"Sitemap {shop}: {len(urls)} Produktseiten")
+            for u in urls:
+                shops.add(slug_name(u), u)
+        found, tried = 0, set()
+        # Durchgang 1: aktuelle Produktseiten (Sitemap-Treffer), Durchgang 2: Internet-Archiv
+        for n in todo:
+            if net >= MAX_NET:
+                break
+            page = shops.find(n)
+            if page:
+                html = http(page); net += 1; time.sleep(PAUSE)
+                img = page_img(html)
+                if img:
+                    extra[n] = img; found += 1; log("   +", n, "->", img[:100])
+        for n in todo:
+            if net >= MAX_NET:
+                break
+            if n in extra:
+                continue
+            ts, orig = wayback_aldi(n); net += 1
+            if ts:
+                html = http(f"https://web.archive.org/web/{ts}id_/{orig}"); net += 1; time.sleep(PAUSE)
+                im = page_img(html)
+                if im:  # Bild über das Archiv laden (Original-Adresse kann schon gelöscht sein)
+                    extra[n] = f"https://web.archive.org/web/{ts}im_/{im}"; found += 1; log("   + (Archiv)", n, "->", im[:90])
+            tried.add(n)
+        for n in tried:
+            if n not in extra:
+                miss[n] = today + "+n"
+        rest = [n for n in rest if n not in extra]
+        log(f"Aus Aldi-/Lidl-Produktseiten und Archiv gefunden: {found} ({net} Abrufe)")
+
     for n in rest:
-        miss[n] = today
+        miss.setdefault(n, today)
     log("Noch ohne Bild:", len(rest))
 
     keep = set(names) | set(cat)
