@@ -362,3 +362,15 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .cpq.has .cpq-row{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
 .cpq.has .cpq-row b{font:800 1.1rem var(--f-price,inherit);color:var(--save)}
 .cpq.has .cpq-row span{flex:1;min-width:0;font-size:.82rem;color:var(--muted)}
+
+/* Coupon-Knopf auf dem Zettel */
+.cpbtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:3px;height:30px;min-width:30px;padding:0 6px;border-radius:9px;border:1px dashed var(--line);font-size:.95rem;justify-content:center;box-sizing:border-box;flex:none}
+.cpbtn.on{border-style:solid;border-color:color-mix(in oklab,var(--save) 55%,var(--line));background:var(--save-bg)}
+.cpbtn small{font:800 .72rem var(--f-mono,inherit);color:var(--save)}
+/* Handy: Artikelname bekommt die ganze Breite, Coupon/Menge/Preis darunter rechts */
+@media (max-width:560px){
+ .rline:has(.qstep){display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+ .rline:has(.qstep) .rcheck{flex:1 1 100%}
+ .rline:has(.qstep) .rcheck+*{margin-left:auto}
+ .rline .cpbtn small{display:none}
+}
