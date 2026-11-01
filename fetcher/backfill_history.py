@@ -167,7 +167,8 @@ def collect(path):
         if (time.time() - t0) / 60 > MAX_MIN:
             log("Zeit um – nächster Lauf macht weiter")
             break
-        html = get(f"https://web.archive.org/web/{ts}id_/{url}")
+        # 1 Versuch, 15 s: Antwortet das Archiv, dann in Sekunden; sonst kostete jede Seite ~1 min (Etappe 1: 34 von 40 min Warten)
+        html = get(f"https://web.archive.org/web/{ts}id_/{url}", tries=1, timeout=15)
         time.sleep(PAUSE)
         key = f"{ts}|{url}"
         if not html:  # Archiv hat nicht geantwortet: in der nächsten Etappe noch einmal, danach aufgeben
@@ -208,7 +209,8 @@ def merge(path):
     hist = f.load("history.json", {})
     added = 0
     for k, days in rows.items():
-        cur = {json.dumps([r[0], r[2], r[3]]): r[1] for r in hist.get(k, []) if len(r) >= 4}  # alte Zeilen ohne Marke/Menge fallen weg
+        old = [r for r in hist.get(k, []) if len(r) < 4]  # alte Zeilen ohne Marke/Menge bleiben (ordnet update_history zu)
+        cur = {json.dumps([r[0], r[2], r[3]]): r[1] for r in hist.get(k, []) if len(r) >= 4}
         for dk, p in days.items():
             if not dk.startswith("["):
                 continue
@@ -216,7 +218,8 @@ def merge(path):
                 cur[dk] = p; added += 1
             elif p < cur[dk]:
                 cur[dk] = p
-        hist[k] = sorted(([*json.loads(dk)[:1], p, *json.loads(dk)[1:]] for dk, p in cur.items()), key=lambda r: r[0])[-150:]
+        new = [[*json.loads(dk)[:1], p, *json.loads(dk)[1:]] for dk, p in cur.items()]
+        hist[k] = sorted(old + new, key=lambda r: r[0])[-150:]
     f.save("history.json", hist)
     log(f"history.json: {added} Preise nachgetragen, {len(hist)} Artikel")
 
