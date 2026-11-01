@@ -177,7 +177,7 @@ def merge(path):
                 cur[d] = p; added += 1
             elif p < cur[d]:
                 cur[d] = p
-        hist[k] = [[d, cur[d]] for d in sorted(cur)][-60:]
+        hist[k] = [[d, cur[d]] for d in sorted(cur)][-90:]
     f.save("history.json", hist)
     log(f"history.json: {added} Preise nachgetragen, {len(hist)} Artikel")
 
