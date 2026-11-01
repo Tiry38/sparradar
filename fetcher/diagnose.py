@@ -33,10 +33,28 @@ def get(u):
         return r.read().decode("utf-8", "replace")
 
 
-rp = urllib.robotparser.RobotFileParser()
-rp.parse(get("https://web.archive.org/robots.txt").splitlines())
-print("robots cdx erlaubt:", rp.can_fetch(f.UA, "https://web.archive.org/cdx/search/cdx?url=x"))
-print("robots web erlaubt:", rp.can_fetch(f.UA, "https://web.archive.org/web/2026id_/https://www.aldi-sued.de/"))
+def robots(host, path):
+    try:
+        txt = get(f"https://{host}/robots.txt")
+    except Exception as e:
+        print(host, "robots.txt:", str(e)[:60], "-> keine Regeln"); return True
+    rp = urllib.robotparser.RobotFileParser(); rp.parse(txt.splitlines())
+    ok = rp.can_fetch(f.UA, f"https://{host}{path}"); print(host, path, "erlaubt:", ok)
+    lines = [l for l in txt.splitlines() if l.lower().startswith(("disallow", "user-agent", "crawl"))]
+    print("   ", " | ".join(lines[:30])); return ok
+
+
+robots("web.archive.org", "/cdx/search/cdx?url=x")
+robots("world.openfoodfacts.org", "/cgi/search.pl?search_terms=x&json=1")
+robots("world.openfoodfacts.org", "/api/v2/search?brands_tags=x")
+robots("search.openfoodfacts.org", "/search?q=x")
+for u in ["https://search.openfoodfacts.org/search?q=IronMaxx%20SqueeBarista%20Caramel&page_size=5&fields=product_name,brands,code,image_front_small_url,image_small_url,images,lang",
+          "https://world.openfoodfacts.org/cgi/search.pl?search_terms=IronMaxx%20SqueeBarista&json=1&page_size=5&fields=product_name,brands,code,image_front_small_url"]:
+    try:
+        print("\nOFF", u[:60], get(u)[:1500])
+    except Exception as e:
+        print("OFF FEHLER", u[:60], str(e)[:80])
+    time.sleep(3)
 
 for p in PATS:
     q = urllib.parse.urlencode({"url": p, "from": "20260801", "output": "json",
