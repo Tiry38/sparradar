@@ -274,6 +274,8 @@ function watchMatch(o,k){
   if(norm(CATS[o.c]||"")===norm(k))return true;
   const t=wTokens(k);if(!t.length)return false;
   const w=oWords(o),wd=oWordsD(o),inW=x=>w.some(v=>{const i=v.indexOf(x);if(i<0)return false;const r=v.slice(i+x.length);
+    // „Laktosefreier“ sind keine Eier, „Sparpreis“ kein Reis, „Schwein“ kein Wein; Wortteil davor mind. 3 Buchstaben (Reis ist kein Eis)
+    if(i>0&&(i<3||(x.startsWith("ei")&&v.slice(i-2,i)==="fr")||(x.startsWith("reis")&&v[i-1]==="p")||(x.startsWith("wein")&&v.slice(i-3,i)==="sch")))return false;
     if(/^(|e|n|en|s|es|er|ern|ns)$/.test(r))return !(i>0&&/(leber|fleisch)kaese/.test(v)); // Leberkäse ist kein Käse // Mehrzahl und hinten im Wort (Weißbiere, Bohnenkaffee): der letzte Wortteil sagt, was es ist
     // vorne im Wort nur mit „Form“-Endung (Kaffeebohnen, Kaffeepads) – Buttermilch ist keine Butter, Kaffeevollautomat kein Kaffee
     return r.length>=3&&WATCH_FORM.test(r)&&!NONFOOD_CATS.includes(o.c)}) // Milkana ist auch nicht Milka
@@ -865,6 +867,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  121:["🏷️ Zettel: Hat Aldi einen Artikel sonst sowieso billiger als das Angebot (z. B. Mehl), steht das jetzt darunter.","🥚 Treffsicherer: „Eier“ findet keine Make-up-Eier oder laktosefreien Joghurt mehr, „Eis“ keinen Reis."],
   120:["💡 Zettel versteht einfache Wörter: Schreibst du „Milch“, zeigt SparRadar darunter das beste Angebot – mit „Nehmen“ tauschst du es ein. Nichts passiert von selbst.","🏷️ Gibt es keinen Rabatt, steht der Aldi-Normalpreis dabei – mit einem Tipp eingetragen.","🧮 Spar-Check auf dem Zettel: zeigt, was du sparen kannst, und übernimmt alle Tipps mit einem Knopf.","⏰ Auf dem Zettel steht, welches Angebot heute oder morgen endet.","🧾 Kassen-Kontrolle: Liest du den Kassenbon ein, merkt SparRadar, wenn du mehr bezahlt hast als im Angebot.","📦 Vorrats-Tipps: haltbare Artikel, die gerade besonders günstig sind – mit „2 Stück“ oder „3 Stück“ gleich auf den Zettel.","👓 Einfache Ansicht (Einstellungen): weniger Knöpfe, größere Schrift, oben „Für dich im Angebot“.","👪 Für jemand anderen einrichten (Einstellungen): ein WhatsApp-Link – installieren, „Verbinden“, und ihr habt denselben Einkaufszettel."],
   119:["🆕 Neu seit deinem letzten Besuch: Neue Angebote tragen ein grünes „Neu“, oben bei „Deine Woche“ zeigt eine Kachel sie mit einem Tipp.","⭐ Merkliste: Mit „Beste Angebote auf den Zettel“ legst du je Begriff das günstigste Angebot mit einem Tipp auf den Zettel.","🔄 Ist ein Angebot auf deinem Zettel abgelaufen und gibt es denselben Artikel im selben Markt wieder, wird es automatisch erneuert.","Artikel-Fenster: „Auf den Einkaufszettel“ und „Merken“ bleiben unten immer sichtbar.","Merkliste schlägt vor, was du oft kaufst – ein Tipp, und SparRadar beobachtet es."],
   118:["Neue Angebote kommen jetzt schneller: Am Wochenende sucht SparRadar alle 5 Minuten nach neuen Prospekten (vorher alle 15), und die offene App holt neue Angebote jede Minute ab."],
@@ -1296,29 +1299,45 @@ const exWords=s=>String(s||"").split(/[\s\/,&+()]+/).flatMap(t=>{const p=t.split
 const exEq=(w,k)=>w===k||["n","e","en","s","er","es"].some(e=>w===k+e||k===w+e);
 // Hauptwort = letztes großgeschriebenes Wort vor „,/mit/oder …“: „Milch Mäuse“ -> Mäuse, „Haltbare fettarme Milch“ -> Milch (Stufe 4)
 const exHead=n=>{const seg=String(n||"").split(/,|\/|\(|(?:^|\s)(?:mit|oder|und|in|aus|für)\s/)[0],ws=seg.split(/\s+/).filter(w=>/^[A-ZÄÖÜ][a-zäöüß]|-[A-ZÄÖÜ][a-zäöüß]/.test(w));return ws.length?exWords(ws[ws.length-1]):[]};
-function exRank(hs,name){const kw=exWords(name);if(!hs.length||!kw.length)return hs;const last=kw[kw.length-1];
+function exRank(hs,name,gk=o=>o.c||o.grp||""){const kw=exWords(name);if(!hs.length||!kw.length)return hs;const last=kw[kw.length-1];
   const tier=o=>{const ws=exWords(o.n);return kw.every(k=>ws.some(w=>exEq(w,k)))?(exHead(o.n).some(w=>exEq(w,last))?4:3):kw.every(k=>ws.some(w=>exEq(w,k)||w.endsWith(k)))?2:1};
-  const t=hs.map(o=>({o,t:tier(o)})),c={};t.forEach(r=>{const g=r.o.c||r.o.grp||"";c[g]=(c[g]||0)+r.t});
-  const g=Object.keys(c).sort((a,b)=>c[b]-c[a])[0],in_=t.filter(r=>(r.o.c||r.o.grp||"")===g),top=Math.max(...in_.map(r=>r.t));
+  const t=hs.map(o=>({o,t:tier(o)})),c={};t.forEach(r=>{const g=gk(r.o);c[g]=(c[g]||0)+r.t});
+  const g=c["★"]!=null?"★":Object.keys(c).sort((a,b)=>c[b]-c[a])[0],in_=t.filter(r=>gk(r.o)===g),top=Math.max(...in_.map(r=>r.t));
   return in_.filter(r=>r.t===top).map(r=>r.o)}
 const exHits=x=>{if(S.checked.includes(x.id)||norm(x.n).length<3)return [];const by={};
-  exRank(weekOffers().filter(o=>o.p&&!S.list.includes(o.id)&&watchMatch(o,x.n)),x.n).forEach(o=>{(by[o.s]=by[o.s]||[]).push(o)});
+  // Kennt Aldi das Wort als Lebensmittel (Eier), fallen Non-Food/Drogerie-Treffer weg (dm „Make-up Eier“)
+  const d=dpHit(x),food=d&&!DP_NF.test(d.grp);
+  exRank(weekOffers().filter(o=>o.p&&!S.list.includes(o.id)&&watchMatch(o,x.n)&&(!food||(o.c!=="drogerie"&&!NONFOOD_CATS.includes(o.c)))),x.n).forEach(o=>{(by[o.s]=by[o.s]||[]).push(o)});
   const u=(a,b)=>unit(a)!=null&&unit(b)!=null&&a.gp.u===b.gp.u?unit(a)-unit(b):fin(a)-fin(b);
   return Object.values(by).map(bestHit).filter(o=>!x.p||fin(o)<x.p-.004).sort(u)};
 // Aldi-Dauerpreise (Normalpreise des ganzen Sortiments, wöchentlich von aldi-sued.de): lädt erst, wenn der Zettel eigene Einträge hat
 let DP=null,DP_LOAD=null;
+const DP_NF=/papier|tücher|wasch|putz|hygiene|deo|dusch|shampoo|haar|zahn|make-up|pflege|haushalt|müll|folie|spül|rasur|baby|tier|katze|hund|blume|sport|drogerie|kosmetik/i;
+// ohne Grundpreis: Stückpreis aus „10er-Packung“/„6 Stück“ (Eier), damit 18er und 10er vergleichbar sind
+const dpGp=r=>{if(r[3])return {v:r[3],u:r[4]};const m=/(\d+)er\b/i.exec(r[0])||/(\d+)\s*(?:Stück|Stk)\b/i.exec(r[0]);return m&&+m[1]>1?{v:Math.round(r[2]/m[1]*1000)/1000,u:"Stk"}:null};
 function loadDauer(){if(DP||DP_LOAD)return;DP_LOAD=fetch("data/dauerpreise.json",{cache:"no-cache"}).then(r=>r.ok?r.json():null).then(d=>{
-  DP={at:d?.at||"",items:(d?.items||[]).map(r=>({n:r[0],b:r[1]||"",p:r[2],gp:r[3]?{v:r[3],u:r[4]}:null,s:"aldi",c:"",d:"",grp:r[5]||""}))};
+  DP={at:d?.at||"",items:(d?.items||[]).map(r=>({n:r[0],b:r[1]||"",p:r[2],gp:dpGp(r),s:"aldi",c:"",d:"",grp:r[5]||""}))};
   if(S.tab==="list"&&S.extra.length)render()}).catch(()=>{DP={at:"",items:[]}})}
+// Nur Artikel, bei denen das Wort im Hauptnamen steht (vor dem ersten Komma): „Tortilla Chips, Salz“ ist kein Salz.
+// Aldi-Warengruppe, die das Wort selbst enthält („Mehl“, „Backzutaten, Mehl & Zucker“), hat Vorrang (★).
+const DP_MEMO=new Map();
 const dpHit=x=>{if(!DP||!DP.items.length||S.checked.includes(x.id)||norm(x.n).length<3)return null;
-  const h=exRank(DP.items.filter(o=>watchMatch(o,x.n)),x.n);if(!h.length)return null;
-  const c={};h.forEach(o=>{const u=o.gp?.u||"";c[u]=(c[u]||0)+1});const mu=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];
-  return h.filter(o=>(o.gp?.u||"")===mu).sort((a,b)=>(a.gp&&b.gp?a.gp.v-b.gp.v:a.p-b.p))[0]};
-function exHintHTML(x){const h=exHits(x);
+  if(DP_MEMO.has(x.n))return DP_MEMO.get(x.n);
+  const kw=exWords(x.n),last=kw[kw.length-1]||"",stem=last.length>4?last.replace(/(en|er|n|e|s)$/,""):last;
+  const main=o=>o._n1??=exWords(String(o.n).split(/,(?!\d)/)[0]);
+  const h=exRank(DP.items.filter(o=>watchMatch(o,x.n)&&kw.every(k=>main(o).some(w=>exEq(w,k)||w.endsWith(k)))),x.n,o=>norm(o.grp).includes(stem)?"★":o.grp);
+  let r=null;if(h.length){const c={};h.forEach(o=>{const u=o.gp?.u||"";c[u]=(c[u]||0)+1});const mu=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];
+    r=h.filter(o=>(o.gp?.u||"")===mu).sort((a,b)=>(a.gp&&b.gp?a.gp.v-b.gp.v:a.p-b.p))[0]}
+  DP_MEMO.set(x.n,r);return r};
+function exHintHTML(x){const h=exHits(x),d=dpHit(x);
+  const dpBox=(t,extra="")=>`<div class="exhit dp"><span>🏷️ ${t}: <b>${eur(d.p)}</b> <small>${esc((d.b?d.b+" ":"")+d.n)}${extra}</small></span><button class="btn ghost sm" data-exprice="${esc(x.id)}|${d.p}">Preis eintragen</button></div>`;
   if(h.length){const o=h[0];
-    return `<div class="exhit"><span>💡 Im Angebot: <b>${esc(sname(o.s))} ${eur(fin(o))}</b> <small>${esc((o.b?o.b+" ":"")+o.n)}${unitTxt(o)?" · "+esc(unitTxt(o)):""}</small></span><button class="btn sm" data-extake="${esc(x.id)}|${esc(o.id)}">Nehmen</button>${h.length>1?`<span class="exalt">Auch: ${h.slice(1,4).map(y=>`<button class="chip plain" data-extake="${esc(x.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))}</button>`).join("")}</span>`:""}</div>`}
-  if(x.p)return "";const d=dpHit(x);if(!d)return "";
-  return `<div class="exhit dp"><span>🏷️ Aldi-Normalpreis: <b>${eur(d.p)}</b> <small>${esc((d.b?d.b+" ":"")+d.n)}</small></span><button class="btn ghost sm" data-exprice="${esc(x.id)}|${d.p}">Preis eintragen</button></div>`}
+    // Aldi hat den Artikel sonst sowieso billiger (gleiche Einheit, mind. 5 % pro kg/l/Stück) -> zusätzlich zeigen
+    const cheaperDp=d&&d.gp&&o.gp&&unit(o)!=null&&d.gp.u===o.gp.u&&d.gp.v<unit(o)*.95;
+    return `<div class="exhit"><span>💡 Im Angebot: <b>${esc(sname(o.s))} ${eur(fin(o))}</b> <small>${esc((o.b?o.b+" ":"")+o.n)}${unitTxt(o)?" · "+esc(unitTxt(o)):""}</small></span><button class="btn sm" data-extake="${esc(x.id)}|${esc(o.id)}">Nehmen</button>${h.length>1?`<span class="exalt">Auch: ${h.slice(1,4).map(y=>`<button class="chip plain" data-extake="${esc(x.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))}</button>`).join("")}</span>`:""}</div>`
+      +(cheaperDp?dpBox("Bei Aldi sonst immer billiger",` · 1 ${esc(d.gp.u)} = ${eur(d.gp.v)}`):"")}
+  if(x.p||!d)return "";
+  return dpBox("Aldi-Normalpreis")}
 // ⏰ Angebot endet bald / gilt erst ab … (auf dem Zettel)
 const endLbl=o=>o.to===TODAY?` <em class="rend">⏰ nur noch heute</em>`:o.to===TOMORROW?` <em class="rend">⏰ endet morgen</em>`:o.from&&shopDay(o.from)>SHOP?` <em class="rsoon">ab ${fmtDate(shopDay(o.from))}</em>`:"";
 function endSoonHTML(items){const open=items.filter(o=>!S.checked.includes(o.id)),t=open.filter(o=>o.to===TODAY).length,m=open.filter(o=>o.to===TOMORROW).length;
