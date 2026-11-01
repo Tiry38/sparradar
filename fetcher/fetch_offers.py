@@ -258,6 +258,23 @@ def unit_price(text):
     return None
 
 
+def pack_unit_price(price, text):
+    """Kein Grundpreis im Prospekt, aber genau eine Packungsgröße („1-l-Pckg.“, „500 g“) -> Preis je kg/l ausrechnen.
+    Nie bei Mehrfachpackungen („6 x 1,5 l“), Spannen („87/90/92 g“) oder mehreren Größen (Kevin 01.11.: Milch ohne Grundpreis)."""
+    t = (text or "").replace("–", "-")
+    if not price or re.search(r"\d\s*[x×]\s*\d", t, re.I):
+        return None
+    hits = re.findall(r"(?<![\d/,.])(\d+(?:[.,]\d+)?)\s*-?\s*(kg|g|ml|l|liter)\b(?!\s*[/-]\s*\d)", t, re.I)
+    sizes = {(float(v.replace(",", ".")), u.lower()) for v, u in hits}
+    if len(sizes) != 1 or re.search(r"\d\s*(?:/|-|bis)\s*\d+(?:[.,]\d+)?\s*-?\s*(?:kg|g|ml|l)\b", t, re.I):
+        return None
+    v, u = sizes.pop()
+    amt, unit = (v / 1000, "kg") if u == "g" else (v / 1000, "l") if u == "ml" else (v, "l" if u in ("l", "liter") else "kg")
+    if amt <= 0:
+        return None
+    return round(price / amt, 2), unit
+
+
 def fake_old(price, old, up, text):
     """kaufDA liefert als „statt“-Preis manchmal den Kilo-/Literpreis oder den Preis der ganzen Packung
     (10 x 0,75 € -> „statt 7,50 €“). Das ist kein Rabatt."""
@@ -285,6 +302,8 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
         return None
     price = price or 0
     up = unit_price(base) if isinstance(base, str) else base
+    if not up:
+        up = pack_unit_price(price, f"{title} {desc or ''}")
     if old and fake_old(price, old, up, f"{title} {desc or ''}"):
         old = None
     o = {
@@ -848,7 +867,32 @@ def app_twins(offers):
                     a["ims"] = list(dict.fromkeys((a.get("ims") or []) + [t["img"]]))
                 if a.get("gp") and a["gp"] == t.get("gp") and a["ap"]:
                     a["gp"] = {**a["gp"], "v": round(a["gp"]["v"] * a["p"] / a["ap"], 2)}  # Grundpreis galt dem App-Preis
+    # Gleicher Artikel zweimal, nur anders aufgeteilt („Die Frische Milch“ + „1,8% Fett 1-l-Pckg.“ vs.
+    # „Die Frische Milch 1,8% Fett“ + „1-l-Pckg.“): gleiche Wörter, Marke, Preis, Zeitraum -> eine Karte (Kevin 01.11.)
+    seen = {}
+    for o in offers:
+        if id(o) in drop:
+            continue
+        k = (o["s"], o.get("b"), o["p"], o.get("from"), o.get("to"),
+             tuple(sorted(re.findall(r"[a-z0-9]+", norm_words(f"{o['n']} {o.get('d') or ''}")))))
+        a = seen.get(k)
+        if not a:
+            seen[k] = o
+            continue
+        drop.add(id(o))
+        if o.get("img") and o["img"] != a.get("img"):
+            a["ims"] = list(dict.fromkeys((a.get("ims") or []) + [o["img"]]))
+        for f in ("gp", "o", "ou", "ap", "inf"):
+            if not a.get(f) and o.get(f):
+                a[f] = o[f]
     return [o for o in offers if id(o) not in drop]
+
+
+def norm_words(s):
+    s = (s or "").lower()
+    for a, b in (("ä", "ae"), ("ö", "oe"), ("ü", "ue"), ("ß", "ss")):
+        s = s.replace(a, b)
+    return s
 
 
 def drop_previews(offers):
@@ -1080,6 +1124,10 @@ def finalize(offers, save_uvp=False):
         dev = special(o.get("n"), o.get("b"), o.get("cat")) or appliance(o.get("n"), o.get("cat"))
         if dev and o.get("c") != dev:
             o["c"] = dev
+        if not o.get("gp"):
+            up = pack_unit_price(o.get("p"), f"{o.get('n')} {o.get('d') or ''}")
+            if up:
+                o["gp"] = {"v": up[0], "u": up[1]}
     mem = learn_uvp(offers, load("uvp.json", {}), today)
     n = borrow_uvp(offers, mem)
     if save_uvp:

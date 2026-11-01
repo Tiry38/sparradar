@@ -759,6 +759,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  114:["Doppelte Karten desselben Artikels (z. B. Milch zweimal mit gleichem Preis) stehen jetzt nur noch einmal da. Fehlt im Prospekt der Preis pro Liter/Kilo, rechnet SparRadar ihn aus der Packungsgröße aus."],
   113:["Merkliste: Der Hinweis „Keine Treffer“ zeigt wieder einen normalen Text statt Zeichensalat."],
   112:["Der Knopf für die Woche danach zeigt jetzt das Datum, z. B. „Ab 09.11.“ – so ist klar, ab wann diese Angebote gelten."],
   111:["Die Zahlen an den Märkten oben gelten jetzt für die gewählte Woche. Hat ein Markt für nächste Woche noch keinen Prospekt, steht dort „noch nichts“."],
@@ -1664,6 +1665,11 @@ function appTwins(l){const k=x=>[x.s,norm(x.n),x.b||"",x.from||"",x.to||""].join
   for(const g of m.values())for(const a of g){if(!a.ap||drop.has(a))continue;
     for(const t of g)if(t!==a&&!t.ap&&!drop.has(t)&&Math.abs(t.p-a.ap)<.005&&(!t.o||Math.abs(t.o-a.p)<.005)){drop.add(t);
       if(t.img&&t.img!==a.img)a.ims=[...new Set([...(a.ims||[]),t.img])];}}
+  // gleicher Artikel, nur anders aufgeteilt („Die Frische Milch“ + „1,8% Fett …“ / „Die Frische Milch 1,8% Fett“ + „…“) -> eine Karte
+  const seen=new Map();for(const o of l){if(drop.has(o))continue;
+    const key=[o.s,o.b||"",o.p,o.from||"",o.to||"",(`${o.n} ${o.d||""}`.toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").match(/[a-z0-9]+/g)||[]).sort().join(" ")].join("|"),a=seen.get(key);
+    if(!a){seen.set(key,o);continue}drop.add(o);if(o.img&&o.img!==a.img)a.ims=[...new Set([...(a.ims||[]),o.img])];
+    for(const f of["gp","o","ou","ap","inf"])if(!a[f]&&o[f])a[f]=o[f]}
   return drop.size?l.filter(x=>!drop.has(x)):l}
 function render(){quickCheck();
   document.getElementById("filters").hidden=S.tab!=="offers";
