@@ -684,6 +684,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  74:["Den Knopf zur Markt-App gibt es jetzt auch für Aldi Süd, Netto und dm."],
   73:["Geräte verbinden: Wer noch mit GitHub-Schlüssel verbunden ist, kann mit einem Tipp auf einen Familien-Code umziehen – sicherer, alles wird mitgenommen."],
   72:["Geräte verbinden ohne GitHub: „Neuen Familien-Code erstellen“ antippen, Code kopieren, an die Familie schicken – fertig."],
   71:["Gespart-Zähler antippen: Einträge einzeln löschen oder alles auf 0 setzen (z. B. nach einem Test)."],
@@ -904,7 +905,8 @@ function restoreTrip(id){const t=S.trips.find(x=>x.id===id);if(!t)return;
   S.trips=S.trips.filter(x=>x.id!==id);S.tab="list";S.sheet=null;hideTripPop();save();render();scrollTo({top:0});
   toast("Einkauf ist wieder auf dem Zettel")}
 // Nach dem Einkauf die Kunden-App des Markts öffnen (Kundenkarte/Code an der Kasse zeigen). Nur Android, nur geprüfte Paketnamen.
-const MKT_APP={lidl:{n:"Lidl Plus",pkg:"com.lidl.eci.lidlplus"},rewe:{n:"REWE",pkg:"de.rewe.app.mobile"},edeka:{n:"EDEKA",pkg:"de.edeka.genuss"}};
+const MKT_APP={lidl:{n:"Lidl Plus",pkg:"com.lidl.eci.lidlplus"},rewe:{n:"REWE",pkg:"de.rewe.app.mobile"},edeka:{n:"EDEKA",pkg:"de.edeka.genuss"},
+  aldi:{n:"ALDI SÜD",pkg:"de.apptiv.business.android.aldi_de"},netto:{n:"Netto",pkg:"com.valuephone.vpnetto"},dm:{n:"Mein dm",pkg:"de.dm.meindm.android"}}; // Aldi/Netto/dm: Kennungen aus Kevins Play-Store-Links
 const ANDROID=/Android/i.test(navigator.userAgent),IN_APK=/SparRadarAndroid|; wv\)/.test(navigator.userAgent);
 function tripStore(t){const c={};t.items.forEach(x=>c[x.s]=(c[x.s]||0)+1);const s=Object.keys(c).sort((a,b)=>c[b]-c[a])[0];return s&&MKT_APP[s]?s:null}
 function openMktApp(s){const a=MKT_APP[s];if(!a)return;const play=`https://play.google.com/store/apps/details?id=${a.pkg}`;
@@ -1091,7 +1093,7 @@ function renderSettings(){
    <div class="sheet-h"><span class="newsico">${IC.gear}</span><h2>Einstellungen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    ${renderShare()}
    ${renderSync()}
-   ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hast du am Handy den letzten Artikel abgehakt, öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA) – dann kannst du an der Kasse gleich deinen Code zeigen.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
+   ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hast du am Handy den letzten Artikel abgehakt, öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA, ALDI SÜD, Netto, Mein dm) – dann kannst du an der Kasse gleich deinen Code zeigen.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
    <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
    <section class="panel"><h3>SparRadar als App</h3><p>Android: APK aufs Handy laden und öffnen. Windows: Setup starten. Beide aktualisieren sich danach selbst und zeigen immer die neueste Version.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
