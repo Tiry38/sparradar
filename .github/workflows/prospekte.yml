@@ -1,7 +1,7 @@
 name: Prospekt-Wächter
 
 # Kevins Wunsch: Die Angebote der nächsten Woche sollen so früh wie möglich in der App stehen.
-# Do–So jede Stunde (Mo–Mi 3×) nur kurz auf die Marktseiten schauen (6 Seitenaufrufe). Taucht ein neuer
+# Fr–So alle 15 min (Cloudflare-Taktgeber), Do/Mo stündlich, Di–Mi 3× nur kurz auf die Marktseiten schauen (6 Seitenaufrufe). Taucht ein neuer
 # Prospekt mit Startdatum in der Zukunft auf, wird sofort der komplette Abruf „Angebote abrufen“ gestartet.
 on:
   schedule:
@@ -38,4 +38,8 @@ jobs:
         if: steps.check.outputs.new == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run angebote.yml --ref main
+        # Läuft der Abruf schon (oder wartet), nicht noch einen starten – er merkt sich am Ende nur die Prospekte,
+        # die bei seinem Start sichtbar waren; was danach kam, findet der nächste Durchgang.
+        run: |
+          N=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow angebote.yml --limit 5 --json status -q '[.[]|select(.status!="completed")]|length')
+          if [ "${N:-0}" -gt 0 ]; then echo "Abruf läuft schon – nicht doppelt starten"; else gh workflow run angebote.yml --ref main; fi

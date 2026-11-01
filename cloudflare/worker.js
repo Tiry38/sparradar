@@ -73,13 +73,20 @@ export default {
       return;
     }
     if (!env.GH_TOKEN) return;
-    const d = new Date(ev.scheduledTime), h = d.getUTCHours(), wd = d.getUTCDay(); // 0 = So
+    const d = new Date(ev.scheduledTime), h = d.getUTCHours(), wd = d.getUTCDay(), m = d.getUTCMinutes(); // 0 = So
     const due = [];
-    if (h === 4) due.push("angebote.yml", "cashback.yml");                       // jeden Morgen ca. 5:10/6:10 Uhr
-    if (h === 17 && [5, 6, 0].includes(wd)) due.push("angebote.yml");             // Fr, Sa, So abends
-    if (h === 2 && wd === 0) due.push("artikelstamm.yml");                        // sonntags nachts
-    if ([6, 12, 18].includes(h)) due.push("bilder.yml");                         // Bilder-Wächter 3× am Tag
-    const pros = [4, 5, 6, 0].includes(wd) ? h >= 5 && h <= 21 : wd === 1 ? h >= 5 && h <= 20 : [5, 9, 15].includes(h);
+    // Kevins Wunsch (01.11.): neue Woche so schnell wie möglich -> Fr/Sa/So und Mo früh alle 15 min nachsehen.
+    // Die großen Abrufe laufen weiter nur im ersten Takt der Stunde (:10).
+    const full = m < 15;
+    if (full) {
+      if (h === 4) due.push("angebote.yml", "cashback.yml");                       // jeden Morgen ca. 5:10/6:10 Uhr
+      if (h === 17 && [5, 6, 0].includes(wd)) due.push("angebote.yml");             // Fr, Sa, So abends
+      if (h === 2 && wd === 0) due.push("artikelstamm.yml");                        // sonntags nachts
+      if ([6, 12, 18].includes(h)) due.push("bilder.yml");                         // Bilder-Wächter 3× am Tag
+    }
+    const often = ([5, 6, 0].includes(wd) && h >= 5 && h <= 22) || (wd === 1 && h >= 3 && h <= 9); // alle 15 min
+    const hourly = full && (wd === 4 ? h >= 5 && h <= 21 : wd === 1 ? h >= 5 && h <= 20 : [2, 3].includes(wd) && [5, 9, 15].includes(h));
+    const pros = often || hourly;
     if (pros && !due.includes("angebote.yml")) due.push("prospekte.yml");         // Prospekt-Wächter
     ctx.waitUntil(Promise.all(due.map(f => fetch(`https://api.github.com/repos/Tiry38/sparradar/actions/workflows/${f}/dispatches`, {
       method: "POST",

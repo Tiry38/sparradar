@@ -80,7 +80,15 @@ def future_marks():
 def main():
     marks = future_marks()
     seen = f.load("prospekte.json", {})
+    snap = os.path.join(os.environ.get("RUNNER_TEMP") or "/tmp", "sr-prospekte-start.json")
+    if "--snap" in sys.argv:  # beim Start des Abrufs: was jetzt sichtbar ist, wird gleich abgerufen
+        with open(snap, "w") as fh:
+            json.dump(marks, fh)
+        return
     if "--save" in sys.argv:
+        if os.path.exists(snap):  # nur merken, was beim Start schon da war (später Erschienenes holt der nächste Abruf)
+            with open(snap) as fh:
+                marks = json.load(fh)
         f.save("prospekte.json", {k: v for k, v in {**seen, **marks}.items() if v >= dt.date.today().isoformat()})
         f.log("Prospekt-Wächter: gemerkt", len(marks))
         return
