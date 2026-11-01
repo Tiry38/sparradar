@@ -113,6 +113,7 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .mtile .sb.lg{width:40px;height:40px;border-radius:12px;font-size:.9rem}
 .mtile.all .sb{background:var(--surface2);color:var(--fg)}
 .mtile .mn{white-space:nowrap}
+.mtile .mtx{display:flex;flex-direction:column;align-items:center;gap:4px}
 .mtile em{font-style:normal;font-size:.7rem;color:var(--muted);font-weight:600}
 .mtile[aria-pressed="true"]{border-color:transparent;box-shadow:0 0 0 2px #1E9E5A,0 6px 18px rgba(30,122,71,.25)}
 .mtile[aria-pressed="true"] em{color:#1E9E5A}
@@ -476,3 +477,11 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .pcshare{margin-top:14px;padding-top:12px;border-top:1px solid var(--line,#e3e6e8)}
 .pcshare h4{margin:0 0 4px}
 .pcshare p{margin:0 0 8px}
+/* PC: Markt-Kacheln über die ganze Leiste verteilen (Handy bleibt wischbar) */
+@media (hover:hover) and (pointer:fine) and (min-width:721px){
+  #storeChips{flex-wrap:nowrap}
+  #storeChips .mtile{flex:1 1 0;min-width:0;flex-direction:row;justify-content:center;gap:12px;padding:10px 14px;text-align:left}
+  #storeChips .mtile .mn{font-size:.92rem}
+  #storeChips .mtile em{font-size:.78rem}
+  #storeChips .mtile .mtx{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}
+}

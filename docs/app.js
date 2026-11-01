@@ -697,6 +697,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  96:["Am PC verteilen sich die Markt-Kacheln jetzt über die ganze Breite.","Artikel landen in der richtigen Kategorie: Katzenfutter-Kroketten nicht mehr bei Tiefkühl, Spielzeug nicht mehr bei Garten, Pflanzen nicht mehr bei Vorrat und vieles mehr.","Die Vorschau auf nächste Woche bei Rewe und Edeka bleibt jetzt drin, bis der echte Prospekt vollständig da ist."],
   95:["SparRadar startet schneller: Angebote werden nur noch neu geladen, wenn sich wirklich etwas geändert hat."],
   94:["Einstellungen → Teilen: SparRadar für den PC per E-Mail schicken. Am PC die E-Mail öffnen, Link anklicken, installieren – fertig."],
   93:["Geld holen: Feld für die PayPal-E-Mail (manche Aktionen zahlen per PayPal) und Hinweis, wie ausgezahlt wird. Aktionen mit zusätzlichem Gewinnspiel sind mit 🎲 markiert – Mitmachen ist freiwillig."],
@@ -1389,7 +1390,7 @@ function render(){
   const nc=S.coupons.filter(cpActive).length,nd=cbDue().length,cb=document.getElementById("cpBadge");cb.textContent=nd?"💸 "+nd:nc;cb.hidden=!nc&&!nd;cb.classList.toggle("due",!!nd);cb.title=nd?"Geld zurückholen: Bon hochladen":"";
   const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
   // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
-  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mn">Alle</span><em>${OFFERS.length}</em></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></button>`).join("");
+  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mtx"><span class="mn">Alle</span><em>${OFFERS.length}</em></span></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mtx"><span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></span></button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cats.size}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cats.has(k)).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cats.has(k)}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("sort").value=S.sort;

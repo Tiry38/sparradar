@@ -52,7 +52,7 @@ Bettwaesche Pfanne Spielzeug Fahrrad Jacke Schuhe Pflanzen""".split()
 DROGERIE = (r"eyeliner|augenpads|augen-pads|augenpflege|kajal|concealer|gesichtsmaske|lippenbalsam|wimpern|lidschatten|foundation|duschgel|schaumbad|haarentfern|epilier|duschbad|dusche\b|shampoo|sp[üu]lung|conditioner|\bdeo\b|deodorant|deospray|antitranspirant|"
             r"zahncreme|zahnpasta|zahnb[üu]rste|zahnseide|mundsp[üu]l|(?<![a-zäöü])seife|fl[üu]ssigseife|handseife|cremeseife|bodylotion|k[öo]rperlotion|k[öo]rpermilch|body ?butter|"
             r"gesichtscreme|gesichtspflege|tagescreme|nachtcreme|handcreme|hautcreme|hautpflege|pflegecreme|sonnencreme|sonnenspray|lippenpflege|"
-            r"make-?up|mascara|lippenstift|nagellack|parfum|parf[üu]m|eau de|kosmetik|rasier|damenbinde|\bbinden\b|tampon|slipeinlage|"
+            r"massage(?:tool|roller|ball|b[üu]rste)|make-?up|mascara|lippenstift|nagellack|parfum|parf[üu]m|eau de|kosmetik|rasier|damenbinde|\bbinden\b|tampon|slipeinlage|"
             r"toilettenpapier|klopapier|toilettent[üu]cher|taschent[üu]cher|kosmetikt[üu]cher|k[üu]chenrolle|k[üu]chent[üu]cher|wattepad|wattest[äa]bchen|"
             r"haargel|haarspray|haarfarbe|haarpflege|styling|nivea|balea|isana|labello|elmex|colgate|blend-a-med|odol|gillette|wilkinson|"
             r"schauma|head ?& ?shoulders|garnier|l'or[ée]al|rexona|\baxe\b|zewa|hakle|tempo\b|always|o\.b\.")
@@ -63,9 +63,9 @@ CATS = [  # Reihenfolge = Priorität
     ("tk", r"tiefk[üu]hl|eisbecher|ice cream|magnum|langnese|cremissimo|h[äa]+gen[ -]?dazs|nuggets|vanilleeis|die ofenfrische|pizzeria|iglo\b|coppenrath|fischst|\btk\b|tk-|gefroren|fischst[äa]bchen|pommes|eiscreme|\beis\b|speiseeis|pizza|kroketten|gyoza|dumplings|bibigo"),
     ("kaffee", r"kaffee|matcha|caf[eéè] latte|caff[eèé] latte|kamille|pfefferminztee|kr[äa]utertee|fr[üu]chtetee|(?<!eis)tee\b|kr[öo]nung|tchibo|jacobs|dallmayr|lavazza|melitta|espresso|cappuccino|crema|kapseln|kaffee-?pads|senseo|dolce gusto|nespresso|tassimo|\btee\b|teebeutel|kakao"),
     ("getraenke", r"getr[äa]nk|(?<!-)bier\b|(?<!trauben )\bhell\b|mixery|rockstar|granini|trinkgenuss|mocktail|black tower|biermarken|biersorten|helles\b|lager\b|export\b|krombacher|bitburger|veltins|paulaner|erdinger|beck'?s\b|radeberger|k[öo]nig pilsener|\blicher\b|jever|hasseröder|flensburger|franziskaner|hofbr[äa]u|warsteiner|pils\b|pilsener|radler\b|stubbi|weizenbier|weissbier|wei[ßs]bier|warsteiner|spaten|rothaus|tannenz[äa]pfle|m[öo]nchshof|budweiser|tyskie|corona|guinness|desperados|heineken|sternburg|br[äa]u\b|brauspezial|aperitif|aperol|lillet|bacardi|tequila|\bkorn\b|doppelkorn|kornmarken|edelbrand|obstbrand|destillat|schnaps|pastis|brandy|weinbrand|berentzen|wilthener|goldkrone|piccolo|henkell|zweigelt|m[üu]ller-thurgau|cuv[ée]e|rebsorten|7 ?up|pepsi|schwip schwap|fassbrause|hohes c|capri-sun|saftmarken|softdrink|adelholzener|spreequell|shots?\b|wasser\b|mineralwasser|saft\b|s[äa]fte\b|fruchtsaft|nektar|ouzo|amaro|kr[äa]uterlik|obstbrand|volvic|gerolsteiner|\bcola\b|limo\b|limonade|schorle|\bbier\b|pils|radler|weizenbier|hefeweizen|(?<![a-zäöüß])weine?\b|rotwein\b|wei[ßs]wein\b|ros[ée]wein\b|gl[üu]hwein\b|punsch\b|riesling\b|sekt\b|prosecco\b|secco|spirituos|lik[öo]r|whisk|wodka|vodka|\bgin\b|\brum\b|energy|eistee|smoothie|sprudel"),
-    ("suess", r"s[üu][ßs]waren|s[üu][ßs]igkeiten|geb[äa]ck|knusperflocken|cashew|mandeln|macadamia|pistazie|pinienkern|studentenfutter|maronen|nougat|toffifee|[üu]berraschungs ?ei|marzipan|pl[äa]tzchen|kipferl|soft cake|jaffa|kinder country|kinder bueno|oreo|schoko|praline|bonbon|gummi|fruchtgummi|chips|snack|keks|cookie|riegel|waffel|lebkuchen|spekulatius|stollen|n[üu]sse\b|(?<!ge)n[üu]ss(?!ig)|erdn[üu]ss|popcorn|cracker|salzst|haribo|goldb[äa]ren|bahlsen|leibniz|milka\b|ritter sport|lindt|ferrero(?! milch)|merci\b"),
+    ("suess", r"s[üu][ßs]waren|s[üu][ßs]igkeiten|geb[äa]ck|knusperflocken|cashew|mandeln|macadamia|pistazie|pinienkern|studentenfutter|maronen|nougat|toffifee|[üu]berraschungs ?ei|marzipan|pl[äa]tzchen|kipferl|soft cake|jaffa|kinder country|kinder bueno|oreo|schoko|praline|bonbon|gummi|fruchtgummi|chips|snack|keks|cookie|riegel|waffel|lebkuchen|spekulatius|stollen|n[üu]sse\b|(?<!ge)n[üu]ss(?!ig)|erdn[üu]ss|popcorn|cracker|salzst|haribo|goldb[äa]ren|marshmallow|bahlsen|leibniz|milka\b|ritter sport|lindt|ferrero(?! milch)|merci\b"),
     ("fleisch", r"fleisch|chorizo|corned beef|serrano|jam[óo]n|landj[äa]ger|peitsche|pfefferbei[ßs]er|wagyu|patties|\bburger|-burger|griller|r[äa]ucherling|wurst|w[üu]rstchen|schinken|h[äa]hnchen|huhn|gefl[üu]gel|pute\b|puten|\brind(?!e\b|en\b)|rinder|schwein|\bhack|hackfleisch|steak|schnitzel|gulasch|salami|aufschnitt|leberk[äa]se|lachs|fisch(?!er)|forelle|thunfisch|garnele|shrimps|hering|kassler|filet|bacon|speck|saumagen|frikadell|braten\b|tafelspitz|nacken|kotelett|schweinehals|spareribs|ribs\b|\bleber\b|\bwade\b|\bente\b|entenbrust|entenkeule|entenschenkel|entenpfanne|\bgans\b|g[äa]nsebrust|g[äa]nsekeule|cordon bleu|entrec[ôo]te|kaninchen|h[üu]fte\b|roastbeef|pulled (?:beef|pork)|kabanos|\blamm(?!fell)|kalbs|hirsch|wildschwein"),
-    ("kuehl", r"milch|gr[üu]nl[äa]nder|cheddar|tilsiter|cr[eè]me fra[iî]che|gr[üu]tze|milkana|schmelzk|leerdammer|babybel|burlander|milram|k[äa]se|gouda|emmentaler|camembert|mozzarella|feta|joghurt|jogurt|quark|skyr|sahne|butter|margarine|\beier?\b|pudding|dessert|frischk[äa]se|kefir|molke|ziegen|\brama\b|sanella|l[äa]tta|schmand|buttermilch|appenzeller|grana padano|parmigiano|parmesan|bergader|bonifaz|bavaria blu|fol epi|patros|\bbrie\b|gorgonzola|halloumi|ricotta|mascarpone|actimel|frucht ?zwerge|mousse|\bbuko\b|k[æa]rg[åa]rden|\bfage\b|hummus"),
+    ("kuehl", r"ehrmann|protein ?drink|proteindrink|high protein|milch|gr[üu]nl[äa]nder|cheddar|tilsiter|cr[eè]me fra[iî]che|gr[üu]tze|milkana|schmelzk|leerdammer|babybel|burlander|milram|k[äa]se|gouda|emmentaler|camembert|mozzarella|feta|joghurt|jogurt|quark|skyr|sahne|butter|margarine|\beier?\b|pudding|dessert|frischk[äa]se|kefir|molke|ziegen|\brama\b|sanella|l[äa]tta|schmand|buttermilch|appenzeller|grana padano|parmigiano|parmesan|bergader|bonifaz|bavaria blu|fol epi|patros|\bbrie\b|gorgonzola|halloumi|ricotta|mascarpone|actimel|frucht ?zwerge|mousse|\bbuko\b|k[æa]rg[åa]rden|\bfage\b|hummus"),
     ("vorrat", r"pancake|oliven[öo]l(?!-?brot)|sonnenblumen[öo]l|raps[öo]l|speise[öo]l|\bmais\b|pfirsiche|tortelloni|cerealien|haferflocken|chia|noodles|nutella|schwartau|fonds?\b|honig(?!melone)|marmelade|konfit|nudel|pasta\b|teigwaren|spaghetti|lasagne|ravioli|gnocchi|tortiglioni|basmati|\breis\b|mehl\b|type 405|zucker|dressing|senf|mayo|ketchup|gew[üu]rz|gemahlen|chilisalz|\bfix\b|br[üu]he|suppe|heisse tasse|p[üu]ree|fertiggericht|konserve|essig|m[üu]sli|cornflakes|aufstrich|streichcreme|pflanzenfett|cremefine"),
     ("brot", r"brot(?!aufstrich|zeit|dose|kasten|messer|back|box)|kn[äa]cke|comtess|ciabatta|fladen|berliner|amerikaner|kruste|br[öo]tchen|toast|baguette|croissant|brezel|kuchen|backwaren|semmel|laugen|bagel|wrap"),
     ("obst", r"obst|datteln|pastinake|grapefruit|kaki\b|sharon|limette|passionsfrucht|pomelo|pampelmuse|sultanine|zitrus|petersilie|schnittlauch|basilikum|tomate|apfel|[äa]pfel|banane|kartoffel|salat|gurke|paprika|zwiebel|beere|traube|orange|mandarine|clementine|zitrone|k[üu]rbis|pilz|champignon|avocado|m[öo]hre|karotte|birne|kiwi|ananas|mango|melone|kohl|brokkoli|lauch|porree|spinat|zucchini|aubergine|radieschen|ingwer|pflaume|bohnen\b|buschbohnen|rote bete|schalotte|knoblauch|feldsalat|rucola|sellerie|fenchel"),
@@ -76,12 +76,12 @@ NF_CATS = [
     ("freizeit", r"rollenspiel|spielzeug|eisenbahn|kugelbahn|prinzessin|spielb[äa]ckerei|\bzug\b|holzlebensmittel|holz-?k[üu]che|holz k[üu]chen|spielk[üu]che|mini-k[üu]che|kinderk[üu]che|spielset|spieltier|spielk[üu]che|kindersofa|activity|lego|playmobil|puppe|pl[üu]sch|ballzauber"),
     ("tier", r"vitakraft|\bhund|katzenstreu|streu\b|vogel|nager|aquarium|tierbedarf|kratzbaum|halsband|\bleine\b"),
     ("baby", r"baby|windel|kinderwagen|schnuller|feuchtt[üu]cher"),
-    ("haushalt", r"somat\b|sp[üu]lmaschinen|geschirrtabs|wasserenth[äa]rter|calgon|reinigungstab|waschmittel|weichsp[üu]l|reiniger|sp[üu]lmittel|geschirrsp[üu]l|putz|m[üu]llbeutel|frischhaltefolie|alufolie|backpapier|schw[äa]mm|wischmop|batterie|gl[üu]hbirne|leuchtmittel|haushalt"),
-    ("garten", r"garten|(?<!& )orchidee|(?<!led-)weihnachtsstern|poinsettia|rosenstrau|blumenstrau|\bstrau[ßs]\b|amaryllis|ritterstern|calluna|heidekraut|\bheide\b|christrose|nieswurz|kaktus|sukkulente|\brosen?\b|freischneider|laubsauger|holzspalter|schwei[ßs]ger|\baxt\b|schleifer|werkbank|wagenheber|bagger|dumper|sauna|w[äa]rmekabine|streusalz|auftausalz|pflanze(?!nfett)|blume|\berde\b|d[üu]nger|rasen|grillrost|holzkohle|gasgrill|kugelgrill|elektrogrill|grillzange|werkzeug|bohr|schrauber|s[äa]ge\b|schrauben|heimwerk|leiter\b|\bauto\b|kfz|fahrrad|e-bike"),
-    ("technik", r"k[üu]hlschrank|mikrowelle|kontaktgrill|kontakt-grill|trockensauger|elektr|\btv\b|fernseher|laptop|notebook|tablet\b|smartphone|handy|kopfh[öo]rer|lautsprecher|kabel|ladeger|\bakku|powerbank|kamera|drucker|monitor|konsole|playstation|gaming|haartrockner|f[öo]hn\b|mixer\b|k[üu]chenmaschine|kaffeemaschine|wasserkocher|toaster|fritteuse|hei[ßs]luft|staubsauger|lampe|leuchte|\bled\b"),
-    ("mode", r"\bboots\b|boxer|retroshorts|sohlen\b|kleid|hose\b|jacke|mantel|pullover|pulli|shirt|bluse|socke|strumpf|unterw[äa]sche|\bslip|schuh|stiefel|sneaker|m[üu]tze|\bschal\b|handschuh|pyjama|schlafanzug|bekleidung|jeans|leggings|weste\b"),
-    ("wohnen", r"\btopf\b|t[öo]pfe|topf-|gusstopf|eisentopf|kochtopf|back-?zubeh[öo]r|tee-set|br[äa]ter|kasserolle|backform|springform|backblech|r[üu]hrsch[üu]ssel|sch[üu]ssel|teller\b|becher\b|\bmug\b|tablett|servier|messerblock|seiher|trinkflasche|eisw[üu]rfel|teelicht|spannbett|bettw[äa]sche|laken\b|grillplatte|backzubeh[öo]r|licht\b|m[öo]bel|k[üu]chenutensil|\bkrug\b|glas\b|regal|tisch\b|stuhl|sofa|\bbett|kissen|decke\b|matratze|teppich|handtuch|gardine|vorhang|deko|weihnachtsbaum|kerze|vase|pfanne|\btopf|geschirr|besteck|gl[äa]ser\b|aufbewahrung|adventskalender"),
-    ("freizeit", r"experimentier|bausteine|zaubertafel|modell-|spielzeug|spiel\b|spiele\b|lego|puppe|pl[üu]sch|puzzle|sport|fitness|yoga|camping|zelt|koffer|rucksack|\breisen?\b|rundreise|kreuzfahrt|urlaub|\bhotel|netto-reisen|\bbuch\b|b[üu]cher|basteln"),
+    ("haushalt", r"somat\b|sp[üu]lmaschinen|geschirrtabs|wasserenth[äa]rter|calgon|reinigungstab|waschmittel|weichsp[üu]l|reiniger|sp[üu]lmittel|geschirrsp[üu]l|putz|m[üu]llbeutel|frischhaltefolie|alufolie|backpapier|schw[äa]mm|wischmop|batterie|gl[üu]hbirne|leuchtmittel|haushalt|denkmit|duftspray|raumspray|raumduft|lufterfrisch|duftstecker|febreze|sodastream|co2-?zylinder|wassersprudler"),
+    ("garten", r"garten|zaun|sichtschutz|terrassen|dielen\b|lamellendach|pavillon|carport|gew[äa]chshaus|ger[äa]tehaus|au[ßs]enbau|markise|maler-|(?<!& )orchidee|(?<!led-)weihnachtsstern|poinsettia|rosenstrau|blumenstrau|\bstrau[ßs]\b|amaryllis|ritterstern|calluna|heidekraut|\bheide\b|christrose|nieswurz|kaktus|sukkulente|\brosen?\b|freischneider|laubsauger|holzspalter|schwei[ßs]ger|\baxt\b|schleifer|werkbank|wagenheber|bagger|dumper|sauna|w[äa]rmekabine|streusalz|auftausalz|pflanze(?!nfett)|blume|\berde\b|d[üu]nger|rasen|grillrost|holzkohle|gasgrill|kugelgrill|elektrogrill|grillzange|werkzeug|bohr|schrauber|s[äa]ge\b|schrauben|heimwerk|leiter\b|\bauto\b|kfz|fahrrad|e-bike"),
+    ("technik", r"k[üu]hlschrank|heizung|heizl[üu]fter|radiator|kamin\b|ventilator|klimager|mikrowelle|kontaktgrill|kontakt-grill|trockensauger|elektr|\btv\b|fernseher|laptop|notebook|tablet\b|smartphone|handy|kopfh[öo]rer|lautsprecher|kabel|ladeger|\bakku|powerbank|kamera|drucker|monitor|konsole|playstation|gaming|haartrockner|f[öo]hn\b|mixer\b|k[üu]chenmaschine|kaffeemaschine|wasserkocher|toaster|fritteuse|hei[ßs]luft|staubsauger|lampe|leuchte|\bled\b"),
+    ("mode", r"\bboots\b|boxer|retroshorts|sohlen\b|kleid|hose\b|f[üu][ßs]ling|hausanzug|overall|jacke|mantel|pullover|pulli|shirt|bluse|socke|strumpf|unterw[äa]sche|\bslip|schuh|stiefel|sneaker|m[üu]tze|\bschal\b|handschuh|pyjama|schlafanzug|bekleidung|jeans|leggings|weste\b"),
+    ("wohnen", r"badewanne|whirlpool|sanit[äa]r|waschbecken|duschkabine|\btopf\b|t[öo]pfe|topf-|gusstopf|eisentopf|kochtopf|back-?zubeh[öo]r|tee-set|br[äa]ter|kasserolle|backform|springform|backblech|r[üu]hrsch[üu]ssel|sch[üu]ssel|teller\b|becher\b|\bmug\b|tablett|servier|messerblock|seiher|trinkflasche|eisw[üu]rfel|teelicht|spannbett|bettw[äa]sche|laken\b|grillplatte|backzubeh[öo]r|licht\b|m[öo]bel|k[üu]chenutensil|\bkrug\b|glas\b|regal|tisch\b|stuhl|sofa|\bbett|kissen|decke\b|matratze|teppich|handtuch|gardine|vorhang|deko|weihnachtsbaum|kerze|vase|pfanne|\btopf|geschirr|besteck|gl[äa]ser\b|aufbewahrung|adventskalender"),
+    ("freizeit", r"experimentier|bausteine|zaubertafel|modell-|spielzeug|spiel\b|spiele\b|lego|puppe|pl[üu]sch|puzzle|sport|fitness|yoga|camping|zelt|koffer|rucksack|\breisen?\b|rundreise|kreuzfahrt|urlaub|\bhotel|netto-reisen|\bbuch\b|(?:mal|eintrag|tage|notiz|kinder)buch|b[üu]cher|basteln"),
 ]
 
 
@@ -162,6 +162,36 @@ def appliance(title, cats=None):
     return "freizeit" if TOY.search(t + " / " + ct) else "technik"
 
 
+# Eindeutige Fälle vor allen anderen Regeln, egal ob die Quelle „Lebensmittel“ sagt (01.11. geprüft):
+# Mila's-World-Kroketten sind Katzenfutter, Erdtmanns ist Vogelfutter, Lupilu-Bohrhammer ist Spielzeug,
+# Zuckerhutfichte ist eine Pflanze (nicht Vorrat wegen „Zucker“), Schneebesen ist Küchenzubehör, Garn ist Basteln.
+SPECIAL = [
+    ("katze", re.compile(r"^(?!.*streu).*mila'?s world")),
+    ("tier", re.compile(r"max'?s world|erdtmann|vogelfutter|streufutter|fettfutter|wildvogel|meisenkn[öo]del|futterstelle|futterhaus")),
+    ("freizeit", re.compile(r"hot wheels|mattel|lupiblox|playtive|\blego\b|playmobil|toylino|ravensburger|hasbro|schleich|vtech|fisher-?price|lego duplo|"
+                            r"bastel|laubs[äa]ge|gravier|(?<![a-zäöüß])garn\b|-garn\b|strickgarn|strickwolle|wollkn[äa]uel|h[äa]kel|polymer|ton-set|gie[ßs]pulver|crelando|n[äa]hset")),
+    ("haushalt", re.compile(r"\btesa(?:film)?\b|klebeband|geschenkband|geschenkpapier|kraftpapier|geschenkt[üu]te|weihnachtst[üu]te|beschriftungsger|etikettierger|schreibwaren")),
+    ("garten", re.compile(r"gardenline|(?<!badezusatz )(?:zuckerhut-?)?fichten?\b|zuckerhut-?fichte|chamaecyparis|scheinzypresse|zypresse|konifere|nadelgeh[öo]lz|\bthuja|nordmann|"
+                          r"hortensie|alpenveilchen|\bprimel|stiefm[üu]tterchen|blumenzwiebel")),
+    ("wohnen", re.compile(r"schneebesen|backhelfer|teigschaber|teigrolle|nudelholz|ausstecher|spritzbeutel|backformen|silikon-?backform|\bcrofton\b|\bernesto\b")),
+]
+SPECIAL_NOT = re.compile(r"\b(?:bad|badezusatz|duft|kerze|[öo]l|tee|sirup|bonbon)\b|duftkerze|nadel[öo]l")
+
+
+def special(title, brand="", cats=None):
+    name = f"{title or ''} {brand or ''}".lower()
+    ct = " / ".join(c for c in (cats or [])[-2:] if isinstance(c, str)).lower()
+    for key, rx in SPECIAL:
+        if rx.search(name) and not (key == "garten" and SPECIAL_NOT.search(name)):
+            if key == "freizeit" and re.search(NF_CATS[6][1], name) and not re.search(r"spiel|puppe", name):
+                return "mode"   # Hot-Wheels-Shirt ist Kleidung
+            return key
+    # Warengruppe „Spielzeug“ (Kinder-Bohrhammer, Spielzeug-Blumenstrauß) – nicht bei Katzen-/Hundespielzeug
+    if re.search(r"spielzeug|spielwaren", ct) and not re.search(r"katze|hund|tier", name + ct) and not re.search(NF_CATS[6][1], name):
+        return "freizeit"
+    return None
+
+
 def classify(title, brand="", food=True, cats=None):
     """Kevins Vorgabe: Die Beschreibung (Werbetext, „passt zu Fisch“) beeinflusst die Kategorie NICHT.
     Es zählen nur Artikelname, Marke und die zwei genauesten Warengruppen des Händlers (z. B. „Mischbrot“).
@@ -174,17 +204,23 @@ def classify(title, brand="", food=True, cats=None):
     # genaueste Warengruppe „Hundefutter“ schlägt den Namen („Rinder-Herzen“ von ZooRoyal ist Hundefutter)
     if re.search(r"hundefutter|hundenahrung|hunde ?snack|katzenfutter|katzennahrung|zooroyal|vitakraft|pedigree|chappi|rinti|frolic|animonda|beneful", ident):
         return "katze" if re.search(r"katze", ident) else "tier"
+    sp = special(title, brand, cats)
+    if sp:
+        return sp
+    dev = appliance(title, cats)
+    if dev:
+        return dev
+    if re.search(r"donuts?\b|muffins?\b", name) and not re.search(NF_CATS[6][1] + r"|motiv|kerze|deko|kissen|spiel|form", name):
+        return "brot"
     if food:
         # zusammengesetzte Namen: Käse-Aufschnitt ist Käse, Schinken-Croissant ist Backware
         if re.search(r"croissant|br[öo]tchen|baguette|brezel|laugenst|(?<!leb)kuchen\b|\btorte\b", name) and not re.search(r"salami|wurst", name) and not re.search(r"tiefgefr|tk\b", name):
             return "brot"
-        if re.search(r"k[äa]se", name) and not re.search(r"leberk[äa]se|fleischk[äa]se|wurst|schinken|salami|kuchen|torte|nuggets|chips|cracker|sticks", name):
-            return "kuehl"
+    # Käse ist Käse, auch wenn die Quelle „kein Lebensmittel“ sagt (Arla Pizzakäse landete unter Tiefkühl)
+    if not re.search(r"reibe|glocke|messer|brett|hobel|fondue|dose|laugen|br[öo]tchen|croissant|brezel|stange", name) and re.search(r"k[äa]se", name) and not re.search(r"leberk[äa]se|fleischk[äa]se|wurst|schinken|salami|kuchen|torte|nuggets|chips|cracker|sticks|tiefgefr|\btk\b", name):
+        return "kuehl"
     if re.search(r"gutschein|geschenkkarte|guthabenkarte", name):
         return "sonstiges"
-    dev = appliance(title, cats)
-    if dev:
-        return dev
     if "langnese" in ident and "honig" in ident:
         return "vorrat"  # Langnese gibt es als Honig und als Eis
     if ALCOHOL.search(ident) and not re.search(r"glas|gl[äa]ser|k[üu]hler|dekanter|essig|sauce|so[ßs]e", name):
@@ -1016,7 +1052,7 @@ def finalize(offers, save_uvp=False):
     today = dt.date.today().isoformat()
     offers = drop_previews(merge(offers))
     for o in offers:  # auch schon gespeicherte Angebote nach den Geräte-Regeln einordnen
-        dev = appliance(o.get("n"), o.get("cat"))
+        dev = special(o.get("n"), o.get("b"), o.get("cat")) or appliance(o.get("n"), o.get("cat"))
         if dev and o.get("c") != dev:
             o["c"] = dev
     mem = learn_uvp(offers, load("uvp.json", {}), today)
