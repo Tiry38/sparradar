@@ -758,6 +758,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  107:["Oben an jedem Markt steht jetzt eine kleine orange „💸 Zahl“: So viele Angebote mit Geld zurück hat dieser Markt diese Woche."],
   106:["Der Filter „Geld zurück“ (und „Preis-Alarm“) aus „Deine Woche“ ist jetzt schlau: Er gilt nur für das, was du gerade ansiehst. Wechselst du den Markt, die Kategorie oder die Woche oder suchst etwas, geht er von selbst aus – so siehst du nie eine leere Liste."],
   105:["Die Kacheln „Geld zurück“ und „Preis-Alarm“ bei „Deine Woche“ sind jetzt Schalter: antippen = Filter an (grün), nochmal antippen = Filter aus. Wechselst du den Markt, bleibt die grüne Kachel sichtbar, damit du den Filter jederzeit ausschalten kannst."],
   104:["„Meine Coupons“ ist jetzt einfacher: oben steht in 3 Schritten, wie du einen Coupon direkt beim Artikel einträgst. Das lange Formular ist eingeklappt – nur noch für Coupons, die für eine ganze Marke gelten."],
@@ -1661,8 +1662,10 @@ function render(){quickCheck();
   const lb=document.getElementById("listBadge");lb.textContent=ln;lb.hidden=!ln;
   const nc=S.coupons.filter(cpActive).length,nd=cbDue().length,cb=document.getElementById("cpBadge");cb.textContent=nd?"💸 "+nd:nc;cb.hidden=!nc&&!nd;cb.classList.toggle("due",!!nd);cb.title=nd?"Geld zurückholen: Bon hochladen":"";
   const counts={},ccount={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
+  const cbc={};weekOffers().forEach(o=>{if(cbFor(o))cbc[o.s]=(cbc[o.s]||0)+1});const cbAll=Object.values(cbc).reduce((a,n)=>a+n,0);
+  const cbTag=n=>n?`<span class="mcb" title="${n} ${n===1?"Angebot":"Angebote"} mit Geld zurück">💸${n}</span>`:"";
   // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
-  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mtx"><span class="mn">Alle</span><em>${OFFERS.length}</em></span></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mtx"><span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}</em></span></button>`).join("");
+  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mtx"><span class="mn">Alle</span><em>${OFFERS.length}${cbTag(cbAll)}</em></span></button>`+Object.keys(STORES).map(k=>`<button class="mtile" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mtx"><span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||0}${cbTag(cbc[k])}</em></span></button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cats.size}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cats.has(k)).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cats.has(k)}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("sort").value=S.sort;
