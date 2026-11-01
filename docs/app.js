@@ -696,6 +696,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  84:["Kasse noch einfacher: großer Zähler „Coupon 1 von 3“, Wischen zum nächsten Coupon, klare Tipps."],
   83:["Einstellungen und Willkommens-Infos neu erklärt – Schritt für Schritt, für jeden verständlich.","Am PC bleibt die obere Leiste auch mit großer Schrift (A+) im Bild."],
   82:["Coupons an der Kasse: Papier-Coupon einfach fotografieren – SparRadar liest den Strichcode. Hakst du den letzten Artikel ab, kommen deine Coupons groß nacheinander, am Ende öffnet ein Tipp die Markt-App mit deiner Karte."],
   81:["Neu im Tab „Coupons“: Knopf „🔍 Coupon suchen“. Zeigt alle App- und Bonus-Vorteile der Woche (Lidl Plus, Edeka-/Netto-App, Rewe Bonus), die größten zuerst – einfach „Einfügen“ oder „Nein“."],
@@ -975,18 +976,23 @@ function renderKasse(){const k=S.kasse||{},cps=kasseCps(k.s),n=cps.length,i=Math
   return `<div class="sheet kasse" role="dialog" aria-modal="true" aria-label="Coupons an der Kasse">
    <div class="sheet-h">${sb(k.s,true)}<h2>Kasse ${esc(sname(k.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <div class="ks-dots" aria-hidden="true">${cps.map((_,j)=>`<i class="${j<i?"d":j===i?"on":""}"></i>`).join("")}${app?`<i class="${last?"on":""} ap">📱</i>`:""}</div>
-   ${!last?`<p class="ks-step">Coupon <b>${i+1} von ${n}</b> · zeig ihn an der Kasse, der Code wird vom Bildschirm gescannt.</p>
+   ${!last?`<p class="ks-step"><span class="ks-n">Coupon ${i+1} von ${n}</span>Handy an der Kasse hinhalten. Ist er gescannt: grünen Knopf drücken.</p>
     <div class="ks-card">${c.code?`<svg id="ksSvg" role="img" aria-label="Strichcode ${esc(c.code)}"></svg>`:`<img src="${img}" alt="Foto vom Coupon">`}
      <div class="ks-t"><b>${esc(c.k||"Coupon")}</b><span>${esc(cpValueTxt(c))}${c.to?" · bis "+fmtDate(c.to):""}</span></div></div>
     <button class="btn ks-next" data-ksnext="1">✓ Gescannt – ${i+1<n?"nächster Coupon":app?`weiter zur ${esc(app.n)}-App`:"fertig"}</button>
     <div class="ks-a">${i?'<button class="linkbtn" data-ksback="1">‹ Zurück</button>':"<span></span>"}<button class="linkbtn" data-ksnext="1">Überspringen ›</button></div>
-    <p class="ks-tip">💡 Bildschirm hell drehen. Klappt das Scannen nicht, kann die Kasse die Nummer unter dem Strichcode eintippen.</p>`
+    <p class="ks-tip">💡 Bildschirm hell drehen. Klappt das Scannen nicht, kann die Kasse die Nummer unter dem Strichcode eintippen. Wischen geht auch: nach links = nächster Coupon.</p>`
    :`<div class="ks-fin"><div class="ks-ok">✓</div>${n?`<b>${n===1?"Coupon":"Alle "+n+" Coupons"} gezeigt.</b>`:""}
     ${app?`<p>Zum Schluss deine <b>${esc(app.n)}-Karte</b> zeigen. Darin stecken <b>alle Coupons, die du in der App aktiviert hast – ein Code für alles.</b></p>
      ${ANDROID?`<button class="btn ks-app" data-mktapp="${k.s}">📱 ${esc(app.n)} öffnen</button>`:`<p>Öffne jetzt die ${esc(app.n)}-App auf deinem Handy.</p>`}`:"<p>Fertig – viel Spaß beim Sparen!</p>"}
     ${t?`<p class="ks-sum">Einkauf gespeichert: bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</p><div class="ks-a"><button class="linkbtn" data-triprestore="${t.id}">Zurück auf den Zettel</button><button class="linkbtn" data-tripopen="${t.id}">Bericht ansehen</button></div>`:""}
     <button class="btn ghost" data-ksdone="1">Fertig</button></div>`}</div>`}
 
+let ksX=null;
+document.addEventListener("touchstart",e=>{ksX=S.sheet==="kasse"&&e.target.closest?.(".kasse")?e.touches[0].clientX:null},{passive:true});
+document.addEventListener("touchend",e=>{if(ksX==null||S.sheet!=="kasse")return;const dx=e.changedTouches[0].clientX-ksX;ksX=null;
+  if(Math.abs(dx)<60)return;const n=kasseCps(S.kasse.s).length;
+  if(dx<0&&S.kasse.i<n){S.kasse.i++;render()}else if(dx>0&&S.kasse.i>0){S.kasse.i--;render()}},{passive:true});
 let tpT;
 function tripPop(t,auto){
   const ks=auto?kasseStore(t):null; // eigene Coupons für diesen Markt -> erst die Coupons, am Ende die App
@@ -1112,8 +1118,9 @@ function cpFinds(){const no=store.get("cpNo",[]),have=new Set(S.coupons.map(c=>c
     .map(x=>({...x,pc:Math.round(x.g.d/(x.o.p+(x.o.ap?0:x.g.d))*100)})).sort((a,b)=>b.g.d-a.g.d||b.pc-a.pc).slice(0,40)}
 function cpHowHTML(){return `<section class="panel cphow"><h3>So sparst du mit Coupons am meisten</h3>
   <ol><li><b>🔍 Coupon suchen</b> – SparRadar zeigt die größten App- und Bonus-Rabatte der Woche. „Einfügen“ = landet auf deinem Zettel. Danach einmal auf „📱 App öffnen“ tippen und den Coupon dort aktivieren.</li>
-   <li><b>📷 Papier-Coupon fotografieren</b> – aus Prospekt, Zeitung oder von der Packung. SparRadar liest den Strichcode, du musst nichts abtippen.</li>
-   <li><b>🧾 An der Kasse</b> – hakst du den letzten Artikel auf dem Zettel ab, kommen deine Coupons groß nacheinander. Zeigen, „Gescannt“ tippen, am Ende öffnet ein Tipp die Markt-App mit deiner Karte (darin stecken alle App-Coupons).</li></ol></section>`}
+   <li><b>📷 Coupon fotografieren</b> – aus Prospekt, Zeitung, Mail oder von der Packung. SparRadar liest den Strichcode, du musst nichts abtippen. Hast du den Coupon auf Papier dabei, gib ihn an der Kasse am besten einfach ab – das klappt immer.</li>
+   <li><b>🧾 An der Kasse</b> – hakst du den letzten Artikel auf dem Zettel ab, kommen deine Coupons groß nacheinander. Zeigen, grünen Knopf drücken, am Ende öffnet ein Tipp die Markt-App.</li></ol>
+  <p class="cpf-n"><b>Am einfachsten:</b> Coupons in der Markt-App (Lidl Plus, REWE, …) einmal aktivieren. Dann reicht an der Kasse <b>ein einziger Scan</b> deiner Kundenkarte – alle aktivierten Coupons sind darin.</p></section>`}
 function cpNewHTML(){const nw=S.cpNew;if(!nw)return "";const def=S.stores.size===1?[...S.stores][0]:"";
   return `<section class="panel cpnew"><div class="cpf-h"><h3>📷 Neuer Coupon</h3><button class="ibtn" data-cpnewx="1" aria-label="Abbrechen">${IC.x}</button></div>
    <div class="cpn-g"><img src="${nw.data}" alt="Foto vom Coupon"><p>${nw.code?`<b class="ok">✓ Strichcode erkannt</b><br><small>${esc(nw.code)} – wird an der Kasse gestochen scharf gezeigt.</small>`:`<b>Strichcode nicht lesbar</b><br><small>Kein Problem: An der Kasse wird das Foto gezeigt. Tipp: Für ein schärferes Bild nah ran und gerade halten.</small>`}</p></div>

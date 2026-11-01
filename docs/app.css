@@ -442,3 +442,4 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .kasse .ks-fin .btn{width:100%;justify-content:center}
 .kasse .ks-ok{width:56px;height:56px;border-radius:50%;background:#16a34a;color:#fff;font-size:2rem;display:grid;place-items:center}
 .kasse .ks-sum .sv{color:#15803d}
+.kasse .ks-n{display:block;font-family:var(--f-display);font-size:1.5rem;font-weight:800;margin-bottom:4px}
