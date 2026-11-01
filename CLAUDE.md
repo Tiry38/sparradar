@@ -134,6 +134,14 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Preis-Alarm** (`lowSince()`): Preisverlauf desselben Markts reicht ≥ 21 Tage zurück und so günstig wie seit X Wochen/Monaten nicht (oder noch nie) -> „📉“ statt Verlaufszeile auf der Karte, Kasten in der Detailansicht, zählt im Filter „Tiefstpreis“.
 - **Handy (< 560 px): 2 Karten nebeneinander**, quadratische Bilder; bei A+ (Klasse `html.zoomed`) wieder 1 Spalte. Jede Karte hat oben einen Streifen in der Markt-Farbe (`--sc`).
 
+## Bedienung & Automatik (v119, 01.11., Kevin: „Verbesserungen einfach einbauen, gerne auch Automatisierungen“)
+- **🆕 Neu seit deinem letzten Besuch:** jedes Angebot (`nKey` = id + Startdatum) bekommt beim ersten Sehen einen Zeitstempel in Minuten (`seenStamp()`, localStorage `sr_seen`, nicht im Sync; ganz erster Start = alles gesehen; nicht mehr vorhandene Schlüssel bleiben 30 Tage, weil kaufDA mischt). Besuch = `SESS` (`sr_sess`), neuer Besuch nach 30 min ohne sichtbare App (`sessTick`). `isNew(o)` -> grünes „Neu“ (`.newtag`) auf der Karte, Kachel „🆕 N neue Angebote“ vorne bei „Deine Woche“ = Schnellfilter `S.flt.nw` (wie Geld zurück/Preis-Alarm, `data-gonew`); liegt Neues in der anderen Woche, eigene Kachel „… ab 09.11.“, die dorthin wechselt.
+- **Merkliste -> Zettel nur per Knopf** „Beste Angebote auf den Zettel (N)“ (`w2lHTML`, `watchToList`, `bestHit` = niedrigster Grundpreis, sonst Preis; Begriffe mit Treffer schon auf dem Zettel bleiben unberührt). **Kevin 01.11.: Merklisten-Treffer dürfen NICHT automatisch auf den Zettel rutschen** – keine Automatik dafür bauen.
+- **„Kaufst du oft – beobachten?“** (`oftenHTML`) in der Merkliste: Artikel aus „Meine Einkäufe“, die in mind. 2 Einkäufen vorkommen, mit einem Tipp merken (`data-watchname`).
+- **Abgelaufenes erneuern** (`autoRenew()` beim Laden): Zettel-Eintrag abgelaufen (`OLD`) und derselbe Artikel (gleicher Markt + Name + Marke) ist in der aktuellen Woche wieder im Angebot -> Eintrag wird ersetzt (Menge/Haken wandern mit), Hinweis „🔄 … automatisch erneuert“. Andere Märkte nur per Tausch-Knopf.
+- **Detailansicht:** „Auf den Einkaufszettel“ (+ Menge) steht als Leiste `.dmain` immer unten sichtbar (sticky); Merken/Teilen am Ende.
+- **Nichts abgeschnitten:** Platzhalter am Handy kürzer (`PH(lang,kurz)`, < 560 px). PC: Taste „/“ springt in die Suche.
+
 ## App-Funktionen (Überblick)
 Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil (Summe pro Markt, Tausch-Tipps) · Gespart-Zähler · Barcode-Scanner · Preisvergleich · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).
 

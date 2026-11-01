@@ -372,6 +372,12 @@ function cheaper(o){
   CHEAP.set(ck,r);return r}
 const cheapTxt = (c,o) => `Genau diesen Artikel gibt es bei ${sname(c.x.s)} für ${eur(fin(c.x))}${c.app?" (mit "+c.app+")":""} – ${eur(c.d)} weniger als bei ${sname(o.s)}.`;
 const sshort = s => sname(s).split(" ")[0];
+// Platzhalter am Handy kürzer, damit nichts abgeschnitten wird (Kevin: nichts darf abgeschnitten sein)
+const PH=(long,short)=>innerWidth<560?short:long;
+{const q=document.getElementById("q"),f=()=>{if(q)q.placeholder=PH("Artikel oder Marke suchen, z. B. Butter, Felix, Kaffee …","Suchen, z. B. Butter")};f();addEventListener("resize",f)}
+// PC: Taste „/“ springt in die Suche (wie bei vielen Websites)
+document.addEventListener("keydown",e=>{if(e.key!=="/"||e.ctrlKey||e.metaKey||e.altKey||S.sheet||document.activeElement?.matches("input,textarea,select"))return;
+  const q=document.getElementById("q");if(!q)return;e.preventDefault();if(S.tab!=="offers"){S.tab="offers";render()}q.focus()});
 function askCheaper(o,c){
   let el=document.getElementById("cheapAsk");
   if(!el){el=document.createElement("div");el.id="cheapAsk";el.className="exitask";document.body.appendChild(el)}
@@ -474,12 +480,13 @@ const fltOk=o=>{const F=S.flt;
   if(F.app&&!appName(o))return false;
   if(F.low&&verdict(o).t!=="low"&&!lowSince(o))return false;
   if(F.cb&&!cbFor(o))return false;
+  if(F.nw&&!isNew(o))return false;
   return true};
 const fltCount=()=>Object.values(S.flt).filter(Boolean).length;
 const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur App-Angebote",noapp:"Ohne App & Karte",low:"Tiefstpreis",cb:"💸 Geld zurück"};
 // App-Angebot? (Preis nur mit App = ao, oder extra App-Preis = ap) -> Name der App fürs Abzeichen
 const appName = o => (o.ao||"").replace(/-App$/," App")||(o.ap&&o.ap<o.p?(o.s==="lidl"?"Lidl Plus":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App":"App")):"");
-const fltSummary=()=>[].concat(S.flt.min?[`ab ${S.flt.min} %`]:[],S.flt.max?[`bis ${eur(S.flt.max)}`]:[],Object.keys(FLT_LABEL).filter(k=>S.flt[k]).map(k=>FLT_LABEL[k]));
+const fltSummary=()=>[].concat(S.flt.nw?["🆕 Neu seit deinem letzten Besuch"]:[],S.flt.min?[`ab ${S.flt.min} %`]:[],S.flt.max?[`bis ${eur(S.flt.max)}`]:[],Object.keys(FLT_LABEL).filter(k=>S.flt[k]).map(k=>FLT_LABEL[k]));
 const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o.rk&&o.rk.t==="ok"?3:0)-(o.rk&&o.rk.t==="open"&&o.ou===1?20:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
 // Kracher (Kevins Wunsch 01.11.): nur Lebensmittel & Drogerie – keine Non-Food-Aktionen wie Edekas Topf-Serie mit 70 %.
 // Und Abwechslung: höchstens 2 Artikel derselben Warengruppe pro Markt vorne, der Rest rutscht nach hinten.
@@ -492,6 +499,38 @@ const ranked = () => {const all=weekOffers().filter(o=>o.p>0&&!NONFOOD_CATS.incl
 // Märkte mit Angeboten, aber ohne belegbaren Rabatt (Rewe druckt fast nie „statt“) -> kurzer Hinweis im Kracher
 const noProof=()=>{const r=ranked(),ws=weekOffers();return [...new Set(ws.map(o=>o.s))].filter(st=>!r.slice(0,8).some(o=>o.s===st))}
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?isNextWk(o):!isNextWk(o)))&&hitW(o,w))}));
+// „🆕 Neu seit deinem letzten Besuch“ (01.11., Kevin: neue Angebote sofort erkennen): Jedes Angebot (id + Startdatum) bekommt
+// beim ersten Sehen einen Zeitstempel (Minuten). Neu = zum ersten Mal in diesem Besuch gesehen. Ein Besuch endet nach 30 min ohne
+// offene App. Nur auf dem Gerät (localStorage), nicht im Sync. Allererster Start: alles gilt als gesehen.
+const nKey=o=>o.id+"|"+(o.from||"");
+const SESS=store.get("sess",{});{const t=Date.now();if(!SESS.s||t-(SESS.a||0)>30*6e4)SESS.s=t;SESS.a=t;store.set("sess",SESS)}
+let SEEN=store.get("seen",null);
+function seenStamp(){if(!OFFERS.length)return;const t=Math.floor(Date.now()/6e4),first=!SEEN;SEEN=SEEN||{};let ch=first;
+  for(const o of OFFERS){const k=nKey(o);if(SEEN[k]==null){SEEN[k]=first?0:t;ch=true}}
+  if(!ch)return;const cur=new Set(OFFERS.map(nKey)),old=t-30*1440;
+  for(const k in SEEN)if(!cur.has(k)&&SEEN[k]<old)delete SEEN[k]; // kaufDA mischt: kurz verschwundene Angebote zählen 30 Tage als gesehen
+  store.set("seen",SEEN)}
+const isNew=o=>!!SEEN&&(SEEN[nKey(o)]??Infinity)>=Math.floor(SESS.s/6e4);
+function sessTick(){const t=Date.now();
+  if(!document.hidden&&t-(SESS.a||0)>30*6e4){SESS.s=t;if(S.flt.nw){S.flt.nw=0;if(QUICK)QUICK.keys.delete("nw")}SESS.a=t;store.set("sess",SESS);render();return}
+  SESS.a=t;store.set("sess",SESS)}
+setInterval(()=>{if(!document.hidden)sessTick()},60*1000);
+document.addEventListener("visibilitychange",sessTick);
+// Merkliste -> Zettel nur per Knopf (Kevin 01.11.: Merklisten-Treffer dürfen NICHT automatisch auf den Zettel rutschen):
+// je Begriff das beste Angebot (niedrigster Grundpreis, sonst Preis); Begriffe mit einem Treffer schon auf dem Zettel bleiben unberührt.
+const bestHit=hits=>{const u=hits.filter(o=>unit(o)!=null);return (u.length?u.sort((a,b)=>unit(a)-unit(b)):hits.slice().sort((a,b)=>fin(a)-fin(b)))[0]};
+function watchToList(wk){const add=[];
+  for(const {hits} of watchHits(wk)){if(!hits.length||hits.some(o=>S.list.includes(o.id)))continue;
+    const b=bestHit(hits);if(b&&!S.list.includes(b.id)){S.list.push(b.id);add.push(b)}}
+  if(add.length)save();return add}
+const w2lTxt=a=>a.slice(0,3).map(o=>`${o.n} (${sname(o.s)} ${eur(fin(o))})`).join(", ")+(a.length>3?` und ${a.length-3} weitere`:"");
+// Abgelaufenes Angebot auf dem Zettel, und derselbe Artikel (gleicher Markt, Name, Marke) ist wieder im Angebot -> still erneuern
+function autoRenew(){const wo=OFFERS.filter(o=>!isNextWk(o)),got=[];
+  S.list=S.list.map(id=>{if(byId(id)||!OLD.has(id))return id;const o=OLD.get(id),nn=norm(o.n),bb=norm(o.b||"");
+    const x=wo.filter(x=>x.s===o.s&&norm(x.n)===nn&&norm(x.b||"")===bb&&!S.list.includes(x.id)).sort((a,c)=>fin(a)-fin(c))[0];
+    if(!x)return id;got.push(x);if(S.qty[id]){S.qty[x.id]=S.qty[id];delete S.qty[id]}S.checked=S.checked.map(c=>c===id?x.id:c);return x.id});
+  if(!got.length)return;S.list=[...new Set(S.list)];save();
+  setTimeout(()=>toast(`🔄 ${got.length===1?got[0].n+" ist":got.length+" Artikel sind"} wieder im Angebot – auf dem Zettel automatisch erneuert`),600)}
 
 async function load(){
   try{
@@ -501,6 +540,7 @@ async function load(){
     META=o;HIST=h;
     loadCashback().then(()=>render()); // Geld-zurück-Abzeichen an den Angeboten
     RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();CMP.clear();CHEAP.clear();twinFix();
+    OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});seenStamp();autoRenew();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote<span id="tick"></span>${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;if(typeof tickShow==="function")tickShow();
@@ -621,7 +661,7 @@ function card(o,bestIds){
   const ls=lowSince(o);
   return `<article class="card" data-detail="${esc(o.id)}" tabindex="0" aria-label="${esc(o.n)}: Details anzeigen" style="--sc:${(STORES[o.s]||{}).c||"#6B7280"}">${thumb(o)}
    <div class="body">
-   <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}${o.pv?' <em class="pvtag" title="Vorschau – der Prospekt deines Markts ist noch nicht online">Vorschau</em>':""}</span>
+   <span class="store">${esc(sname(o.s))}${o.b?" · "+esc(o.b):""}${o.pv?' <em class="pvtag" title="Vorschau – der Prospekt deines Markts ist noch nicht online">Vorschau</em>':""}${isNew(o)?' <em class="newtag" title="Neu seit deinem letzten Besuch">Neu</em>':""}</span>
    <div class="name">${esc(o.n)}<small>${esc(o.d||"")}</small></div>
    ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
    <div class="pricerow">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag" aria-label="${eur(o.p)}">${tagHTML(o.p)}</div>`}
@@ -646,6 +686,11 @@ function weekHTML(hitCount){const t=[];
   const low=wo.filter(o=>lowSince(o)).length;
   const ON='<small class="wkon">✓ Filter an – nochmal antippen = aus</small>';
   if(low||S.flt.low)t.push(`<button class="wk wk-p${S.flt.low?" on":""}" data-golow="1" aria-pressed="${!!S.flt.low}"><i>📉</i><b>${low?`${low} ${low===1?"Preis-Alarm":"Preis-Alarme"}${bei}`:`Kein Preis-Alarm${bei}`}</b>${S.flt.low?ON:"<small>so günstig wie seit Wochen nicht</small>"}</button>`);
+  // 🆕 neu seit dem letzten Besuch – ganz vorne; liegt Neues nur in der anderen Woche, führt die Kachel dorthin
+  const nw=wo.filter(isNew).length,nws=[...new Set(wo.filter(isNew).map(o=>sshort(o.s)))].slice(0,3).join(", ");
+  if(nw||S.flt.nw)t.unshift(`<button class="wk wk-n${S.flt.nw?" on":""}" data-gonew="${S.week}" aria-pressed="${!!S.flt.nw}"><i>🆕</i><b>${nw?`${nw} ${nw===1?"neues Angebot":"neue Angebote"}${bei}`:`Nichts Neues${bei}`}</b>${S.flt.nw?ON:`<small>seit deinem letzten Besuch${nws&&!bei?" · "+esc(nws):""}</small>`}</button>`);
+  const ow=S.flt.nw?0:OFFERS.filter(o=>(S.week?!isNextWk(o):isNextWk(o))&&(!S.stores.size||S.stores.has(o.s))&&isNew(o)).length;
+  if(ow)t.splice(nw?1:0,0,`<button class="wk wk-n" data-gonew="${S.week?0:1}"><i>🆕</i><b>${ow} ${ow===1?"neues Angebot":"neue Angebote"} ${S.week?(WEEKEND?"ab Montag":"diese Woche"):nextShort()}${bei}</b><small>antippen zeigt ${ow===1?"es":"sie"}</small></button>`);
   const cbn=wo.filter(o=>cbFor(o)).length;
   if(cbn||S.flt.cb)t.push(`<button class="wk wk-c${S.flt.cb?" on":""}" data-gocb="1" aria-pressed="${!!S.flt.cb}"><i>💸</i><b>${cbn?`${cbn} ${cbn===1?"Angebot":"Angebote"} mit Geld zurück${bei}`:`Kein Angebot mit Geld zurück${bei}`}</b>${S.flt.cb?ON:`<small>Antippen zeigt ${cbn===1?"es":"sie"} – Hersteller zahlt dir etwas zurück</small>`}</button>`);
   if(!t.length)return "";
@@ -802,9 +847,11 @@ function renderDetail(){
     <div class="verdict ${vd.t}">${spark(o,90,24)}<span>${esc(vd.l)}</span></div>
     ${hist.length?`<div class="dtext"><h4>So viel kostete es bei ${esc(sname(o.s))}</h4>${hst?`<p class="hstat">${hst}</p>`:""}<ul class="dhist">${hist.map(x=>`<li><span>${x.from===x.to?fmtDate(x.from):dShort(x.from)+" – "+dShort(x.to)}${x.to>=TODAY&&x.from<=TODAY?" · jetzt":""}</span><b>${eur(x.p)}</b></li>`).join("")}</ul></div>`:""}
     <div class="dactions">
-     <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>${inL?qStep(o.id,true):""}
      <button class="btn ghost" data-fav="${esc(o.id)}">${IC.star}${fav?"Gemerkt":"Merken"}</button>
      <a class="btn wa" href="${waLink(share)}" target="_blank" rel="noopener">${WA_ICON}Teilen</a>
+    </div>
+    <div class="dactions dmain">
+     <button class="btn" data-add="${esc(o.id)}">${inL?IC.check+"Auf dem Zettel":IC.plus+"Auf den Einkaufszettel"}</button>${inL?qStep(o.id,true):""}
     </div>
    </div>
   </div>`}
@@ -813,6 +860,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  119:["🆕 Neu seit deinem letzten Besuch: Neue Angebote tragen ein grünes „Neu“, oben bei „Deine Woche“ zeigt eine Kachel sie mit einem Tipp.","⭐ Merkliste: Mit „Beste Angebote auf den Zettel“ legst du je Begriff das günstigste Angebot mit einem Tipp auf den Zettel.","🔄 Ist ein Angebot auf deinem Zettel abgelaufen und gibt es denselben Artikel im selben Markt wieder, wird es automatisch erneuert.","Artikel-Fenster: „Auf den Einkaufszettel“ und „Merken“ bleiben unten immer sichtbar.","Merkliste schlägt vor, was du oft kaufst – ein Tipp, und SparRadar beobachtet es."],
   118:["Neue Angebote kommen jetzt schneller: Am Wochenende sucht SparRadar alle 5 Minuten nach neuen Prospekten (vorher alle 15), und die offene App holt neue Angebote jede Minute ab."],
   117:["⚠️ Achtung-Hinweis: Gibt es genau denselben Artikel bei einem anderen Markt billiger, steht das auf der Karte. Setzt du den teureren auf den Einkaufszettel, fragt SparRadar nach, welchen du nehmen willst.","Doppelte Karten im selben Markt (z. B. Butter und „Butter oder Streichzart“) sind jetzt eine Karte mit allen Bildern."],
   116:["Auf jeder Karte steht jetzt, was der Artikel beim letzten Mal gekostet hat – z. B. „Letztes Mal 1,29 €“ oder „Letztes Mal billiger“. Tippst du den Artikel an, siehst du alle früheren Preise mit Datum."],
@@ -1010,14 +1058,24 @@ function renderWatch(){
   const hits=[...new Map(sel.flatMap(x=>x.hits).map(o=>[o.id,o])).values()].sort((a,b)=>offPct(b)-offPct(a));
   return `<section class="panel"><h3>Was soll ich für dich beobachten?</h3>
     <p>Begriff oder Marke eingeben. Mit Wunschpreis wird daraus ein <b>Vorrats-Alarm</b>: Treffer zählen nur, wenn der Grundpreis darunter liegt. Die Zahl am Tab „Merkliste“ zeigt dir beim Öffnen, wie viele Treffer gerade im Angebot sind.</p>
-    <form class="addrow" id="kwForm"><input id="kwIn" placeholder="z. B. Mozzarella, Felix, Cola" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg (optional)" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
+    <form class="addrow" id="kwForm"><input id="kwIn" placeholder="${PH("z. B. Mozzarella, Felix, Cola","z. B. Butter, Felix")}" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
     <div id="kwSugg"></div>
     <div class="wlist">${S.watch.map((w,i)=>{const n=wh[i].hits.length,im=sugImg(w.k)||(wh[i].hits.find(o=>o.img)||{}).img||simImg(w.k)||(SIMG&&CATALOG_N?liveImg(w.k):"")||"",on=S.wsel===i;
       return `<div class="witem${n?" hit":""}${on?" on":""}"><button class="wmain" data-wsel="${i}" aria-pressed="${on}" title="${esc(w.k)}">${safeUrl(im)?`<img src="${esc(sharp(im))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<span class="wph">${IC.bell}</span>`}<span class="wtx"><b>${esc(w.k)}</b><small>${n?`${n} ${n===1?"Treffer":"Treffer"} im Angebot`:"gerade nicht im Angebot"}${w.max?` · bis ${eur(w.max)}/kg`:""}</small></span></button><button class="wdel" data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></div>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
+    ${w2lHTML()}${oftenHTML()}
    </section>
    <div class="meta"><h2>${S.wsel!=null?`Treffer für „${esc(S.watch[S.wsel].k)}“`:"Deine Treffer"}</h2><span>${S.wsel!=null?`<button class="linkbtn" data-wsel="${S.wsel}">Alle zeigen</button> · `:""}${hits.length} Angebote</span></div>
    ${hits.length?`<div class="grid">${hits.slice(0,60).map(o=>card(o,new Set())).join("")}</div>`:`<div class="empty"><b>Keine Treffer</b>${S.wsel!=null?"Dieser Artikel ist gerade nicht im Angebot. SparRadar schaut bei jedem Abruf nach.":"Gerade ist nichts von deiner Merkliste reduziert oder unter deinem Wunschpreis."}</div>`}`}
 
+// Merkliste -> Zettel mit einem Tipp (nur wenn du willst, nie automatisch)
+function w2lHTML(){if(!S.watch.length)return "";const n=watchHits(S.week).filter(x=>x.hits.length&&!x.hits.some(o=>S.list.includes(o.id))).length;
+  return n?`<div class="w2l"><button class="btn" data-w2l="1">${IC.plus}Beste Angebote auf den Zettel (${n})</button><small>Legt je Begriff das günstigste Angebot auf deinen Einkaufszettel – nur wenn du antippst.</small></div>`:""}
+// Verknüpfung Einkäufe -> Merkliste: was du oft kaufst (mind. 2 Einkäufe), mit einem Tipp beobachten
+function oftenHTML(){if(!S.trips.length)return "";const have=new Set(S.watch.map(w=>norm(w.k))),c={};
+  S.trips.slice(0,60).forEach(t=>{const one=new Set();[...(t.items||[]),...(t.extra||[])].forEach(x=>{const k=norm(x.n||"");
+    if(!k||one.has(k)||have.has(k)||x.p<0||/pfand|leergut|tasche|t[uü]te|sonstiges|nicht erkannt/i.test(x.n))return;one.add(k);(c[k]=c[k]||{n:x.n,c:0}).c++})});
+  const top=Object.values(c).filter(x=>x.c>=2).sort((a,b)=>b.c-a.c||a.n.length-b.n.length).slice(0,10);if(!top.length)return "";
+  return `<div class="freq often"><span>Kaufst du oft – beobachten?</span>${top.map(x=>`<button class="chip plain" data-watchname="${esc(x.n)}">${IC.star}${esc(x.n.length>28?x.n.slice(0,27)+"…":x.n)}</button>`).join("")}</div>`}
 // Ersparnis-Zähler: was auf dem Zettel abgehakt wird, zählt als gekauft
 const savedOn=()=>S.saved.filter(x=>!x.off);
 function savedHTML(){const sv=savedOn();if(!sv.length)return "";
@@ -1222,7 +1280,7 @@ function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>
    ${TOUCH()&&inCart&&inCart<all.length?`<button class="btn ghost sm cart-done" data-tripfinish="1">Einkauf jetzt abschließen (Rest bleibt auf dem Zettel)</button>`:""}</div>`}
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;
-  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
+  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button></form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
   if(!items.length&&!extra.length)return `${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const done=id=>S.checked.includes(id);
@@ -1714,7 +1772,7 @@ const viewKey=()=>[...S.stores].sort().join()+"|"+[...S.cats].sort().join()+"|"+
 function fltStore(){const f={...S.flt};if(QUICK)for(const k of QUICK.keys)f[k]=0;store.set("flt",f)}
 function quickCheck(){if(!QUICK||QUICK.at===viewKey())return;
   const ks=[...QUICK.keys];QUICK=null;ks.forEach(k=>S.flt[k]=0);
-  if(ks.length)toast(ks.includes("cb")?"💸 Geld-zurück-Filter aus – du siehst wieder alle Angebote":"📉 Preis-Alarm-Filter aus – du siehst wieder alle Angebote")}
+  if(ks.length)toast((ks.includes("nw")?"🆕 Neu-Filter":ks.includes("cb")?"💸 Geld-zurück-Filter":"📉 Preis-Alarm-Filter")+" aus – du siehst wieder alle Angebote")}
 function quickToggle(k){const on=!S.flt[k];S.flt[k]=on?1:0;
   if(on)QUICK={keys:new Set([...(QUICK&&QUICK.at===viewKey()?QUICK.keys:[]),k]),at:viewKey()};else if(QUICK)QUICK.keys.delete(k);
   S.limit=60;render();if(on)document.querySelector(".meta")?.scrollIntoView({block:"start"});return on}
@@ -1867,6 +1925,9 @@ document.addEventListener("click",e=>{
   if(b.id==="planToList"){let n=0;weekPlan().forEach(([,g])=>g.items.forEach(o=>{if(!S.list.includes(o.id)){S.list.push(o.id);n++}}));save();toast(n?`${n} Artikel auf den Einkaufszettel gesetzt`:"Schon alles auf dem Zettel");render();return}
   if(b.id==="goWatch"){S.tab="watch";render();scrollTo({top:0});return}
   if(b.dataset.go){S.tab=b.dataset.go;render();scrollTo({top:0});return}
+  if(b.dataset.gonew!=null){const w=+b.dataset.gonew;if(w!==S.week&&!S.flt.nw){S.week=w;S.limit=60;quickCheck()}
+    toast(quickToggle("nw")?"Filter an: nur neue Angebote seit deinem letzten Besuch – nochmal antippen = aus":"Filter aus: alle Angebote");return}
+  if(b.dataset.w2l){const a=watchToList(S.week);toast(a.length?`Auf den Zettel: ${w2lTxt(a)}`:"Schon alles auf dem Zettel");render();return}
   if(b.dataset.gocb){toast(quickToggle("cb")?"Filter an: nur Angebote mit Geld zurück – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
   if(b.dataset.golow){toast(quickToggle("low")?"Filter an: nur Preis-Alarme – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
