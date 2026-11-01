@@ -1,0 +1,38 @@
+name: Aldi-Dauerpreise holen
+
+# Einmal pro Woche die Normalpreise des Aldi-Süd-Sortiments (öffentliche Kategorie-Seiten, robots.txt erlaubt sie)
+# -> docs/data/dauerpreise.json. Die App zeigt damit auch für Artikel ohne Angebot einen echten Preis.
+on:
+  schedule:
+    - cron: "17 3 * * 0"   # sonntags ca. 4:17 / 5:17 Uhr deutscher Zeit
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: angebote          # nie gleichzeitig mit dem Angebots-Abruf committen
+  cancel-in-progress: false
+
+jobs:
+  dauerpreise:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Dauerpreise holen
+        run: python fetcher/fetch_dauerpreise.py
+
+      - name: Speichern
+        run: |
+          git config user.name "SparRadar Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data/dauerpreise.json || true
+          git diff --cached --quiet || git commit -m "Aldi-Dauerpreise $(date +%F)"
+          git pull --rebase --autostash
+          git push
