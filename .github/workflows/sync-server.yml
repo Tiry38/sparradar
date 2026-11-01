@@ -52,7 +52,7 @@ jobs:
           compatibility_date = "2025-01-01"
           workers_dev = true
           [triggers]
-          crons = ["17 3 * * SUN", "10,25,40,55 * * * *"]
+          crons = ["17 3 * * SUN", "*/5 * * * *"]
           [[d1_databases]]
           binding = "DB"
           database_name = "sparradar-sync"

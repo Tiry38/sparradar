@@ -80,16 +80,16 @@ export default {
     if (!env.GH_TOKEN) return;
     const d = new Date(ev.scheduledTime), h = d.getUTCHours(), wd = d.getUTCDay(), m = d.getUTCMinutes(); // 0 = So
     const due = [];
-    // Kevins Wunsch (01.11.): neue Woche so schnell wie möglich -> Fr/Sa/So und Mo früh alle 15 min nachsehen.
-    // Die großen Abrufe laufen weiter nur im ersten Takt der Stunde (:10).
-    const full = m < 15;
+    // Kevins Wunsch (01.11.): neue Woche so schnell wie möglich -> Fr/Sa/So und Mo früh alle 5 min nachsehen
+    // (Cron „*/5“, je Durchgang nur 6 Seitenaufrufe). Die großen Abrufe laufen weiter nur einmal pro Stunde (Takt :10).
+    const full = m >= 10 && m < 15;
     if (full) {
       if (h === 4) due.push("angebote.yml", "cashback.yml");                       // jeden Morgen ca. 5:10/6:10 Uhr
       if (h === 17 && [5, 6, 0].includes(wd)) due.push("angebote.yml");             // Fr, Sa, So abends
       if (h === 2 && wd === 0) due.push("artikelstamm.yml");                        // sonntags nachts
       if ([6, 12, 18].includes(h)) due.push("bilder.yml");                         // Bilder-Wächter 3× am Tag
     }
-    const often = ([5, 6, 0].includes(wd) && h >= 5 && h <= 22) || (wd === 1 && h >= 3 && h <= 9); // alle 15 min
+    const often = ([5, 6, 0].includes(wd) && h >= 5 && h <= 22) || (wd === 1 && h >= 3 && h <= 9); // alle 5 min
     const hourly = full && (wd === 4 ? h >= 5 && h <= 21 : wd === 1 ? h >= 5 && h <= 20 : [2, 3].includes(wd) && [5, 9, 15].includes(h));
     const pros = often || hourly;
     if (pros && !due.includes("angebote.yml")) due.push("prospekte.yml");         // Prospekt-Wächter

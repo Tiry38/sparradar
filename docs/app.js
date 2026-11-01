@@ -813,6 +813,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  118:["Neue Angebote kommen jetzt schneller: Am Wochenende sucht SparRadar alle 5 Minuten nach neuen Prospekten (vorher alle 15), und die offene App holt neue Angebote jede Minute ab."],
   117:["⚠️ Achtung-Hinweis: Gibt es genau denselben Artikel bei einem anderen Markt billiger, steht das auf der Karte. Setzt du den teureren auf den Einkaufszettel, fragt SparRadar nach, welchen du nehmen willst.","Doppelte Karten im selben Markt (z. B. Butter und „Butter oder Streichzart“) sind jetzt eine Karte mit allen Bildern."],
   116:["Auf jeder Karte steht jetzt, was der Artikel beim letzten Mal gekostet hat – z. B. „Letztes Mal 1,29 €“ oder „Letztes Mal billiger“. Tippst du den Artikel an, siehst du alle früheren Preise mit Datum."],
   115:["Jetzt hat fast jedes Angebot einen Vergleichspreis: Gibt es keinen „statt“-Preis, zeigt die Karte jetzt den Preis desselben Artikels bei einem anderen Markt (orange, wenn er dort günstiger ist)."],
@@ -1994,13 +1995,13 @@ async function freshen(){
     if(o.generated&&o.generated!==META.generated)load();
   }catch(e){}
 }
-setInterval(freshen,5*60*1000);
-// Wann zuletzt nach neuen Prospekten gesucht wurde (Taktgeber, alle 15 min am Wochenende) – „Stand“ ist nur der letzte Abruf mit neuen Daten
+setInterval(freshen,60*1000);  // jede Minute: neue Angebote sind spätestens 1 min nach dem Hochladen in der offenen App
+// Wann zuletzt nach neuen Prospekten gesucht wurde (Taktgeber, alle 5 min am Wochenende) – „Stand“ ist nur der letzte Abruf mit neuen Daten
 let TICK=0;
 async function tickLoad(){try{const u=await Sync.srv();if(!u)return;const t=(await (await fetch(u+"/tick",{cache:"no-store"})).json()).at;if(t){TICK=t;tickShow()}}catch(e){}}
 function tickShow(){const el=document.getElementById("tick");if(!el||!TICK)return;const d=new Date(TICK),today=new Date().toDateString()===d.toDateString();
   el.textContent=` · zuletzt nach Neuem gesucht: ${today?"":d.toLocaleDateString("de-DE",{weekday:"short"})+" "}${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`}
-tickLoad();setInterval(tickLoad,5*60*1000);
+tickLoad();setInterval(tickLoad,60*1000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)tickLoad()});
 // Samstag 22 Uhr: offene App wechselt von selbst auf die Angebote ab Montag
 setInterval(()=>{if(shopFrom()!==SHOP)location.reload()},60*1000);

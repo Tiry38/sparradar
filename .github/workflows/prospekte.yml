@@ -1,7 +1,7 @@
 name: Prospekt-Wächter
 
 # Kevins Wunsch: Die Angebote der nächsten Woche sollen so früh wie möglich in der App stehen.
-# Fr–So alle 15 min (Cloudflare-Taktgeber), Do/Mo stündlich, Di–Mi 3× nur kurz auf die Marktseiten schauen (6 Seitenaufrufe). Taucht ein neuer
+# Fr–So alle 5 min (Cloudflare-Taktgeber), Do/Mo stündlich, Di–Mi 3× nur kurz auf die Marktseiten schauen (6 Seitenaufrufe). Taucht ein neuer
 # Prospekt mit Startdatum in der Zukunft auf, wird sofort der komplette Abruf „Angebote abrufen“ gestartet.
 on:
   schedule:
