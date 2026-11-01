@@ -287,7 +287,7 @@ function perk(o){
   if(!o||o.o||o.bo||!o.p||offPct(o))return null;
   if(PERK.has(o.id))return PERK.get(o.id);
   let r=null;const k=coreKey(o),q=packQty(o.d);
-  const same=OFFERS.filter(x=>x!==o&&x.s===o.s&&x.p>o.p+.009&&(x.from||"")<(o.from||"")&&coreKey(x)===k&&((q&&packQty(x.d)&&Math.abs(packQty(x.d).v-q.v)/q.v<.05)||(!q&&x.d===o.d))).sort((a,b)=>(b.from||"").localeCompare(a.from||""))[0];
+  const same=[...OFFERS,...OLD.values()].filter(x=>x!==o&&x.s===o.s&&x.p>o.p+.009&&(x.from||"")<(o.from||"")&&coreKey(x)===k&&((q&&packQty(x.d)&&Math.abs(packQty(x.d).v-q.v)/q.v<.05)||(!q&&x.d===o.d))).sort((a,b)=>(b.from||"").localeCompare(a.from||""))[0];
   if(same){const pct=Math.round((1-o.p/same.p)*100);
     if(pct>=3)r={pct,w:same.p,b:`−${pct} % ggü. bisher`,s:`bisher ${eur(same.p)}`,l:`Bei ${sname(o.s)} kostet dieselbe Packung bis ${same.to?fmtDate(same.to):"jetzt"} ${eur(same.p)}, ab ${fmtDate(shopDay(o.from))} nur ${eur(o.p)}. Das sind ${pct} % weniger.`}}
   const h=histOf(o),last=h.length?h[h.length-1]:0;
@@ -399,7 +399,10 @@ const FLT_LABEL={bio:"Nur Bio",vegan:"Vegan",real:"Nur echte Rabatte",app:"Nur A
 const appName = o => (o.ao||"").replace(/-App$/," App")||(o.ap&&o.ap<o.p?(o.s==="lidl"?"Lidl Plus":(STORES[o.s]?STORES[o.s].n.split(" ")[0]+" App":"App")):"");
 const fltSummary=()=>[].concat(S.flt.min?[`ab ${S.flt.min} %`]:[],S.flt.max?[`bis ${eur(S.flt.max)}`]:[],Object.keys(FLT_LABEL).filter(k=>S.flt[k]).map(k=>FLT_LABEL[k]));
 const score = o => {const v=verdict(o).t;return sortPct(o)-(dealWarn(o)?25:0)+(o.rk&&o.rk.t==="ok"?3:0)-(o.rk&&o.rk.t==="open"&&o.ou===1?20:0)+(v==="low"?8:0)-(v==="fake"?40:0)+(S.useApp?((o.x||[]).length+couponsFor(o).length)*3+(o.ap?3:0):0)};
-const ranked = () => weekOffers().filter(o=>o.p>0).sort((a,b)=>score(b)-score(a));
+// Kracher (Kevins Wunsch 01.11.): nur Lebensmittel & Drogerie – keine Non-Food-Aktionen wie Edekas Topf-Serie mit 70 %.
+// Und Abwechslung: höchstens 2 Artikel derselben Warengruppe pro Markt vorne, der Rest rutscht nach hinten.
+const ranked = () => {const all=weekOffers().filter(o=>o.p>0&&!NONFOOD_CATS.includes(o.c)).sort((a,b)=>score(b)-score(a)),n={},head=[],tail=[];
+  all.forEach(o=>{const k=o.s+"|"+o.c;n[k]=(n[k]||0)+1;(n[k]<=2?head:tail).push(o)});return head.concat(tail)};
 const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?o.from>SHOP:!o.from||o.from<=SHOP))&&hitW(o,w))}));
 
 async function load(){
@@ -684,6 +687,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  77:["Am PC bleibt die ganze obere Leiste (Logo, Schriftgröße, Woche und Reiter) beim Scrollen stehen."],
+  76:["Kracher der Woche: nur noch Lebensmittel & Drogerie – keine Töpfe, Leitern & Co. mehr. Und mehr Abwechslung statt zehnmal dasselbe."],
   75:["Am PC bleibt die Leiste mit Angebote, Merkliste, Einkaufszettel und Coupons beim Runterscrollen oben stehen."],
   74:["Den Knopf zur Markt-App gibt es jetzt auch für Aldi Süd, Netto und dm."],
   73:["Geräte verbinden: Wer noch mit GitHub-Schlüssel verbunden ist, kann mit einem Tipp auf einen Familien-Code umziehen – sicherer, alles wird mitgenommen."],
@@ -1375,11 +1380,11 @@ document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",
 document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key==="Enter"&&e.target.id==="q"){hideSugg();e.target.blur()}});
 // Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
 const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];
-// PC: Reiter-Leiste bleibt beim Scrollen oben angeheftet (Handy: sowieso fest unten). Platzhalter verhindert Springen.
-const TABS=document.querySelector("nav.tabs"),TABS_PH=document.createElement("div");TABS_PH.className="tabs-ph";TABS.before(TABS_PH);
+// PC: ganze obere Leiste (Logo, A+, Woche, Reiter) bleibt beim Scrollen oben angeheftet (Handy: Reiter fest unten). Platzhalter verhindert Springen.
+const TABS=document.querySelector(".pinbar"),TABS_PH=document.createElement("div");TABS_PH.className="tabs-ph";TABS.before(TABS_PH);
 function pinTabs(){const desk=matchMedia("(min-width:721px)").matches,was=TABS.classList.contains("pinned");
-  const pin=desk&&(was?TABS_PH:TABS).getBoundingClientRect().top<6;
-  if(pin){TABS_PH.style.height=TABS.offsetHeight+"px";TABS_PH.style.display="block";TABS.style.left=TABS_PH.offsetLeft+"px";TABS.style.width=TABS_PH.offsetWidth+"px"}
+  const pin=desk&&(was?TABS_PH:TABS).getBoundingClientRect().top<0;
+  if(pin){if(!was){TABS_PH.style.height=TABS.offsetHeight+"px";TABS_PH.style.display="block"}TABS.style.left=TABS_PH.offsetLeft+"px";TABS.style.width=TABS_PH.offsetWidth+"px"}
   else if(was){TABS_PH.style.display="";TABS.style.left=TABS.style.width=""}
   if(pin!==was)TABS.classList.toggle("pinned",pin)}
 addEventListener("scroll",pinTabs,{passive:true});addEventListener("resize",()=>{TABS.classList.remove("pinned");TABS_PH.style.display="";TABS.style.left=TABS.style.width="";pinTabs()});

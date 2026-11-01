@@ -397,4 +397,6 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
 .svrow{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--line)}
 .svrow>span{display:flex;align-items:center;gap:6px;min-width:0;overflow-wrap:anywhere}
 .tabs-ph{display:none}
-@media (min-width:721px){nav.tabs.pinned{position:fixed;top:6px;z-index:20;box-shadow:0 8px 24px rgba(0,0,0,.28)}}
+.pinbar{display:grid;gap:12px;min-width:0}
+@media (min-width:721px){.pinbar.pinned{position:fixed;top:0;z-index:20;padding:8px 0 10px;background:var(--bg);box-shadow:0 10px 24px -12px rgba(0,0,0,.45)}
+  .pinbar.pinned::before{content:"";position:absolute;inset:0 -16px;background:var(--bg);z-index:-1}}

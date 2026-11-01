@@ -74,7 +74,7 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Hinweis beim Öffnen:** neue Merklisten-Treffer seit dem letzten Öffnen (`seenHits`) – kein Push, nur in der App.
 - **Vorschläge/Suche:** `BASE_WORDS` + `docs/data/names.json` (alle je gesehenen Artikelnamen, auch Lidl ohne Rabatt). Suche nur in Name, Marke, Markt; Kategoriename nur bei exakter Eingabe.
 - **Kategorien:** mehrere gleichzeitig wählbar (`S.cats` = Set, `catTitle()`), antippen = an/aus, „Alle Kategorien“ = zurücksetzen.
-- **Reiter-Leiste am PC angeheftet** (Kevins Wunsch 01.11.): ab 721 px Breite bleibt `nav.tabs` beim Scrollen oben (`pinTabs()`, Klasse `.pinned` = `position:fixed`, Platzhalter `.tabs-ph` gegen Springen; `position:sticky` geht nicht, weil die Leiste in `header.top` steckt). Am Handy weiter fest unten.
+- **Obere Leiste am PC angeheftet** (Kevins Wunsch 01.11.): ab 721 px Breite bleibt `.pinbar` (Logo, A+, Woche, Reiter) beim Scrollen oben (`pinTabs()`, Klasse `.pinned` = `position:fixed`, Platzhalter `.tabs-ph` gegen Springen; `position:sticky` geht nicht, weil sie in `header.top` steckt). Am Handy weiter fest unten.
 - **Bedienung:** „A+“-Knopf (3 Schriftstufen per CSS-`zoom`), am Handy Märkte/Kategorien/Sortierung im Fenster „Märkte & Filter“. Look: Farbverläufe in `docs/look.css`.
 - **Sperren nicht umgehen:** rewe.de und netto-online.de blocken automatische Abrufe (403). Diese Sperren nicht umgehen, keine API-Schlüssel aus Websites auslesen (z. B. bei Marktguru). Nur öffentliche Seiten, die robots.txt erlaubt, mit ehrlichem User-Agent, höchstens einmal pro Tag (Ausnahme: zusätzliche Abend-Abrufe Fr/Sa/So) und mit Pausen (`PAUSE`).
 - Das Repository ist öffentlich (nötig für kostenloses GitHub Pages). Keine Passwörter, Tokens oder persönlichen Daten hineinschreiben.
@@ -84,6 +84,7 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 - **Feld `ou`** (vom Abruf): 0 = „statt“ ist eigener früherer Preis des Markts (kaufDA `secondaryPriceIsUVP=false`, Lidl `discount.fromRecommendedPrice=false`) -> laut PAngV § 11 niedrigster Preis der letzten 30 Tage = **bestätigt**. 1 = UVP -> Karte zeigt „UVP“ statt „statt“.
 - **Entfernt** (`rk.t="fix"`): „statt“ = Kilo-/Literpreis, = Preis der ganzen Packung, = Preis der größeren Packung bei gleichem Grundpreis.
 - **Ab 40 % geprüft** (82 % der Lebensmittel-Rabatte liegen unter 40 %, nur ~1 % ab 60 %): Händlerangabe, Grundpreis, gleicher Artikel bei anderem Markt (pro kg/l oder gleiche Menge), Preisverlauf, „statt“ = genau 3×/4×… Preis.
+- **Kracher-Liste** (`ranked()`): nur Lebensmittel & Drogerie (kein `NONFOOD_CATS`, Kevins Wunsch 01.11. nach Edekas Topf-Serie mit 70 %), höchstens 2 Artikel je Markt + Warengruppe vorne. `perk()` vergleicht auch mit der Vorwoche desselben Markts (`OLD`), wichtig für Rewe (druckt fast nie „statt“).
 - Zustände: `ok` ✅ bestätigt (oben, leichter Bonus beim Kracher) · `open` 🔍 noch nicht bestätigt, aber kein Gegenbeweis (**voller Rang, nicht grau**) · `warn` ⚠️ widerlegt (grau „?“, Sortierung mit realistischer Ersparnis) · `fix` 🔧 falscher statt-Preis entfernt.
 
 ## Preisvergleich, Zettel, Gespart, Scanner (31.10.)
