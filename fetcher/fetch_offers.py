@@ -23,7 +23,7 @@ import urllib.request
 UA = "SparRadar/1.0 (private Angebotsuebersicht; 1 Abruf pro Tag)"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "docs", "data")
-PAUSE = 1.5  # Sekunden zwischen zwei Abrufen bei kaufDA
+PAUSE = 2.0  # Sekunden zwischen zwei Abrufen bei kaufDA (robots.txt: crawl-delay 2)
 
 KD_STORES = {  # kaufDA-Händlerseiten für Wörth am Rhein
     "rewe": "https://www.kaufda.de/Woerth-am-Rhein/REWE/p-r101",
@@ -32,6 +32,10 @@ KD_STORES = {  # kaufDA-Händlerseiten für Wörth am Rhein
     "lidl": "https://www.kaufda.de/Woerth-am-Rhein/Lidl/p-r74",
     "dm": "https://www.kaufda.de/Woerth-am-Rhein/dm-drogerie-markt/p-r104",
     "mueller": "https://www.kaufda.de/Woerth-am-Rhein/Mueller/p-r85",  # Müller im Maximilian-Center (Diagnose 02.11.)
+    # „EDEKA Wörth“ bei kaufDA = Marktkauf/Scheck-in im Maximilian-Center (eigener Prospekt, ~420 Angebote, Händler „EDEKA“).
+    # Welche Angebote zu Scheck-In gehören, entscheidet die Prospekt-ID dieser Seite (kd_store); scheck-in-center.de
+    # selbst verbietet Abrufe (robots.txt Disallow: /).
+    "scheck": "https://www.kaufda.de/Woerth-am-Rhein/EDEKA/p-r107",
 }
 # Händlerseiten der Nachbarorte zeigen je Ort andere 16 Angebote aus DEMSELBEN Prospekt (Diagnose 01.11.:
 # Edeka 16 -> 48, dm 16 -> 32). Übernommen wird nur, was aus dem Prospekt der eigenen Händlerseite stammt.
@@ -577,13 +581,26 @@ def kd_items(url):
     return items
 
 
+def scheck_flyers():
+    """Prospekt-IDs von Scheck-In Wörth: was die Händlerseite gerade zeigt + Prospekt-Gedächtnis (flyers.json)"""
+    return {b for b in KD_INFO.get(KD_STORES["scheck"], {}).get("brochures", set()) if b and b != "None"} | local_flyers("scheck")
+
+
+def kd_store(it):
+    """Markt eines kaufDA-Angebots. Scheck-In läuft bei kaufDA als „EDEKA“ -> über die Prospekt-ID unterscheiden."""
+    st = KD_PUBLISHER.get(it.get("publisherName"))
+    if st == "edeka" and str((it.get("parentContent") or {}).get("id")) in scheck_flyers():
+        return "scheck"
+    return st
+
+
 APP_COND = re.compile(r"lidl\s*plus|app[- ]?preis|mit (der )?app|netto[- ]?app|payback|deutschlandcard|kundenkarte|coupon", re.I)
 APP_LABEL = {"lidl": "Lidl Plus", "edeka": "Edeka-App", "netto": "Netto-App", "rewe": "Rewe-App", "dm": "dm-App", "aldi": "Aldi-App", "mueller": "Müller-App"}
 APP_HINT = re.compile(r"(?:mit\s+(?:der\s+)?app|app[- ]preis|rewe\s+bonus|lidl\s+plus|netto[- ]app)[^0-9]{0,25}(\d+)[,.](\d\d)", re.I)
 
 
 def kd_offer(it):
-    store = KD_PUBLISHER.get(it.get("publisherName"))
+    store = kd_store(it)
     if not store:
         return None
     paths = it.get("categoryPaths") or []
@@ -651,7 +668,7 @@ def fetch_kaufda():
         if url in near:
             home = {b for b in KD_INFO.get(KD_STORES[near[url]], {}).get("brochures", set()) if b and b != "None"} | local_flyers(near[url])
             for it in items:
-                if str((it.get("parentContent") or {}).get("id")) in home and KD_PUBLISHER.get(it.get("publisherName")) == near[url]:
+                if str((it.get("parentContent") or {}).get("id")) in home and kd_store(it) == near[url]:
                     o = kd_offer(it)
                     if o:
                         out.append(o)
@@ -659,7 +676,7 @@ def fetch_kaufda():
                         near_n += 1
             continue
         for it in items:
-            st = KD_PUBLISHER.get(it.get("publisherName"))
+            st = kd_store(it)
             if url not in KD_STORES.values() and st in regional:
                 regional[st].append(it)
                 continue
@@ -684,6 +701,10 @@ def fetch_kaufda():
 KD_PUB_IDS = {"edeka": "DE-220164", "rewe": "DE-1062"}  # kaufDA-Händlerkennung der Region (Edeka Südwest, Rewe)
 KD_SLUGS = {"lidl": ["Lidl"], "netto": ["Netto-Marken-Discount"], "rewe": ["REWE"], "edeka": ["Edeka"],
             "dm": ["dm-drogerie-markt", "Dm"], "mueller": ["Mueller"]}
+# zusätzliche Sortiment-Begriffe je Markt (Müller: Drogerie, Parfümerie, Spielwaren, Schreibwaren)
+KD_TERMS = {"mueller": """Parfum Duft Make-up Lippenstift Nagellack Mascara Haarfarbe Haarpflege Gesichtspflege Bodylotion Sonnenschutz
+Pflaster Vitamine Nahrungsergaenzung Babynahrung Schnuller Playmobil Schleich Barbie Puzzle Brettspiele Spiele Pluesch Kinderspielzeug
+Schreibwaren Basteln Buecher Socken Strumpfhosen Handtaschen Schmuck Uhren Haushaltswaren Deko Weihnachten Adventskalender""".split()}
 SORTIMENT = """Butter Milch Kaese Joghurt Quark Sahne Eier Mozzarella Margarine Pudding Skyr Frischkaese Gouda
 Hackfleisch Haehnchen Putenbrust Schweinefleisch Rindfleisch Steak Schnitzel Bratwurst Wuerstchen Salami Schinken Wurst Lachs Fisch Garnelen Thunfisch
 Obst Gemuese Tomaten Aepfel Bananen Kartoffeln Paprika Zwiebeln Salat Trauben Mandarinen Beeren Pilze
@@ -776,7 +797,7 @@ def fetch_sortiment(regional=None):
         slugs = KD_SLUGS[store]
         preview = set()
         local = KD_INFO.get(KD_STORES.get(store), {})
-        terms = list(dict.fromkeys(SORTIMENT + [l.rstrip("/").split("/")[-1] for l in local.get("links", [])]))
+        terms = list(dict.fromkeys(SORTIMENT + KD_TERMS.get(store, []) + [l.rstrip("/").split("/")[-1] for l in local.get("links", [])]))
         slug = None
         for sl in slugs:  # gibt es für diesen Händler Sortiment-Seiten?
             items, total = kd_page(f"https://www.kaufda.de/{sl}/Sortiment/Butter" if store not in ("dm", "mueller") else f"https://www.kaufda.de/{sl}/Sortiment/Shampoo")
@@ -815,6 +836,10 @@ def fetch_sortiment(regional=None):
             kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in ok
                           and (str((it.get("parentContent") or {}).get("id")) in base | preview
                                or kd_price(it) in ref.get(flyer_key(it), {kd_price(it)}))]
+        elif store == "mueller":
+            # bundesweite Seite: nur Prospekte, die auch die Wörther Händlerseite zeigt (bzw. flyers.json)
+            base = {b for b in local.get("brochures", set()) if b and b != "None"} | local_flyers(store)
+            kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in base] if base else found
         else:
             kept_items = found
         n0 = len(out)

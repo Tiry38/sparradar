@@ -485,8 +485,8 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .pcshare p{margin:0 0 8px}
 /* PC: Markt-Kacheln über die ganze Leiste verteilen (Handy bleibt wischbar) */
 @media (hover:hover) and (pointer:fine) and (min-width:721px){
-  #storeChips{flex-wrap:nowrap}
-  #storeChips .mtile{flex:1 1 0;min-width:0;flex-direction:row;justify-content:center;gap:12px;padding:10px 14px;text-align:left}
+  #storeChips{flex-wrap:wrap} /* reicht die Breite nicht (9 Märkte, 800 px), bricht die Leiste um statt seitlich zu scrollen */
+  #storeChips .mtile{flex:1 1 128px;min-width:0;flex-direction:row;justify-content:center;gap:10px;padding:10px 12px;text-align:left}
   #storeChips .mtile .mn{font-size:.92rem}
   #storeChips .mtile em{font-size:.78rem}
   #storeChips .mtile .mtx{display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-width:0}

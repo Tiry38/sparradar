@@ -41,6 +41,7 @@ def future_marks(grow=False):
         pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
         br = pi.get("brochures") or {}
         home[store] = f._ids([br.get("viewer"), br.get("publisher")], set()) | f.local_flyers(store)
+        f.KD_INFO.setdefault(url, {})["brochures"] = home[store]  # für kd_store (Scheck-In = Prospekt-ID der Wörther „EDEKA“-Seite)
         for key in ("viewer", "publisher"):  # nur Prospekte dieses Händlers, nicht die „sector“-Werbung anderer
             lst = (pi.get("brochures") or {}).get(key)
             for b in lst if isinstance(lst, list) else []:
@@ -53,7 +54,7 @@ def future_marks(grow=False):
                 pc = (it.get("parentContent") or {}).get("id")
                 if pc:
                     marks[f"{store}:{pc}"] = start
-            if grow and store in GROW and f.KD_PUBLISHER.get(it.get("publisherName")) == store:
+            if grow and store in GROW and f.kd_store(it) == store:
                 home[store].add(str((it.get("parentContent") or {}).get("id")))
                 o = f.kd_offer(it)
                 if o:
@@ -71,7 +72,7 @@ def future_marks(grow=False):
             if start >= today and it.get("publisherId") == pub:
                 marks[f"{store}:{(it.get('parentContent') or {}).get('id')}"] = start
             # bundesweite Seite: nur Angebote aus den eigenen Prospekten (Händlerseite bzw. flyers.json) übernehmen
-            if grow and f.KD_PUBLISHER.get(it.get("publisherName")) == store \
+            if grow and f.kd_store(it) == store \
                     and str((it.get("parentContent") or {}).get("id")) in home.get(store, set()):
                 o = f.kd_offer(it)
                 if o:
