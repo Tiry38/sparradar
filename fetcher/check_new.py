@@ -18,6 +18,11 @@ import time
 import fetch_offers as f
 
 STATE = os.path.join(f.DATA, "prospekte.json")
+# Händlerseiten zeigen je Aufruf andere 16 zufällige Angebote (Edeka 16 von ~230, dm 16 von ~150). Der Wächter lädt
+# sie sowieso (bis zu alle 5 min) -> was dabei auftaucht und in der App noch fehlt, übernimmt er gleich (add_seen),
+# ganz ohne zusätzliche Seitenaufrufe. Lidl/Netto kommen vollständig über Sortiment-Seiten bzw. lidl.de.
+GROW = ("edeka", "dm", "rewe")
+SEEN = []
 
 
 def future_marks():
@@ -43,6 +48,10 @@ def future_marks():
                 pc = (it.get("parentContent") or {}).get("id")
                 if pc:
                     marks[f"{store}:{pc}"] = start
+            if store in GROW and f.KD_PUBLISHER.get(it.get("publisherName")) == store:
+                o = f.kd_offer(it)
+                if o:
+                    SEEN.append(o)
     # Edeka/Rewe: Vorschau-Prospekte der nächsten Woche erscheinen zuerst auf den Sortiment-Seiten (gleiche Händler-Kennung)
     for store, slug, pub in (("edeka", "Edeka", "DE-220164"), ("rewe", "REWE", "DE-1062")):
         h = f.http(f"https://www.kaufda.de/{slug}/Sortiment/Kaffee")
@@ -77,6 +86,47 @@ def future_marks():
     return marks
 
 
+def add_seen():
+    """Gesehene Händlerseiten-Angebote, die in offers.json fehlen, übernehmen. „generated“ (= letzter kompletter
+    Abruf) bleibt, nur „upd“ ändert sich -> die App lädt neu. Höchstens alle 15 min (ab 10 neuen sofort), einzelne
+    Artikel erst nach 60 min, damit nicht jeder Durchgang einen Commit macht. Rückgabe: Anzahl übernommen."""
+    data = f.load("offers.json", {})
+    old = data.get("offers") or []
+    if len(old) < 30 or not SEEN:
+        return 0
+    have = {(o["s"], f.norm(o["n"])[:30], o["p"]) for o in old}
+    ids = {o.get("id") for o in old}
+    cand = [o for o in SEEN if (o["s"], f.norm(o["n"])[:30], o["p"]) not in have and o.get("id") not in ids]
+    if not cand:
+        f.log("Händlerseiten: nichts Neues")
+        return 0
+    f.OLD_OFFERS[:] = old
+    offers = f.finalize([dict(o) for o in old] + cand)
+    new_ids = {o.get("id") for o in cand}
+    n = sum(1 for o in offers if o.get("id") in new_ids and o.get("id") not in ids)
+    now = dt.datetime.now(dt.timezone.utc)
+    try:
+        gap = (now - dt.datetime.fromisoformat(data.get("upd") or data.get("generated"))).total_seconds() / 60
+    except (TypeError, ValueError):
+        gap = 999
+    if not n or (n < 10 and gap < 15) or (n < 3 and gap < 60):
+        f.log(f"Händlerseiten: {n} neue Angebote – warten auf mehr (letzte Änderung vor {gap:.0f} min)")
+        return 0
+    try:
+        f.measure_images(offers)  # misst nur neue Bilder (bekannte Größen aus OLD_OFFERS)
+    except Exception as e:
+        f.log("  ! Bildprüfung fehlgeschlagen:", repr(e))
+    counts = {}
+    for o in offers:
+        counts[o["s"]] = counts.get(o["s"], 0) + 1
+    upd = now.isoformat(timespec="minutes")
+    data.update({"upd": upd, "counts": counts, "offers": offers})
+    f.save("offers.json", data)
+    f.save("stand.json", {"generated": data.get("generated"), "upd": upd})
+    f.log(f"Händlerseiten: {n} neue Angebote übernommen", {s: c for s, c in counts.items() if s in GROW})
+    return n
+
+
 def main():
     marks = future_marks()
     seen = f.load("prospekte.json", {})
@@ -94,10 +144,12 @@ def main():
         return
     new = sorted(k for k in marks if k not in seen)
     f.log("Prospekt-Wächter: künftige Prospekte", len(marks), "davon neu:", new or "keine")
+    # Startet gleich der komplette Abruf (neuer Prospekt) oder läuft er schon (SR_ADD=0), nichts selbst schreiben
+    added = add_seen() if not new and os.environ.get("SR_ADD") == "1" else 0
     out = os.environ.get("GITHUB_OUTPUT")
     if out:
         with open(out, "a") as fh:
-            fh.write(f"new={'true' if new else 'false'}\n")
+            fh.write(f"new={'true' if new else 'false'}\nadded={added}\n")
 
 
 if __name__ == "__main__":

@@ -991,6 +991,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  128:["📥 Edeka, dm und Rewe zeigen online immer nur einen Teil ihrer Angebote. SparRadar sammelt jetzt über den ganzen Tag weiter und ergänzt fehlende Angebote automatisch."],
   127:["🖼️ Zeigt ein Bild einen anderen Artikel? In der Detailansicht unten rechts auf „Falsches Bild?“ tippen – dann wird es ausgeblendet. Der Schoko Drink von Lidl hat jetzt das richtige Bild."],
   126:["🍾 Einkaufszettel: Pfand wird jetzt mitgerechnet (bei Getränken mit „zzgl. Pfand“). Die Summe stimmt also mit der Kasse überein.","🧾 Hast du schon Kassenbons eingetragen? Dann steht bei eigenen Einträgen wie „Brot“, was du zuletzt dafür bezahlt hast, und die Summe rechnet es mit „ca.“ ein.","💪 Neuer Filter „Eiweiß pro €“: zeigt, wo du Eiweiß am günstigsten bekommst (z. B. Quark, Hähnchen, Thunfisch, Eier).","🎌 Feiertage: Die App sagt dir vorher, wann die Märkte geschlossen haben, damit du rechtzeitig einkaufst.","🎤 Zettel: Neuer Knopf „Sprechen“. Sag z. B. „Milch, Butter und drei Eier“ – alles steht sofort drauf.","📲 App-Symbol lange drücken: direkt zum Einkaufszettel, zum Scanner oder zur Merkliste."],
   125:["📷 Einkaufszettel: Neuer Knopf „Scannen“. Im Laden einfach den Strichcode scannen – der Artikel kommt sofort auf den Zettel. Ist er im Angebot, steht er gleich mit Angebotspreis drauf. Während des Einkaufs liegt er direkt im Wagen."],
@@ -2418,7 +2419,8 @@ async function freshen(){
     const v=(await (await fetch("index.html",{cache:"no-store"})).text()).match(/app\.js\?v=(\d+)/)?.[1];
     if(v&&MYV&&v!==MYV){location.reload();return}
     const o=await (await fetch("data/stand.json",{cache:"no-store"})).json();  // winzig, statt jedes Mal alle Angebote zu laden
-    if(o.generated&&o.generated!==META.generated)load();
+    const k=x=>x.upd||x.generated;  // upd = auch Nachträge des Prospekt-Wächters, generated = letzter kompletter Abruf
+    if(k(o)&&k(o)!==k(META))load();
   }catch(e){}
 }
 setInterval(freshen,60*1000);  // jede Minute: neue Angebote sind spätestens 1 min nach dem Hochladen in der offenen App

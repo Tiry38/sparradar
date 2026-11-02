@@ -11,7 +11,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write  # gesehene Händlerseiten-Angebote, die noch fehlen, gleich in offers.json übernehmen
   actions: write   # um „Angebote abrufen“ zu starten
 
 concurrency:
@@ -29,10 +29,29 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Läuft gerade „Angebote abrufen“?
+        id: busy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow angebote.yml --limit 5 --json status -q '[.[]|select(.status!="completed")]|length')" >> "$GITHUB_OUTPUT"
+
       - name: Neue Prospekte?
         id: check
         working-directory: fetcher
+        env:
+          SR_ADD: ${{ steps.busy.outputs.n == '0' && '1' || '0' }}   # während eines Abrufs nichts selbst schreiben
         run: python check_new.py
+
+      # Edeka/dm/Rewe zeigen je Aufruf andere 16 Angebote: was der Wächter dabei sieht und noch fehlt, kommt gleich in
+      # die App (keine zusätzlichen Seitenaufrufe). Ist inzwischen ein neuer Stand online, wird nichts überschrieben.
+      - name: Gesehene Angebote speichern
+        if: steps.check.outputs.added != '0' && steps.check.outputs.added != '' && steps.check.outputs.new != 'true'
+        run: |
+          git config user.name "SparRadar Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/data/offers.json docs/data/stand.json
+          git commit -q -m "Angebote $(date +%F) (+${{ steps.check.outputs.added }} vom Prospekt-Wächter)"
+          git push || echo "Inzwischen neuer Stand online – nichts überschrieben, der nächste Durchgang sammelt weiter"
 
       - name: Kompletten Abruf starten
         if: steps.check.outputs.new == 'true'

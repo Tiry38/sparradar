@@ -1376,8 +1376,9 @@ def write_offers(offers):
     for o in offers:
         counts[o["s"]] = counts.get(o["s"], 0) + 1
     gen = dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes")
-    save("offers.json", {"generated": gen, "region": "Wörth am Rhein", "counts": counts, "offers": offers})
-    save("stand.json", {"generated": gen})  # winzige Datei: daran erkennt die App neue Daten, ohne alles zu laden
+    # „upd“ = letzte Änderung (auch vom Prospekt-Wächter, check_new.add_seen), „generated“ = letzter kompletter Abruf
+    save("offers.json", {"generated": gen, "upd": gen, "region": "Wörth am Rhein", "counts": counts, "offers": offers})
+    save("stand.json", {"generated": gen, "upd": gen})  # winzige Datei: daran erkennt die App neue Daten, ohne alles zu laden
     return counts
 
 
