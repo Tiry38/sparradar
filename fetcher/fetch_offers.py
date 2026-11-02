@@ -642,7 +642,7 @@ def fetch_kaufda():
     for n, url in enumerate(pages, 1):
         items = kd_items(url)
         if url in near:
-            home = {b for b in KD_INFO.get(KD_STORES[near[url]], {}).get("brochures", set()) if b and b != "None"}
+            home = {b for b in KD_INFO.get(KD_STORES[near[url]], {}).get("brochures", set()) if b and b != "None"} | local_flyers(near[url])
             for it in items:
                 if str((it.get("parentContent") or {}).get("id")) in home and KD_PUBLISHER.get(it.get("publisherName")) == near[url]:
                     o = kd_offer(it)
@@ -714,21 +714,41 @@ def flyer_ref(items, known, base_ids):
 
 def same_flyer(items, ref, base_ids, store=""):
     """Welche Prospekte entsprechen dem lokalen Prospekt? Manche Märkte haben eine eigene Prospekt-ID mit gleichem
-    Inhalt. Ein fremder Prospekt zählt als „unserer“, wenn mindestens 2 Artikel mit gleicher Marke, gleichem Namen und
-    gleichem Preis wie im lokalen Prospekt vorkommen und höchstens jeder 5. gemeinsame Artikel einen anderen Preis hat.
+    Inhalt. Ein fremder Prospekt zählt als „unserer“, wenn mindestens 2 Artikel (und mind. 2 % seiner Artikel) mit
+    gleicher Marke, gleichem Namen und gleichem Preis wie im lokalen Prospekt vorkommen und höchstens jeder 5.
+    gemeinsame Artikel einen anderen Preis hat. Geprüft wird nacheinander, der sicherste Prospekt zuerst; jeder
+    übernommene Prospekt erweitert die Vergleichsliste `ref` (nur um Artikel, die dort noch fehlen).
     Anlass 02.11.: ein Edeka-Prospekt einer anderen Gegend hatte 2 gleiche Artikel, aber z. B. Président Meersalzbutter
-    2,49 statt 2,79 € und Wagner Pizza 3,99 statt 2,49 € -> 206 Angebote mit falschen Preisen in der App."""
-    stats = {}
+    2,49 statt 2,79 € und Wagner Pizza 3,99 statt 2,49 € -> über 200 Angebote mit falschen Preisen in der App."""
+    groups = {}
     for it in items:
         b = str((it.get("parentContent") or {}).get("id"))
-        if b in base_ids:
-            continue
-        s = stats.setdefault(b, [0, 0, 0])  # Artikel, gleicher Preis, anderer Preis
-        s[0] += 1
-        prices = ref.get(flyer_key(it))
-        if prices:
-            s[1 if kd_price(it) in prices else 2] += 1
-    ok = {b for b, (n, same, diff) in stats.items() if same >= 2 and diff * 4 <= same}
+        if b not in base_ids:
+            groups.setdefault(b, []).append(it)
+
+    def stat(its):
+        same = diff = 0
+        for it in its:
+            prices = ref.get(flyer_key(it))
+            if prices:
+                if kd_price(it) in prices:
+                    same += 1
+                else:
+                    diff += 1
+        return [len(its), same, diff]
+
+    ok, stats, left = set(), {}, set(groups)
+    while left:
+        for b in left:
+            stats[b] = stat(groups[b])
+        good = [b for b in left if stats[b][1] >= max(2, stats[b][0] * 0.02) and stats[b][2] * 4 <= stats[b][1]]
+        if not good:
+            break
+        best = max(good, key=lambda b: (stats[b][1] - 4 * stats[b][2], stats[b][1]))
+        ok.add(best)
+        left.discard(best)
+        for it in groups[best]:
+            ref.setdefault(flyer_key(it), {kd_price(it)})
     for b, (n, same, diff) in sorted(stats.items(), key=lambda kv: -kv[1][0]):
         if same or diff:
             log(f"  {store}: Prospekt {b[:8]} ({n} Artikel): {same} gleich, {diff} anderer Preis"
@@ -764,7 +784,7 @@ def fetch_sortiment(regional=None):
         found = [it for it in found if not (it.get("id") in seen or seen.add(it.get("id")))]
         if store in ("rewe", "edeka"):
             # regionale Händler: nur Prospekte mit gleichem Inhalt wie die lokale Händlerseite
-            base = {b for b in local.get("brochures", set()) if b and b != "None"}
+            base = {b for b in local.get("brochures", set()) if b and b != "None"} | local_flyers(store)
             known = set(local.get("known", set()))
             for city in KD_NEAR.get(store, []):  # Händlerseiten der Nachbarorte (gleicher Prospekt) zählen mit
                 known |= KD_INFO.get(f"https://www.kaufda.de/{city}/{'/'.join(KD_STORES[store].split('/')[4:])}", {}).get("known", set())
@@ -881,6 +901,36 @@ def save(name, obj):
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
     os.replace(tmp, os.path.join(DATA, name))
+
+
+# Gedächtnis der eigenen Prospekte (docs/data/flyers.json = {Markt: {Prospekt-ID: zuletzt gesehen}}): Die Händlerseite
+# zeigt je Abruf nur 16 zufällige Angebote, ein echter Jockgrim-Prospekt fehlt dort also manchmal (02.11., 4:47 Uhr:
+# fb448281 fehlte -> fremder Prospekt 8c874c03 ohne Gegenbeweis übernommen). Gemerkt wird nur, was die lokale
+# Händlerseite selbst gezeigt hat, 21 Tage lang.
+FLYERS = None
+FLYER_DAYS = 21
+
+
+def local_flyers(store):
+    global FLYERS
+    if FLYERS is None:
+        FLYERS = load("flyers.json", {})
+    return set((FLYERS.get(store) or {}).keys())
+
+
+def remember_flyers():
+    local_flyers("")
+    today = dt.date.today()
+    cut = (today - dt.timedelta(days=FLYER_DAYS)).isoformat()
+    data = {}
+    for st, url in KD_STORES.items():
+        seen = {b: d for b, d in (FLYERS.get(st) or {}).items() if d >= cut}
+        seen.update({b: today.isoformat() for b in KD_INFO.get(url, {}).get("brochures", set()) if b and b != "None"})
+        if seen:
+            data[st] = dict(sorted(seen.items()))
+    FLYERS.clear()
+    FLYERS.update(data)
+    save("flyers.json", data)
 
 
 def merge(offers):
@@ -1387,6 +1437,16 @@ def main():
         if n_old >= 20 and n_new < n_old * 0.3:
             log(f"  ! {st}: nur {n_new} statt bisher {n_old} Angebote – Quelle gestört? Alte gültige Angebote bleiben.")
             new += [dict(o) for o in valid if o["s"] == st]
+    # Händlerseiten zeigen je Abruf andere 16 Angebote: Schon gesehene, noch gültige Angebote aus den eigenen Prospekten
+    # (Edeka Jockgrim, dm, Rewe) bleiben stehen, auch wenn sie diesmal nicht dabei waren. Neue Daten zuerst -> merge()
+    # bevorzugt sie. Fremde Prospekte sind nie in flyers.json und bleiben deshalb nicht hängen.
+    remember_flyers()
+    for st in ("edeka", "dm", "rewe"):
+        mine = local_flyers(st)
+        stick = [dict(o) for o in valid if o["s"] == st and not o.get("pv") and o.get("bid") in mine]
+        if stick:
+            new += stick
+            log(f"  {st}: {len(stick)} bisherige Angebote aus eigenen Prospekten behalten (doppelte fallen in merge raus)")
     offers = finalize(new, save_uvp=True)
     try:
         measure_images(offers)
