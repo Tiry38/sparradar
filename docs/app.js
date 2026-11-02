@@ -991,6 +991,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  129:["🍏 SparRadar gibt es jetzt auch fürs iPhone und iPad: In den Einstellungen unter „SparRadar verschenken“ kannst du die App an Freunde mit Apple-Geräten schicken – per WhatsApp, iMessage oder als Link."],
   128:["📥 Edeka, dm und Rewe zeigen online immer nur einen Teil ihrer Angebote. SparRadar sammelt jetzt über den ganzen Tag weiter und ergänzt fehlende Angebote automatisch."],
   127:["🖼️ Zeigt ein Bild einen anderen Artikel? In der Detailansicht unten rechts auf „Falsches Bild?“ tippen – dann wird es ausgeblendet. Der Schoko Drink von Lidl hat jetzt das richtige Bild."],
   126:["🍾 Einkaufszettel: Pfand wird jetzt mitgerechnet (bei Getränken mit „zzgl. Pfand“). Die Summe stimmt also mit der Kasse überein.","🧾 Hast du schon Kassenbons eingetragen? Dann steht bei eigenen Einträgen wie „Brot“, was du zuletzt dafür bezahlt hast, und die Summe rechnet es mit „ca.“ ein.","💪 Neuer Filter „Eiweiß pro €“: zeigt, wo du Eiweiß am günstigsten bekommst (z. B. Quark, Hähnchen, Thunfisch, Eier).","🎌 Feiertage: Die App sagt dir vorher, wann die Märkte geschlossen haben, damit du rechtzeitig einkaufst.","🎤 Zettel: Neuer Knopf „Sprechen“. Sag z. B. „Milch, Butter und drei Eier“ – alles steht sofort drauf.","📲 App-Symbol lange drücken: direkt zum Einkaufszettel, zum Scanner oder zur Merkliste."],
@@ -1979,6 +1980,10 @@ const inviteText = () => { const n=(store.get("inviteName","")||"").trim();
 const EXE_URL="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe";
 const pcMailText=()=>{const n=(store.get("inviteName","")||"").trim();
   return `Hallo,\n\nhier ist SparRadar für deinen PC – alle Angebote von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth, mit Einkaufszettel und Geld-zurück-Aktionen.\n\nSo geht's am PC:\n1. Diesen Link in Google Chrome oder Microsoft Edge öffnen:\n${inviteUrl()}\n2. Auf „SparRadar installieren“ klicken und bestätigen – fertig.\nSparRadar liegt dann im Startmenü und aktualisiert sich von selbst.\n\nOder als Windows-Programm herunterladen:\n${EXE_URL}\n(Windows zeigt dabei eventuell eine Warnung, weil das Programm neu ist: „Weitere Informationen“ → „Trotzdem ausführen“.)\n\nViele Grüße${n?"\n"+n:""}`};
+// Apple: kein App Store (bräuchte Apple-Entwicklerkonto + Mac; reine Web-Hüllen lehnt Apple ab) -> Web-App über Safari „Zum Home-Bildschirm“
+const iosText=()=>{const n=(store.get("inviteName","")||"").trim();
+  return `🍏 SparRadar für dein iPhone${n?" – Einladung von "+n:""}\n\nAlle Angebote von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth in einer App.\n\n👉 So geht's (1 Minute):\n1. Link in Safari öffnen\n2. Auf Teilen tippen (Quadrat mit Pfeil – bei neueren iPhones erst unten auf ⋯)\n3. „Zum Home-Bildschirm“ → „Hinzufügen“ – fertig!\n\nOhne App Store, ohne Anmeldung, Updates kommen von selbst.\n${inviteUrl()}`};
+const iosSms=()=>"sms:&body="+encodeURIComponent(iosText());
 const pcMailLink=()=>"mailto:?subject="+encodeURIComponent("SparRadar für deinen PC")+"&body="+encodeURIComponent(pcMailText());
 function renderShare(){
   const n=store.get("inviteName","");
@@ -1990,6 +1995,8 @@ function renderShare(){
    <div class="links"><a class="btn wa inv-btn" id="inviteWa" href="${waLink(inviteText())}" target="_blank" rel="noopener">${WA_ICON}Einladung per WhatsApp senden</a>${navigator.share?'<button class="btn ghost" id="shareOther">Anders teilen …</button>':""}</div>
    <div class="pcshare"><h4>💻 Für den PC</h4><p>Schick dir oder anderen SparRadar per E-Mail. Am PC die E-Mail öffnen, auf den Link klicken, „SparRadar installieren“ – fertig.</p>
     <div class="links"><a class="btn" id="pcMail" href="${pcMailLink()}">✉️ PC-Version per E-Mail senden</a><button class="btn ghost" id="pcCopy">Link kopieren</button></div></div>
+   <div class="pcshare"><h4>🍏 Für iPhone, iPad &amp; Mac</h4><p>Für Freunde mit Apple-Geräten. Sie öffnen den Link in <b>Safari</b> und legen SparRadar mit 3 Tipps auf den Home-Bildschirm – ohne App Store, ohne Anmeldung, Updates kommen von selbst.</p>
+    <div class="links"><a class="btn wa" id="iosWa" href="${waLink(iosText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp senden</a><a class="btn" id="iosSms" href="${iosSms()}">💬 Per iMessage / SMS</a><button class="btn ghost" id="iosCopy">Link kopieren</button></div></div>
   </section>`}
 
 function renderSettings(){
@@ -2002,7 +2009,7 @@ function renderSettings(){
    ${renderFor()}
    ${ANDROID?`<section class="panel"><h3>📱 Nach dem Einkauf</h3><p>Hakst du am Handy den letzten Artikel ab, gilt der Einkauf als erledigt. Danach öffnet SparRadar die App des Markts (Lidl Plus, REWE, EDEKA, ALDI SÜD, Netto, Mein dm), damit du an der Kasse gleich deine Kundenkarte zeigen kannst.</p><button class="chip${store.get("openMktApp",true)?" on":""}" data-mktauto="1" aria-pressed="${store.get("openMktApp",true)}">${store.get("openMktApp",true)?"✓ Markt-App automatisch öffnen":"Markt-App automatisch öffnen"}</button></section>`:""}
    <section class="panel"><h3>👋 Erste Schritte</h3><p>Kurz erklärt, was SparRadar alles kann.</p><button class="btn ghost sm" data-showwelcome="1">Willkommens-Infos ansehen</button></section>
-   <section class="panel"><h3>SparRadar als App</h3><p><b>Am einfachsten:</b> SparRadar in Chrome öffnen → Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. Ohne Warnungen, aktualisiert sich selbst.</p><p>Alternativ als Datei: Android-App (APK, Android fragt dabei nach Erlaubnis) oder Windows-Setup. Beide aktualisieren sich danach ebenfalls selbst.</p>
+   <section class="panel"><h3>SparRadar als App</h3><p><b>Am einfachsten:</b> SparRadar in Chrome öffnen → Menü ⋮ → „App installieren“ bzw. „Zum Startbildschirm hinzufügen“. Ohne Warnungen, aktualisiert sich selbst.</p><p><b>iPhone & iPad:</b> SparRadar in Safari öffnen → Teilen (Quadrat mit Pfeil) → „Zum Home-Bildschirm“. <b>Mac:</b> in Safari „Ablage“ → „Zum Dock hinzufügen“.</p><p>Alternativ als Datei: Android-App (APK, Android fragt dabei nach Erlaubnis) oder Windows-Setup. Beide aktualisieren sich danach ebenfalls selbst.</p>
     <div class="links"><a class="btn ghost sm" href="${APK_URL}">Android-App (APK)</a><a class="btn ghost sm" href="https://github.com/Tiry38/sparradar/releases/download/apps/SparRadar-Setup.exe">Windows-Setup</a></div></section>
    <section class="panel"><h3>Über SparRadar</h3><p>Angebote werden jeden Morgen ab ca. 4 Uhr neu abgerufen (im Sommer ab 5 Uhr)${g?`, zuletzt am ${g.toLocaleDateString("de-DE",{weekday:"long",day:"2-digit",month:"2-digit"})} um ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr`:""}. ${OFFERS.length} Angebote, ${NAMES.length} bekannte Artikel für Vorschläge.</p>
     <div class="links"><button class="btn ghost sm" id="reloadApp">App neu laden</button>${window.SparRadarApp?'<button class="btn ghost sm" id="appUpdNow">Nach App-Update suchen</button>':""}</div></section>
@@ -2334,6 +2341,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
   if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
+  if(b.id==="iosCopy"){copy(inviteUrl(),"Link kopiert – auf dem iPhone in Safari öffnen");return}
   if(b.id==="pcCopy"){copy(inviteUrl(),"Link kopiert – am PC in Chrome oder Edge öffnen");return}
   if(b.id==="shareOther"){navigator.share({title:"Persönliche Einladung zu SparRadar",text:inviteText()}).catch(()=>{});return}
   if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){S.watch.push({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
@@ -2375,7 +2383,7 @@ document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.targ
 document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");if(e.target.id==="extraIn")showSugg("exSugg",parseExtra(e.target.value).n,"ex");
   if(e.target.id==="syncToken"){const cp=codeParse(e.target.value);if(cp.p){store.set("syncPick",cp.p);
     document.querySelectorAll("[data-pick]").forEach(c=>{const on=cp.p[c.dataset.pick];c.classList.toggle("on",on);c.setAttribute("aria-pressed",on);c.textContent=(on?"✓ ":"")+Sync.PARTS[c.dataset.pick].n})}}
-  if(e.target.id==="inviteName"){store.set("inviteName",e.target.value.trim());const a=document.getElementById("inviteWa");if(a)a.href=waLink(inviteText());const m=document.getElementById("pcMail");if(m)m.href=pcMailLink()}});
+  if(e.target.id==="inviteName"){store.set("inviteName",e.target.value.trim());const a=document.getElementById("inviteWa");if(a)a.href=waLink(inviteText());const m=document.getElementById("pcMail");if(m)m.href=pcMailLink();const iw=document.getElementById("iosWa");if(iw)iw.href=waLink(iosText());const is=document.getElementById("iosSms");if(is)is.href=iosSms()}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")hideSugg();if(e.key==="Enter"&&e.target.id==="q"){hideSugg();e.target.blur()}});
 // Schrift größer (A+): vergrößert die ganze App gleichmäßig, Layout passt sich an
 const ZOOM=[1,1.2,1.4],ZOOM_UI=[["A+","Schrift größer"],["A++","Schrift noch größer"],["A−","Wieder normale Schriftgröße"]];

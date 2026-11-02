@@ -9,7 +9,10 @@
 <meta name="theme-color" content="#16191C">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SparRadar">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
 <!-- Vorschau in WhatsApp & Co. -->
 <meta property="og:title" content="🎁 Persönliche Einladung zu SparRadar">
 <meta property="og:description" content="Du wurdest ausgewählt: alle Angebote von Lidl, Aldi, Rewe, Netto, Edeka und dm rund um Wörth in einer App.">
@@ -143,6 +146,7 @@
     c.hidden = false;
     btn.hidden = true;
   }
+  if (ios && !standalone) btn.textContent = "🍏 So kommt SparRadar aufs iPhone";  // Apple hat keinen Installieren-Knopf -> Anleitung
   addEventListener("appinstalled", () => done());
   if (standalone) {
     // schon als App installiert und geöffnet: keine Installations-Schritte zeigen
@@ -164,6 +168,9 @@
     if (ios) return "<b>So installierst du SparRadar:</b><ol><li>Auf <b>Teilen</b> tippen (Quadrat mit Pfeil nach oben – bei neueren iPhones erst unten auf <b>⋯</b>)</li>"
       + "<li><b>„Zum Home-Bildschirm“</b> wählen (evtl. etwas nach unten wischen)</li><li>Oben rechts auf <b>„Hinzufügen“</b> tippen</li></ol>"
       + "<p class='small'>Kein „Teilen“ zu sehen? Dann ist die Seite in einer anderen App geöffnet: erst <b>„In Safari öffnen“</b> wählen.</p>";
+    if (/Macintosh/.test(UA) && /Safari\//.test(UA) && !/Chrome|Chromium|Edg\/|Firefox/.test(UA))
+      return "<b>So installierst du SparRadar am Mac:</b><ol><li>Oben in der Menüleiste auf <b>„Ablage“</b> klicken</li><li><b>„Zum Dock hinzufügen“</b> wählen</li><li>Mit <b>„Hinzufügen“</b> bestätigen</li></ol>"
+        + "<p class='small'>SparRadar liegt dann im Dock und im Ordner „Programme“. Geht ab macOS Sonoma (14), sonst Chrome oder Edge nehmen.</p>";
     if (!android) return "<b>So installierst du SparRadar am PC:</b><ol><li>In <b>Chrome</b> oder <b>Edge</b> oben in der Adressleiste rechts auf das Symbol <b>„App installieren“</b> klicken (kleiner Bildschirm mit Pfeil)</li>"
       + "<li>Mit <b>„Installieren“</b> bestätigen</li></ol>"
       + "<p class='small'>Kein Symbol zu sehen? Im Menü <b>⋮</b> bzw. <b>…</b> nach <b>„installieren“</b> suchen (Chrome: „Streamen, speichern und teilen“, Edge: „Apps“).</p>";
