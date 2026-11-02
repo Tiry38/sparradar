@@ -130,7 +130,10 @@ def add_seen():
         gap = (now - dt.datetime.fromisoformat(data.get("upd") or data.get("generated"))).total_seconds() / 60
     except (TypeError, ValueError):
         gap = 999
-    if not n or gap < 10 or (n < 10 and gap < 15) or (n < 3 and gap < 60):
+    if not n:  # nur Doppel bestehender Karten (anders aufgeteilter Name, Sorten-/App-Doppel) -> finalize führt zusammen
+        f.log("Eingesammelt: nichts Neues", f"({len(SEEN)} Angebote angesehen, {len(cand)} davon Doppel)")
+        return 0
+    if gap < 10 or (n < 10 and gap < 15) or (n < 3 and gap < 60):
         f.log(f"Eingesammelt: {n} neue Angebote – warten auf mehr (letzte Änderung vor {gap:.0f} min)")
         return 0
     try:
