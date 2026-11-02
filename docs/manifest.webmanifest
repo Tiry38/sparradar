@@ -8,6 +8,8 @@
   "display": "standalone",
   "background_color": "#16191C",
   "theme_color": "#16191C",
+  "related_applications": [{ "platform": "webapp", "url": "https://tiry38.github.io/sparradar/manifest.webmanifest" }],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "icon-192.png",
