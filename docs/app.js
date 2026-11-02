@@ -7,8 +7,12 @@ const STORES = {
   rewe:   {n:"Rewe",          m:"Re", c:"#D9363E", app:"Rewe Bonus", link:"https://www.kaufda.de/Woerth-am-Rhein/REWE/p-r101", dom:"rewe.de"},
   netto:  {n:"Netto",         m:"Ne", c:"#C99400", app:"Netto App",  link:"https://www.kaufda.de/Woerth-am-Rhein/Netto-Marken-Discount/p-r9", dom:"netto-online.de"},
   edeka:  {n:"Edeka Jockgrim",m:"Ed", c:"#1F5FAF", app:"Payback",    link:"https://www.kaufda.de/Jockgrim/EDEKA/p-r107", dom:"edeka.de"},
-  dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/", dom:"dm.de"}
+  dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/", dom:"dm.de"},
+  // Maximilian-Center Wörth-Maximiliansau: nur zu sehen, wenn man den Markt oben ausdrücklich antippt (opt)
+  mueller:{n:"Müller",        m:"Mü", c:"#E8620C", opt:1, link:"https://www.mueller.de/", dom:"mueller.de"},
+  scheck: {n:"Scheck-In Center",m:"SI",c:"#C4161C", opt:1, link:"https://www.scheck-in-center.de/", dom:"scheck-in-center.de"}
 };
+const OPT = new Set(Object.keys(STORES).filter(k=>STORES[k].opt));
 const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käse & Eier",brot:"Brot & Backwaren",vorrat:"Vorrat",tk:"Tiefkühl",suess:"Süßes & Snacks",kaffee:"Kaffee & Tee",getraenke:"Getränke",katze:"Katzenfutter",drogerie:"Drogerie & Pflege",
   haushalt:"Haushalt & Putzen",tier:"Tierbedarf",baby:"Baby & Kind",technik:"Technik & Elektro",mode:"Mode & Schuhe",wohnen:"Wohnen & Küche",garten:"Garten & Heimwerken",freizeit:"Freizeit, Spiel & Reisen",sonstiges:"Sonstiges"};
 const NONFOOD_CATS = ["haushalt","tier","baby","technik","mode","wohnen","garten","freizeit","sonstiges"];
@@ -59,7 +63,7 @@ const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0},store.get("flt",{}),store.get("fltq")?{}:{cb:0}),useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
   coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),act:store.get("act",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),sheet:null,limit:60};
-let OFFERS = [], RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
+let OFFERS = [], ALLO = [], OPTK = null, RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
 // Einkaufstag: Samstag ab 22 Uhr und sonntags hat kein Markt mehr offen -> die Hauptseite zeigt schon die
@@ -474,6 +478,11 @@ const wasLbl = o => o.o&&o.ou===1&&ref(o)===o.o?"UVP":"statt";
 const dealWarn = o => !!(o.rk&&o.rk.t==="warn");
 // Sortierung: zweifelhafte Rabatte zählen nur mit der realistischen Ersparnis (sonst höchstens 45 %)
 const sortPct = o => dealWarn(o)?(o.rk.real!=null?Math.min(o.rk.real,offPct(o)):Math.min(offPct(o),45)):offPct(o);
+// Müller/Scheck-In (STORES.opt) nur, wenn oben ausdrücklich gewählt: OFFERS = sichtbare Angebote, ALLO = alle.
+// Gilt überall (Liste, Kracher, Merkliste, Preisvergleich, „woanders billiger“); Zettel-Einträge findet byId weiter.
+function optSync(force){const k=[...S.stores].filter(s=>OPT.has(s)).sort().join();if(!force&&k===OPTK)return;OPTK=k;
+  OFFERS=ALLO.filter(o=>!OPT.has(o.s)||S.stores.has(o.s));PERK.clear();CMP.clear();CHEAP.clear();memoReset()}
+const optCount = (k,wk) => ALLO.reduce((n,o)=>n+(o.s===k&&(!wk||(S.week?isNextWk(o):!isNextWk(o)))?1:0),0);
 const weekOffers = () => OFFERS.filter(o => S.week ? isNextWk(o) : !isNextWk(o));
 function filtered(){
   let r=weekOffers();
@@ -531,9 +540,9 @@ const watchHits = wk => S.watch.map(w=>({w,hits:OFFERS.filter(o=>(wk==null||(wk?
 const nKey=o=>o.id+"|"+(o.from||"");
 const SESS=store.get("sess",{});{const t=Date.now();if(!SESS.s||t-(SESS.a||0)>30*6e4)SESS.s=t;SESS.a=t;store.set("sess",SESS)}
 let SEEN=store.get("seen",null);
-function seenStamp(){if(!OFFERS.length)return;const t=Math.floor(Date.now()/6e4),first=!SEEN;SEEN=SEEN||{};let ch=first;
-  for(const o of OFFERS){const k=nKey(o);if(SEEN[k]==null){SEEN[k]=first?0:t;ch=true}}
-  if(!ch)return;const cur=new Set(OFFERS.map(nKey)),old=t-30*1440;
+function seenStamp(){if(!ALLO.length)return;const t=Math.floor(Date.now()/6e4),first=!SEEN;SEEN=SEEN||{};let ch=first;
+  for(const o of ALLO){const k=nKey(o);if(SEEN[k]==null){SEEN[k]=first?0:t;ch=true}}
+  if(!ch)return;const cur=new Set(ALLO.map(nKey)),old=t-30*1440;
   for(const k in SEEN)if(!cur.has(k)&&SEEN[k]<old)delete SEEN[k]; // kaufDA mischt: kurz verschwundene Angebote zählen 30 Tage als gesehen
   store.set("seen",SEEN)}
 const isNew=o=>!!SEEN&&(SEEN[nKey(o)]??Infinity)>=Math.floor(SESS.s/6e4);
@@ -551,7 +560,7 @@ function watchToList(wk){const add=[];
   if(add.length)save();return add}
 const w2lTxt=a=>a.slice(0,3).map(o=>`${o.n} (${sname(o.s)} ${eur(fin(o))})`).join(", ")+(a.length>3?` und ${a.length-3} weitere`:"");
 // Abgelaufenes Angebot auf dem Zettel, und derselbe Artikel (gleicher Markt, Name, Marke) ist wieder im Angebot -> still erneuern
-function autoRenew(){const wo=OFFERS.filter(o=>!isNextWk(o)),got=[];
+function autoRenew(){const wo=ALLO.filter(o=>!isNextWk(o)),got=[];
   S.list=S.list.map(id=>{if(byId(id)||!OLD.has(id))return id;const o=OLD.get(id),nn=norm(o.n),bb=norm(o.b||"");
     const x=wo.filter(x=>x.s===o.s&&norm(x.n)===nn&&norm(x.b||"")===bb&&!S.list.includes(x.id)).sort((a,c)=>fin(a)-fin(c))[0];
     if(!x)return id;got.push(x);if(S.qty[id]){S.qty[x.id]=S.qty[id];delete S.qty[id]}S.checked=S.checked.map(c=>c===id?x.id:c);return x.id});
@@ -565,18 +574,17 @@ async function load(){
     fetch("app-version.json",{cache:"no-store"}).then(r=>r.json()).then(v=>{APPV=v||{};render()}).catch(()=>{});
     META=o;HIST=h;HPC=new WeakMap();HOC=new WeakMap();
     loadCashback().then(()=>render()); // Geld-zurück-Abzeichen an den Angeboten
-    RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));OFFERS=RAW.map(checkDeal);PERK.clear();CMP.clear();CHEAP.clear();twinFix();
-    OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});seenStamp();autoRenew();
+    RAW=appTwins(o.offers.filter(x=>!x.to||x.to>=SHOP));OLD=new Map(o.offers.filter(x=>x.to&&x.to<SHOP).map(x=>[x.id,x]));ALLO=RAW.map(checkDeal);ALLO.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});optSync(1);twinFix();
+    seenStamp();autoRenew();
     const g=new Date(o.generated);
     const pr=flyerInfo();
     document.getElementById("stand").innerHTML=`Wörth am Rhein · Stand ${g.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}, ${g.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr · ${OFFERS.length} Angebote<span id="tick"></span>${pr.sum?`<br><button class="flyer" id="flyerBtn" aria-expanded="false">${pr.sum}</button>`:""}`;if(typeof tickShow==="function")tickShow();
     document.getElementById("flyerInfo").innerHTML=pr.rows;
   }catch(e){
-    OFFERS=[];
+    ALLO=[];OFFERS=[];
     document.getElementById("stand").textContent="Wörth am Rhein · Angebote konnten nicht geladen werden";
     toast("Angebote konnten nicht geladen werden. Bitte später neu öffnen.");
   }
-  OFFERS.forEach(o=>{if(!o.id)o.id="m-"+norm(o.n)+"-"+o.p});
   const before=S.coupons.length;S.coupons=S.coupons.filter(cpActive);if(S.coupons.length!==before)save(); // abgelaufene Coupons aufräumen
   const go=goParam(); // Schnellstart vom App-Symbol (lange drücken): Zettel, Scannen, Merkliste (dann kein Merklisten-Fenster davor)
   render();  if(OFFERS.length&&!go)checkNews();
@@ -604,7 +612,7 @@ function flyerInfo(){
     const n=week(now.filter(o=>o.s===s)),f=mode(n.map(o=>o.from)),t=mode(n.map(o=>o.to)),nx=next.filter(o=>o.s===s).map(o=>o.from).sort()[0];
     return `<span>${sb(s)}${esc(sname(s))}: ${f&&t?d(shopDay(f))+"–"+d(t):t?"bis "+d(t):"laufend"}${nx?` · neu ab ${d(shopDay(nx))}`:""}</span>`}).join("");
   return {sum,rows}}
-const byId = id => OFFERS.find(o=>o.id===id);
+const byId = id => OFFERS.find(o=>o.id===id)||ALLO.find(o=>o.id===id);
 
 // ---------- Vorschläge beim Tippen (Suche und Merkliste) ----------
 // Gängige Artikel und Marken, damit es auch Vorschläge gibt, wenn gerade nichts davon im Angebot ist
@@ -735,7 +743,7 @@ function kracherBtn(){const k=ranked()[0];if(!k)return"";
 const catNames=()=>[...S.cats].filter(k=>CATS[k]).map(k=>CATS[k]);
 const catTitle=()=>{const n=catNames();return n.length>3?`${n.length} Kategorien`:n.join(" · ")};
 function missingHTML(){if(S.q.trim()||S.cats.size)return "";
-  const have=new Set((S.week||WEEKEND?weekOffers():OFFERS.filter(o=>!o.from||o.from<=SHOP)).map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s));
+  const have=new Set((S.week||WEEKEND?weekOffers():OFFERS.filter(o=>!o.from||o.from<=SHOP)).map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s)&&(!OPT.has(s)||S.stores.has(s)));
   if(!miss.length)return "";
   const dm=miss.includes("dm")?` <span class="dmnote">dm veröffentlicht seine Aktionen nicht vorab und hat sonst Dauerpreise (mind. 4 Monate garantiert) – ohne Aktion lohnt kein Warten.</span>`:"";
   return `<p class="catoff miss">Noch kein Prospekt ${S.week?"dafür":WEEKEND?"für nächste Woche":"für heute"} online: <b>${miss.map(s=>esc(sname(s))).join(", ")}</b>. Sobald er veröffentlicht ist, holt SparRadar ihn automatisch.${dm}</p>`}
@@ -991,6 +999,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  130:["Neu: Müller und Scheck-In Center im Maximilian-Center Wörth. Die beiden Märkte stehen oben bei den Märkten (gestrichelter Rahmen) und erscheinen nur, wenn du sie antippst – sonst bleibt alles wie gewohnt."],
   129:["🍏 SparRadar gibt es jetzt auch fürs iPhone und iPad: In den Einstellungen unter „SparRadar verschenken“ kannst du die App an Freunde mit Apple-Geräten schicken – per WhatsApp, iMessage oder als Link."],
   128:["📥 Edeka, dm und Rewe zeigen online immer nur einen Teil ihrer Angebote. SparRadar sammelt jetzt über den ganzen Tag weiter und ergänzt fehlende Angebote automatisch."],
   127:["🖼️ Zeigt ein Bild einen anderen Artikel? In der Detailansicht unten rechts auf „Falsches Bild?“ tippen – dann wird es ausgeblendet. Der Schoko Drink von Lidl hat jetzt das richtige Bild."],
@@ -1567,7 +1576,7 @@ const BON_STOP=new Set(["stk","stueck","pfand","eur","gesamt","summe","und","mit
 const bToks=s=>(String(s||"").toLowerCase().replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss").match(/[a-z]{3,}/g)||[]);
 function bonOffer(x,s,d){if(!s||x.disc||x.kg||!(x.p>0))return null;const q=x.q||1,u=r2(x.p/q),w=[...new Set(bToks(x.n))].filter(t=>!BON_STOP.has(t));if(w.length<2)return null;
   let best=null,bs=0;
-  for(const o of [...OFFERS,...OLD.values()]){if(o.s!==s||o.ao||!(o.p>0)||(o.from&&shopDay(o.from)>d)||(o.to&&o.to<d))continue;
+  for(const o of [...ALLO,...OLD.values()]){if(o.s!==s||o.ao||!(o.p>0)||(o.from&&shopDay(o.from)>d)||(o.to&&o.to<d))continue;
     const ot=bToks(o.n+" "+(o.b||"")),hit=w.filter(t=>ot.some(v=>v.startsWith(t)||(t.startsWith(v)&&v.length>=4))).length,sc=hit/w.length;
     if(hit>=2&&sc>=.6&&sc>bs){bs=sc;best=o}}
   if(!best||[best.p,best.ap].some(v=>v&&Math.abs(v-u)<.005))return null;
@@ -1697,8 +1706,9 @@ async function pdfText(file){const pdfjs=await import("./vendor/pdf/pdf.min.mjs"
     if(!tc.items.length){const vp=pg.getViewport({scale:2.5}),cv=document.createElement("canvas");cv.width=vp.width;cv.height=vp.height;
       await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;const w=await loadOCR();out.push((await w.recognize(cv)).data.text)}}
   return out.join("\n")}
-const BON_MKT=[["lidl",/\blidl\b|\bl[$i1!|]dl\b|lidl\.de|lidl plus|\bldl-\d|schwarz beteiligung/i],["aldi",/\baldi\b|aldi-?s[uü]d|aldi\.de/i],["rewe",/\brewe\b|rewe\.de|rewe markt/i],
-  ["netto",/\bnetto\b|netto-online|marken-?discount/i],["edeka",/\bedeka\b|edeka\.de|e center|e-center|marktkauf/i],["dm",/\bdm[- ]?drogerie|\bdm\.de\b|dm-drogerie markt|\bmein dm\b/i]];
+const BON_MKT=[["scheck",/scheck-? ?in/i],["lidl",/\blidl\b|\bl[$i1!|]dl\b|lidl\.de|lidl plus|\bldl-\d|schwarz beteiligung/i],["aldi",/\baldi\b|aldi-?s[uü]d|aldi\.de/i],["rewe",/\brewe\b|rewe\.de|rewe markt/i],
+  ["netto",/\bnetto\b|netto-online|marken-?discount/i],["edeka",/\bedeka\b|edeka\.de|e center|e-center|marktkauf/i],["dm",/\bdm[- ]?drogerie|\bdm\.de\b|dm-drogerie markt|\bmein dm\b/i],
+  ["mueller",/mueller\.de|drogerie ?m[üu]ller|m[üu]ller handels|m[üu]ller ltd/i]];
 const BON_TOT=/^(zu zahlen|zu bezahlen|summe|gesamt(?:summe|betrag)?|total|endsumme|betrag)\b/i;
 const BON_PAY=/^(kartenzahlung|kreditkarte|girocard|ec[- ]?cash|ec[- ]?karte|bar|gegeben|r[uü]ckgeld|visa|mastercard|maestro|v pay|kontaktlos|zahlung)\b/i;
 const BON_SKIP=/^(eur|zwischensumme|mwst|ust|netto|brutto|steuer|steuer-?nr|ust-?id|tse|seriennr|signatur|pr[uü]fwert|bon-?nr|beleg|kasse|filiale|markt|datum|uhrzeit|kunden|payback|deutschlandcard|punkte|bonus|guthaben|lidl plus|vielen dank|danke|[öo]ffnungszeiten|tel\b|telefon|www\.|http)/i;
@@ -1761,7 +1771,7 @@ function parseBon(raw){
 const bonScore=r=>!r.items.length?-1e9:(r.total&&Math.abs(r.sum-r.total)<.011?1e6:0)+r.items.length*10-(r.total?Math.abs(r.sum-r.total)*100:50);
 // Bon-Artikel einem Angebot desselben Markts zuordnen (gleicher Preis + Wortanfang passt) -> „gespart“ wird echt
 function bonMatch(x,s){const u=r2(x.p/(x.q||1)),w=(x.n.toLowerCase().match(/[a-zäöüß]{3,}/g)||[]).map(t=>t.slice(0,3));if(!w.length)return null;
-  return [...OFFERS,...OLD.values()].find(o=>o.s===s&&[o.p,o.ap].some(v=>v&&Math.abs(v-u)<.005)&&(o.n+" "+(o.b||"")).toLowerCase().match(/[a-zäöüß]{3,}/g)?.some(t=>w.includes(t.slice(0,3))))||null}
+  return [...ALLO,...OLD.values()].find(o=>o.s===s&&[o.p,o.ap].some(v=>v&&Math.abs(v-u)<.005)&&(o.n+" "+(o.b||"")).toLowerCase().match(/[a-zäöüß]{3,}/g)?.some(t=>w.includes(t.slice(0,3))))||null}
 const BON={st:null};
 // Intelligenter Scan: mehrere Durchgänge mit anderer Bildaufbereitung, bis die Summe zum Bon passt. Bestes Ergebnis gewinnt.
 async function bonOCR(file){const w=await loadOCR(),passes=[{mode:"gray",psm:"4"},{mode:"bin",psm:"6",scale:1.5},{mode:"bin",psm:"4",scale:2},{mode:"gray",psm:"6",scale:1.3}];
@@ -1780,7 +1790,7 @@ async function bonRead(file,text){BON.st="work";BON.pct=0;BON.pass=1;BON.err="";
       else if(ty.startsWith("text")||nm.endsWith(".txt")){const raw=await file.text();r=parseBon(raw);r.raw=raw}
       else r=await bonOCR(file)}
     else{r=parseBon(text||"");r.raw=text}
-    if(!r.s){const c={};r.items.forEach(x=>{const o=OFFERS.find(o=>[o.p,o.ap].some(v=>v&&Math.abs(v-x.p/(x.q||1))<.005)&&bonMatch(x,o.s));if(o)c[o.s]=(c[o.s]||0)+1});
+    if(!r.s){const c={};r.items.forEach(x=>{const o=ALLO.find(o=>[o.p,o.ap].some(v=>v&&Math.abs(v-x.p/(x.q||1))<.005)&&bonMatch(x,o.s));if(o)c[o.s]=(c[o.s]||0)+1});
       r.s=Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||store.get("bonStore",null)}
     if(!r.items.length)throw new Error("Auf dem Bon wurden keine Artikel mit Preisen erkannt. Tipp: Bon gerade und ganz aufs Bild, gutes Licht – oder in der Markt-App „Teilen“ nutzen (dort ist der Bon gestochen scharf).");
     BON.r=r;BON.st="ok";BON.more=false;if(r.s&&bonOk(r)){bonSave();return}}catch(e){BON.st="err";BON.err=e.message||String(e)}
@@ -2068,7 +2078,7 @@ function renderTips(){
 // Handy: Märkte, Kategorien und Sortierung aufgeräumt in einem Fenster statt drei langer Leisten
 const SORTS={off:"Höchste Ersparnis",gp:"Bester Grundpreis",p:"Niedrigster Preis"};
 function renderFilter(){
-  const counts={},cc={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;cc[o.c]=(cc[o.c]||0)+1});
+  const counts={},cc={};OFFERS.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;cc[o.c]=(cc[o.c]||0)+1});OPT.forEach(k=>{if(!S.stores.has(k))counts[k]=optCount(k)});
   const n=filtered().length;
   const chip=(attr,k,label,on,extra="")=>`<button class="chip${extra}" ${attr}="${k}" aria-pressed="${on}">${label}</button>`;
   const food=Object.entries(CATS).filter(([k])=>!NONFOOD_CATS.includes(k)&&cc[k]),nf=Object.entries(CATS).filter(([k])=>NONFOOD_CATS.includes(k)&&cc[k]);
@@ -2162,7 +2172,7 @@ function appTwins(l){const k=x=>[x.s,norm(x.n),x.b||"",x.from||"",x.to||""].join
         const im=[o.img,...(o.ims||[])].filter(x=>x&&x!==a.img);if(im.length)a.ims=[...new Set([...(a.ims||[]),...im])];
         for(const k of["gp","ou","inf","d"])if(!a[k]&&o[k])a[k]=o[k]}}}
   return drop.size?l.filter(x=>!drop.has(x)):l}
-function render(){memoReset();quickCheck();
+function render(){optSync();memoReset();quickCheck();
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
   document.getElementById("wk1").textContent=nextLabel();document.getElementById("wk0").textContent=WEEKEND?"Ab Montag":"Diese Woche";
@@ -2172,11 +2182,11 @@ function render(){memoReset();quickCheck();
   const ln=S.list.filter(id=>byId(id)&&!S.checked.includes(id)).length+S.extra.filter(x=>!S.checked.includes(x.id)).length;
   const lb=document.getElementById("listBadge");lb.textContent=ln;lb.hidden=!ln;
   const nc=S.coupons.filter(cpActive).length,nd=cbDue().length,cb=document.getElementById("cpBadge");cb.textContent=nd?"💸 "+nd:nc;cb.hidden=!nc&&!nd;cb.classList.toggle("due",!!nd);cb.title=nd?"Geld zurückholen: Bon hochladen":"";
-  const WO=weekOffers(),counts={},ccount={};WO.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});
+  const WO=weekOffers(),counts={},ccount={};WO.forEach(o=>{counts[o.s]=(counts[o.s]||0)+1;ccount[o.c]=(ccount[o.c]||0)+1});OPT.forEach(k=>{if(!S.stores.has(k))counts[k]=optCount(k,1)});
   const cbc={};WO.forEach(o=>{if(cbFor(o))cbc[o.s]=(cbc[o.s]||0)+1});const cbAll=Object.values(cbc).reduce((a,n)=>a+n,0);
   const cbTag=n=>n?`<span class="mcb" title="${n} ${n===1?"Angebot":"Angebote"} mit Geld zurück">💸${n}</span>`:"";
   // Markt-Leiste mit Logos: antippen = nur dieser Markt (mehrere möglich), „Alle“ = alles
-  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mtx"><span class="mn">Alle</span><em>${WO.length}${cbTag(cbAll)}</em></span></button>`+Object.keys(STORES).map(k=>`<button class="mtile${counts[k]?"":" none"}" data-store="${k}" aria-pressed="${S.stores.has(k)}">${sb(k,true)}<span class="mtx"><span class="mn">${esc(STORES[k].n.replace(" Jockgrim",""))}</span><em>${counts[k]||"noch nichts"}${cbTag(cbc[k])}</em></span></button>`).join("");
+  document.getElementById("storeChips").innerHTML=`<button class="mtile all" data-store="" aria-pressed="${!S.stores.size}"><span class="sb lg">${IC.layers}</span><span class="mtx"><span class="mn">Alle</span><em>${WO.length}${cbTag(cbAll)}</em></span></button>`+Object.keys(STORES).map(k=>`<button class="mtile${counts[k]?"":" none"}${OPT.has(k)?" opt":""}" data-store="${k}" aria-pressed="${S.stores.has(k)}"${OPT.has(k)?` title="Nur zu sehen, wenn du ${esc(STORES[k].n)} antippst"`:""}>${sb(k,true)}<span class="mtx"><span class="mn">${esc(STORES[k].n.replace(" Jockgrim","").replace(" Center",""))}</span><em>${counts[k]||"noch nichts"}${cbTag(cbc[k])}</em></span></button>`).join("");
   document.getElementById("catChips").innerHTML=`<button class="chip plain" data-cat="" aria-pressed="${!S.cats.size}">Alle Kategorien</button>`+Object.entries(CATS).filter(([k])=>ccount[k]||S.cats.has(k)).map(([k,n],i,arr)=>`${NONFOOD_CATS.includes(k)&&i&&!NONFOOD_CATS.includes(arr[i-1][0])?'<span class="chipsep" aria-hidden="true"></span>':""}<button class="chip plain" data-cat="${k}" aria-pressed="${S.cats.has(k)}">${n}</button>`).join("");
   document.getElementById("appSw").setAttribute("aria-checked",S.useApp);
   document.getElementById("sort").value=S.sort;
@@ -2228,7 +2238,7 @@ document.addEventListener("click",e=>{
   if(b.id==="openFilter"||b.id==="openFilter2"){S.sheet="filter";render();return}
   if(b.dataset.zoom){S.lightbox=b.dataset.zoom;render();return}
   if(b.dataset.badimg){if(!confirm("Zeigt das Bild einen anderen Artikel? Dann wird es auf diesem Gerät ausgeblendet."))return;
-    IMG_MINE.add(imgId(b.dataset.badimg));store.set("badimg",[...IMG_MINE].slice(-300));[...RAW,...OFFERS,...OLD.values()].forEach(fixImg);S.dImg=0;render();toast("🖼️ Bild ausgeblendet – danke!");return}
+    IMG_MINE.add(imgId(b.dataset.badimg));store.set("badimg",[...IMG_MINE].slice(-300));[...RAW,...ALLO,...OLD.values()].forEach(fixImg);S.dImg=0;render();toast("🖼️ Bild ausgeblendet – danke!");return}
   if(b.dataset.dimg!==undefined){S.dImg=+b.dataset.dimg;render();return}
   if(b.id==="openSettings"){S.sheet="settings";render();checkVersion();return}
   if(b.id==="settingsBtn"){S.sheet="settings";render();checkVersion();return}

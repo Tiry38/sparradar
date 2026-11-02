@@ -31,13 +31,14 @@ KD_STORES = {  # kaufDA-Händlerseiten für Wörth am Rhein
     "edeka": "https://www.kaufda.de/Jockgrim/EDEKA/p-r107",
     "lidl": "https://www.kaufda.de/Woerth-am-Rhein/Lidl/p-r74",
     "dm": "https://www.kaufda.de/Woerth-am-Rhein/dm-drogerie-markt/p-r104",
+    "mueller": "https://www.kaufda.de/Woerth-am-Rhein/Mueller/p-r85",  # Müller im Maximilian-Center (Diagnose 02.11.)
 }
 # Händlerseiten der Nachbarorte zeigen je Ort andere 16 Angebote aus DEMSELBEN Prospekt (Diagnose 01.11.:
 # Edeka 16 -> 48, dm 16 -> 32). Übernommen wird nur, was aus dem Prospekt der eigenen Händlerseite stammt.
 KD_NEAR = {"edeka": ["Kandel", "Hagenbach", "Bellheim", "Herxheim", "Bad-Bergzabern"],
            "dm": ["Karlsruhe", "Ettlingen", "Rastatt"]}
 KD_PUBLISHER = {"REWE": "rewe", "Netto Marken-Discount": "netto", "EDEKA": "edeka", "Lidl": "lidl",
-                "ALDI SÜD": "aldi", "dm-drogerie markt": "dm", "dm": "dm", "DM": "dm"}
+                "ALDI SÜD": "aldi", "dm-drogerie markt": "dm", "dm": "dm", "DM": "dm", "Müller": "mueller"}
 KD_CITY = "Karlsruhe"  # Stichwort-Seiten gibt es nicht für Wörth; Karlsruhe ist 10 km entfernt, gleiche Prospekt-Region
 KEYWORDS = """Butter Milch Käse Joghurt Quark Sahne Eier Mozzarella Margarine Pudding
 Hackfleisch Hähnchen Putenbrust Schweinefleisch Rindfleisch Steak Bratwurst Würstchen Salami Schinken Aufschnitt Lachs Fisch Garnelen
@@ -577,7 +578,7 @@ def kd_items(url):
 
 
 APP_COND = re.compile(r"lidl\s*plus|app[- ]?preis|mit (der )?app|netto[- ]?app|payback|deutschlandcard|kundenkarte|coupon", re.I)
-APP_LABEL = {"lidl": "Lidl Plus", "edeka": "Edeka-App", "netto": "Netto-App", "rewe": "Rewe-App", "dm": "dm-App", "aldi": "Aldi-App"}
+APP_LABEL = {"lidl": "Lidl Plus", "edeka": "Edeka-App", "netto": "Netto-App", "rewe": "Rewe-App", "dm": "dm-App", "aldi": "Aldi-App", "mueller": "Müller-App"}
 APP_HINT = re.compile(r"(?:mit\s+(?:der\s+)?app|app[- ]preis|rewe\s+bonus|lidl\s+plus|netto[- ]app)[^0-9]{0,25}(\d+)[,.](\d\d)", re.I)
 
 
@@ -682,7 +683,7 @@ def fetch_kaufda():
 # Sie sind bundesweit -> nur Angebote aus Prospekten behalten, die auch für Wörth/Jockgrim gelten.
 KD_PUB_IDS = {"edeka": "DE-220164", "rewe": "DE-1062"}  # kaufDA-Händlerkennung der Region (Edeka Südwest, Rewe)
 KD_SLUGS = {"lidl": ["Lidl"], "netto": ["Netto-Marken-Discount"], "rewe": ["REWE"], "edeka": ["Edeka"],
-            "dm": ["dm-drogerie-markt", "Dm"]}
+            "dm": ["dm-drogerie-markt", "Dm"], "mueller": ["Mueller"]}
 SORTIMENT = """Butter Milch Kaese Joghurt Quark Sahne Eier Mozzarella Margarine Pudding Skyr Frischkaese Gouda
 Hackfleisch Haehnchen Putenbrust Schweinefleisch Rindfleisch Steak Schnitzel Bratwurst Wuerstchen Salami Schinken Wurst Lachs Fisch Garnelen Thunfisch
 Obst Gemuese Tomaten Aepfel Bananen Kartoffeln Paprika Zwiebeln Salat Trauben Mandarinen Beeren Pilze
@@ -778,7 +779,7 @@ def fetch_sortiment(regional=None):
         terms = list(dict.fromkeys(SORTIMENT + [l.rstrip("/").split("/")[-1] for l in local.get("links", [])]))
         slug = None
         for sl in slugs:  # gibt es für diesen Händler Sortiment-Seiten?
-            items, total = kd_page(f"https://www.kaufda.de/{sl}/Sortiment/Butter" if store != "dm" else f"https://www.kaufda.de/{sl}/Sortiment/Shampoo")
+            items, total = kd_page(f"https://www.kaufda.de/{sl}/Sortiment/Butter" if store not in ("dm", "mueller") else f"https://www.kaufda.de/{sl}/Sortiment/Shampoo")
             if items or total:
                 slug = sl
                 break
