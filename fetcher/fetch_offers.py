@@ -9,6 +9,7 @@ Quellen (nur öffentliche Seiten, ohne Login, ein Abruf pro Seite und Tag):
 Ergebnis: docs/data/offers.json und docs/data/history.json (Preisverlauf).
 """
 import datetime as dt
+import html as _html
 import json
 import os
 import re
@@ -919,6 +920,114 @@ def fetch_prospektewoche(shop="rewe", store="rewe"):
     return out
 
 
+# ---------- prospektangebote.de (Folderz) ----------
+# Öffentliche Angebotslisten je Händler (/geschaefte/<händler>/angebote?page=N, robots.txt erlaubt genau dieses
+# Blättern; Suche/Klick-Links sind gesperrt und werden nicht genutzt). Für Müller deutlich mehr als bei kaufDA
+# (02.11.: ~860 statt 183). Liste zeigt nur gerade gültige Angebote: Name, Preis, „statt“, Bild, Restlaufzeit
+# („5 Tage“ = bis heute + 5). Künftige („Gültig in …“) ohne genaues Startdatum werden übersprungen.
+# Eigener Server -> eigene Pause, läuft parallel zu kaufDA. Doppelte zu kaufDA fliegen in pa_dedupe() raus.
+PA = "https://www.prospektangebote.de"
+PA_STORES = {"mueller": ("mueller", False)}  # Markt -> (Händler-Kürzel bei prospektangebote, Lebensmittel-Markt?)
+PA_PAUSE = 2.0
+PA_KEEP = {"DIN", "RC", "HO", "H0", "LED", "USB", "TV", "XXL", "XL", "XS", "DM", "PC", "HD", "UV", "SPF", "LSF", "BIO", "3D", "PS5", "PS4", "II", "III"}
+
+
+def html_unescape(t):
+    return _html.unescape(t or "")
+
+
+def pa_title(t):
+    """GROSSBUCHSTABEN-Namen lesbar machen („KUSCHEL-BADEMANTEL“ -> „Kuschel-Bademantel“), Abkürzungen bleiben."""
+    def w(m):
+        x = m.group(0)
+        if x in PA_KEEP or len(x) <= 2 or not re.search(r"[A-ZÄÖÜ]{2}", x):
+            return x
+        return "-".join(p[:1] + p[1:].lower() for p in x.split("-"))
+    return re.sub(r"[A-ZÄÖÜÉÈÔÂÎ0-9][A-ZÄÖÜÉÈÔÂÎ0-9&'!.-]*", w, t)
+
+
+def pa_money(v):
+    m = re.search(r"(\d+(?:\.\d{3})*),(\d\d)", v or "")
+    return float(m.group(1).replace(".", "") + "." + m.group(2)) if m else None
+
+
+def pa_until(txt, today):
+    """Restlaufzeit -> letzter Gültigkeitstag (eher zu kurz als zu lang: Monate = 30 Tage, Wochen = 7)."""
+    t = (txt or "").strip().lower()
+    if not t or t.startswith("gültig in") or "bald" in t:
+        return None, True  # beginnt erst später
+    m = re.match(r"(\d+)\s*(tag|tage|woche|wochen|monat|monate)\b", t)
+    if m:
+        n, u = int(m.group(1)), m.group(2)
+        return (today + dt.timedelta(days=n * (30 if u.startswith("monat") else 7 if u.startswith("woche") else 1))).isoformat(), False
+    if t in ("heute", "letzter tag", "endet heute"):
+        return today.isoformat(), False
+    return None, False
+
+
+def fetch_prospektangebote():
+    today = dt.date.today()
+    out = []
+    for store, (slug, food) in PA_STORES.items():
+        got, seen, skipped = [], set(), 0
+        for page in range(1, 61):
+            url = f"{PA}/geschaefte/{slug}/angebote" + (f"?page={page}" if page > 1 else "")
+            h = http(url)
+            time.sleep(PA_PAUSE)
+            blocks = (h or "").split('<a class="js-offer-link-item')[1:]
+            if not blocks:
+                break
+            new = 0
+            for b in blocks:
+                b = b.split("</a>")[0]
+                mid = re.search(r'href="(/geschaefte/[^"]+-angebot-(\d+)/)"', b)
+                if not mid or mid.group(2) in seen:
+                    continue
+                seen.add(mid.group(2))
+                new += 1
+                name = re.search(r'product__name[^>]*>([^<]*)<', b)
+                price = pa_money((re.search(r'product__price-offer[^>]*>([^<]*)<', b) or [None, ""])[1])
+                old = pa_money((re.search(r'product__price-normal[^>]*>([^<]*)<', b) or [None, ""])[1])
+                until, future = pa_until((re.search(r'product-date[^>]*>([^<]*)<', b) or [None, ""])[1], today)
+                if future:
+                    skipped += 1
+                    continue
+                img = re.search(r'src="(https://img\.offers-cdn\.net/assets/uploads/offers/[^"]+?)-thumb[^"]*"', b)
+                title = pa_title(html_unescape(name.group(1)).strip()) if name else ""
+                o = offer(store, title, price, old=old, img=(img.group(1) + "-normal.jpeg") if img else None,
+                          start=today.isoformat(), end=until, src="prospektangebote.de", url=PA + mid.group(1), food=food)
+                if o:
+                    o["pa"] = 1  # Quelle prospektangebote (Restlaufzeit gerundet, Start = heute)
+                    got.append(o)
+            if not new:
+                break
+        log(f"  prospektangebote {store}: {len(got)} Angebote ({skipped} künftige ohne Datum übersprungen)")
+        out += got
+    return out
+
+
+def pa_dedupe(offers):
+    """prospektangebote-Angebote raus, wenn kaufDA denselben Artikel im selben Markt zum selben Preis hat
+    (kaufDA hat Marke, Beschreibung, Grundpreis und Prospekt-ID)."""
+    def toks(o):
+        return {norm(t) for t in re.findall(r"[a-zäöüß0-9]{3,}", f"{o.get('b') or ''} {o.get('n')} {o.get('d') or ''}".lower())} - {""}
+    idx = {}
+    for o in offers:
+        if not o.get("pa"):
+            idx.setdefault((o["s"], o["p"]), []).append(toks(o))
+    keep, drop = [], 0
+    for o in offers:
+        if o.get("pa"):
+            t = toks(o)
+            if t and any(len(t & k) >= max(1, round(len(t) * 0.6)) for k in idx.get((o["s"], o["p"]), [])):
+                drop += 1
+                continue
+        keep.append(o)
+    if drop:
+        log(f"  prospektangebote: {drop} doppelte zu kaufDA entfernt")
+    return keep
+
+
 def load(name, default):
     try:
         with open(os.path.join(DATA, name), encoding="utf-8") as f:
@@ -1418,7 +1527,7 @@ def early_save(why):
     if os.environ.get("SR_EARLY_PUSH") != "1" or not OLD_OFFERS:
         return
     with LOCK:
-        offers = finalize([dict(o) for o in COLLECTED] + [dict(o) for o in OLD_OFFERS])
+        offers = finalize(pa_dedupe([dict(o) for o in COLLECTED] + [dict(o) for o in OLD_OFFERS]))
         fut = future_counts(offers)
         gained = {s: n - LAST_FUT.get(s, 0) for s, n in fut.items() if n - LAST_FUT.get(s, 0) >= 10}
         if not gained:
@@ -1453,13 +1562,14 @@ def main():
             early_save(name)
 
     threads = [threading.Thread(target=run, args=a) for a in
-               (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("Rewe-Vorschau", fetch_prospektewoche))]
+               (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("Rewe-Vorschau", fetch_prospektewoche),
+                ("prospektangebote", fetch_prospektangebote))]
     for t in threads:
         t.start()
     run("kaufDA", fetch_kaufda)
     for t in threads:
         t.join()
-    new = [o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau") for o in results.get(name, [])]
+    new = pa_dedupe([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau", "prospektangebote") for o in results.get(name, [])])
     # Sortiment-Abgleich: Jeder Abruf baut die Liste neu auf – neue Artikel kommen dazu, verschwundene fliegen raus.
     # Ausnahme: Liefert ein Markt plötzlich fast nichts (Seite kurz down, Sperre, Umbau), bleiben seine noch gültigen
     # alten Angebote stehen, statt dass der ganze Markt bis zum nächsten Abruf leer ist.
