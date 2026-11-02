@@ -93,8 +93,10 @@ export default {
       if ([6, 12, 18].includes(h)) due.push("bilder.yml");                         // Bilder-Wächter 3× am Tag
     }
     const often = ([5, 6, 0].includes(wd) && h >= 5 && h <= 22) || (wd === 1 && h >= 3 && h <= 9); // alle 5 min
-    const hourly = full && (wd === 4 ? h >= 5 && h <= 21 : wd === 1 ? h >= 5 && h <= 20 : [2, 3].includes(wd) && [5, 9, 15].includes(h));
-    const pros = often || hourly;
+    // Kevins Wunsch (02.11.): jeden Tag tagsüber nach neuen Angeboten aller Märkte schauen und sie gleich einsammeln
+    // -> sonst alle 15 min (Takt :10, :25, :40, :55), 4–21 UTC (Winter 5–22 Uhr). Je Durchgang ca. 9 Seitenaufrufe.
+    const quarter = (m + 50) % 15 < 5 && h >= 4 && h <= 21;
+    const pros = often || quarter;
     if (pros && !due.includes("angebote.yml")) due.push("prospekte.yml");         // Prospekt-Wächter
     ctx.waitUntil(Promise.all(due.map(f => fetch(`https://api.github.com/repos/Tiry38/sparradar/actions/workflows/${f}/dispatches`, {
       method: "POST",

@@ -486,36 +486,42 @@ def fetch_aldi():
         if key in seen:
             continue
         seen.add(key)
-        pr = it.get("price") or {}
-        amount = pr.get("amountRelevant") or pr.get("amount")
-        if not amount:
-            continue
-        cats = " ".join(c.get("name", "") for c in it.get("categories") or [] if isinstance(c, dict))
-        food_hint = bool(re.search(r"frisch|lebensmittel|getr[äa]nk|k[üu]hl|tiefk|s[üu][ßs]|fleisch|obst|gem[üu]se|feinkost|wein|spirit|backwaren|vorrat|fr[üu]hst", cats, re.I))
-        old = None
-        if pr.get("wasPriceDisplay"):
-            mm = re.search(r"(\d+),(\d\d)", pr["wasPriceDisplay"])
-            old = float(f"{mm.group(1)}.{mm.group(2)}") if mm else None
-        img = img_l = None
-        all_imgs = [a["url"].replace("{width}", "1200").replace("{slug}", it.get("urlSlugText") or "bild")
-                    for a in it.get("assets") or [] if isinstance(a, dict) and a.get("url")]
-        for a in it.get("assets") or []:
-            if isinstance(a, dict) and a.get("url"):
-                img = a["url"].replace("{width}", "1000").replace("{slug}", it.get("urlSlugText") or "bild")
-                img_l = a["url"].replace("{width}", "1200").replace("{slug}", it.get("urlSlugText") or "bild")
-                break
-        brand = it.get("brandName")
-        o = offer("aldi", it.get("name"), amount / 100, brand=None if brand in ("BIO", "no-brand") else brand,
-                  desc=it.get("sellingSize") or "", old=old, base=pr.get("comparisonDisplay"), img=img,
-                  start=it.get("onSaleDate"), src="aldi-sued.de", img_large=img_l if img else None, images=all_imgs,
-                  info=" ".join(str(it.get(k)) for k in ("shortDescription", "description", "longDescription") if isinstance(it.get(k), str)),
-                  cats=[c.get("name") for c in it.get("categories") or [] if isinstance(c, dict)],
-                  url=f"https://www.aldi-sued.de/de/produkt/{it.get('urlSlugText')}-{it.get('sku')}.html",
-                  food=food_hint)
+        o = aldi_offer(it)
         if o:
             out.append(o)
     log("Aldi Süd:", len(out))
     return out
+
+
+def aldi_offer(it):
+    """Ein Aldi-Artikel aus __NUXT_DATA__ -> Angebot (auch vom Prospekt-Wächter genutzt)."""
+    pr = it.get("price") or {}
+    amount = pr.get("amountRelevant") or pr.get("amount")
+    if not amount:
+        return None
+    cats = " ".join(c.get("name", "") for c in it.get("categories") or [] if isinstance(c, dict))
+    food_hint = bool(re.search(r"frisch|lebensmittel|getr[äa]nk|k[üu]hl|tiefk|s[üu][ßs]|fleisch|obst|gem[üu]se|feinkost|wein|spirit|backwaren|vorrat|fr[üu]hst", cats, re.I))
+    old = None
+    if pr.get("wasPriceDisplay"):
+        mm = re.search(r"(\d+),(\d\d)", pr["wasPriceDisplay"])
+        old = float(f"{mm.group(1)}.{mm.group(2)}") if mm else None
+    img = img_l = None
+    all_imgs = [a["url"].replace("{width}", "1200").replace("{slug}", it.get("urlSlugText") or "bild")
+                for a in it.get("assets") or [] if isinstance(a, dict) and a.get("url")]
+    for a in it.get("assets") or []:
+        if isinstance(a, dict) and a.get("url"):
+            img = a["url"].replace("{width}", "1000").replace("{slug}", it.get("urlSlugText") or "bild")
+            img_l = a["url"].replace("{width}", "1200").replace("{slug}", it.get("urlSlugText") or "bild")
+            break
+    brand = it.get("brandName")
+    o = offer("aldi", it.get("name"), amount / 100, brand=None if brand in ("BIO", "no-brand") else brand,
+              desc=it.get("sellingSize") or "", old=old, base=pr.get("comparisonDisplay"), img=img,
+              start=it.get("onSaleDate"), src="aldi-sued.de", img_large=img_l if img else None, images=all_imgs,
+              info=" ".join(str(it.get(k)) for k in ("shortDescription", "description", "longDescription") if isinstance(it.get(k), str)),
+              cats=[c.get("name") for c in it.get("categories") or [] if isinstance(c, dict)],
+              url=f"https://www.aldi-sued.de/de/produkt/{it.get('urlSlugText')}-{it.get('sku')}.html",
+              food=food_hint)
+    return o
 
 
 # ---------- kaufDA (Rewe, Netto, Edeka, dm, Lidl) ----------
@@ -1439,10 +1445,10 @@ def main():
             log(f"  ! {st}: nur {n_new} statt bisher {n_old} Angebote – Quelle gestört? Alte gültige Angebote bleiben.")
             new += [dict(o) for o in valid if o["s"] == st]
     # Händlerseiten zeigen je Abruf andere 16 Angebote: Schon gesehene, noch gültige Angebote aus den eigenen Prospekten
-    # (Edeka Jockgrim, dm, Rewe) bleiben stehen, auch wenn sie diesmal nicht dabei waren. Neue Daten zuerst -> merge()
-    # bevorzugt sie. Fremde Prospekte sind nie in flyers.json und bleiben deshalb nicht hängen.
+    # (alle kaufDA-Märkte, auch was der Prospekt-Wächter tagsüber eingesammelt hat) bleiben stehen, auch wenn sie diesmal
+    # nicht dabei waren. Neue Daten zuerst -> merge() bevorzugt sie. Fremde Prospekte sind nie in flyers.json.
     remember_flyers()
-    for st in ("edeka", "dm", "rewe"):
+    for st in KD_STORES:
         mine = local_flyers(st)
         stick = [dict(o) for o in valid if o["s"] == st and not o.get("pv") and o.get("bid") in mine]
         if stick:

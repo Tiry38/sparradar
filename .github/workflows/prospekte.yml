@@ -1,13 +1,12 @@
 name: Prospekt-Wächter
 
-# Kevins Wunsch: Die Angebote der nächsten Woche sollen so früh wie möglich in der App stehen.
-# Fr–So alle 5 min (Cloudflare-Taktgeber), Do/Mo stündlich, Di–Mi 3× nur kurz auf die Marktseiten schauen (6 Seitenaufrufe). Taucht ein neuer
-# Prospekt mit Startdatum in der Zukunft auf, wird sofort der komplette Abruf „Angebote abrufen“ gestartet.
+# Kevins Wunsch: Die Angebote der nächsten Woche sollen so früh wie möglich in der App stehen, und tagsüber neu
+# auftauchende Angebote aller Märkte gleich mit (02.11.: „jeden Tag“). Takt kommt vom Cloudflare-Worker: Fr–So und
+# Mo früh alle 5 min, sonst jeden Tag alle 15 min (ca. 9 Seitenaufrufe je Durchgang). Taucht ein neuer Prospekt mit
+# Startdatum ab heute auf, wird sofort der komplette Abruf „Angebote abrufen“ gestartet.
 on:
   schedule:
-    - cron: "40 4-21 * * 4,5,6,0"     # Do, Fr, Sa, So ca. 5:40–22:40 Uhr (Sommerzeit 6:40–23:40), jede Stunde
-    - cron: "40 4-20 * * 1"           # Mo ca. 5:40–21:40 Uhr jede Stunde (falls ein Prospekt erst am Montag kommt)
-    - cron: "40 4,9,15 * * 2,3"       # Di, Mi 3× am Tag (dm startet neue Aktionen auch unter der Woche)
+    - cron: "40 4-21 * * *"           # Reserve, falls der Taktgeber ausfällt: jeden Tag ca. 5:40–22:40 Uhr stündlich
   workflow_dispatch: {}
 
 permissions:
@@ -42,8 +41,8 @@ jobs:
           SR_ADD: ${{ steps.busy.outputs.n == '0' && '1' || '0' }}   # während eines Abrufs nichts selbst schreiben
         run: python check_new.py
 
-      # Edeka/dm/Rewe zeigen je Aufruf andere 16 Angebote: was der Wächter dabei sieht und noch fehlt, kommt gleich in
-      # die App (keine zusätzlichen Seitenaufrufe). Ist inzwischen ein neuer Stand online, wird nichts überschrieben.
+      # Händlerseiten zeigen je Aufruf andere 16 Angebote, dazu Aldi-Angebots-/Tagesseiten: was der Wächter dabei sieht
+      # und noch fehlt, kommt gleich in die App. Ist inzwischen ein neuer Stand online, wird nichts überschrieben.
       - name: Gesehene Angebote speichern
         if: steps.check.outputs.added != '0' && steps.check.outputs.added != '' && steps.check.outputs.new != 'true'
         run: |
