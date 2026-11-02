@@ -553,7 +553,7 @@ def kd_page(url):
     KD_INFO[url] = {
         "brochures": _ids([br.get("viewer"), br.get("publisher")], set()) | {str((it.get("parentContent") or {}).get("id")) for it in items},
         "links": [l.get("link_href") for l in links if isinstance(l, dict) and l.get("link_href")],
-        "known": {(norm(it.get("title")), round(float((it.get("prices") or {}).get("mainPrice") or 0), 2)) for it in items},
+        "known": {(str((it.get("parentContent") or {}).get("id")),) + flyer_key(it) + (kd_price(it),) for it in items},
         "pubs": {it.get("publisherId") for it in items if it.get("publisherId")},  # Händler-Kennung, z. B. EDEKA = DE-220164
         "future": any(str((b or {}).get("validFrom") or "")[:10] >= dt.date.today().isoformat()
                       for key in ("viewer", "publisher") for b in (br.get(key) if isinstance(br.get(key), list) else [])),
@@ -691,17 +691,52 @@ Kleidung Schuhe Jacke Socken Unterwaesche Bettwaesche Handtuch Kissen Decke Pfan
 Werkzeug Akkuschrauber Garten Pflanzen Blumen Grill Fahrrad Spielzeug Lego Fernseher Kopfhoerer Staubsauger Kaffeemaschine Kuechengeraete""".split()
 
 
-def same_flyer(items, known, base_ids):
-    """Welche Prospekte entsprechen dem lokalen Prospekt? Jeder Edeka-/Rewe-Markt hat eine eigene Prospekt-ID,
-    der Inhalt ist in der Region aber gleich. Ein Prospekt zählt als „unserer“, wenn er mindestens 2 Angebote
-    mit gleichem Artikel und gleichem Preis wie die lokale Händlerseite enthält."""
-    hits = {}
+def kd_price(it):
+    return round(float((it.get("prices") or {}).get("mainPrice") or 0), 2)
+
+
+def flyer_key(it):
+    return (norm(it.get("brand") or ""), norm(it.get("title")))
+
+
+def flyer_ref(items, known, base_ids):
+    """Preise des lokalen Prospekts: (Marke, Name) -> Preise. Aus den Händlerseiten (Wörth/Jockgrim + Nachbarorte, nur
+    Artikel aus den lokalen Prospekten) und allen gefundenen Artikeln dieser Prospekte."""
+    ref = {}
+    for b, brand, title, p in known:
+        if b in base_ids:
+            ref.setdefault((brand, title), set()).add(p)
+    for it in items:
+        if str((it.get("parentContent") or {}).get("id")) in base_ids:
+            ref.setdefault(flyer_key(it), set()).add(kd_price(it))
+    return ref
+
+
+def same_flyer(items, ref, base_ids, store=""):
+    """Welche Prospekte entsprechen dem lokalen Prospekt? Manche Märkte haben eine eigene Prospekt-ID mit gleichem
+    Inhalt. Ein fremder Prospekt zählt als „unserer“, wenn mindestens 2 Artikel mit gleicher Marke, gleichem Namen und
+    gleichem Preis wie im lokalen Prospekt vorkommen und höchstens jeder 5. gemeinsame Artikel einen anderen Preis hat.
+    Anlass 02.11.: ein Edeka-Prospekt einer anderen Gegend hatte 2 gleiche Artikel, aber z. B. Président Meersalzbutter
+    2,49 statt 2,79 € und Wagner Pizza 3,99 statt 2,49 € -> 206 Angebote mit falschen Preisen in der App."""
+    stats = {}
     for it in items:
         b = str((it.get("parentContent") or {}).get("id"))
-        key = (norm(it.get("title")), round(float((it.get("prices") or {}).get("mainPrice") or 0), 2))
-        if key in known:
-            hits[b] = hits.get(b, 0) + 1
-    return set(base_ids) | {b for b, n in hits.items() if n >= 2}
+        if b in base_ids:
+            continue
+        s = stats.setdefault(b, [0, 0, 0])  # Artikel, gleicher Preis, anderer Preis
+        s[0] += 1
+        prices = ref.get(flyer_key(it))
+        if prices:
+            s[1 if kd_price(it) in prices else 2] += 1
+    ok = {b for b, (n, same, diff) in stats.items() if same >= 2 and diff * 4 <= same}
+    for b, (n, same, diff) in sorted(stats.items(), key=lambda kv: -kv[1][0]):
+        if same or diff:
+            log(f"  {store}: Prospekt {b[:8]} ({n} Artikel): {same} gleich, {diff} anderer Preis"
+                f" -> {'übernommen' if b in ok else 'abgelehnt'}")
+    rest = sum(1 for n, same, diff in stats.values() if not same and not diff)
+    if rest:
+        log(f"  {store}: {rest} weitere Prospekte ohne gemeinsame Artikel abgelehnt")
+    return set(base_ids) | ok
 
 
 def fetch_sortiment(regional=None):
@@ -730,7 +765,11 @@ def fetch_sortiment(regional=None):
         if store in ("rewe", "edeka"):
             # regionale Händler: nur Prospekte mit gleichem Inhalt wie die lokale Händlerseite
             base = {b for b in local.get("brochures", set()) if b and b != "None"}
-            ok = same_flyer(found, local.get("known", set()), base)
+            known = set(local.get("known", set()))
+            for city in KD_NEAR.get(store, []):  # Händlerseiten der Nachbarorte (gleicher Prospekt) zählen mit
+                known |= KD_INFO.get(f"https://www.kaufda.de/{city}/{'/'.join(KD_STORES[store].split('/')[4:])}", {}).get("known", set())
+            ref = flyer_ref(found, known, base)
+            ok = same_flyer(found, ref, base, store)
             # Vorschau auf die nächste Woche: Solange die lokale Händlerseite noch keinen neuen Prospekt zeigt, die
             # künftigen Prospekte desselben Händlers (gleiche Händler-Kennung) von den Sortiment-Seiten übernehmen.
             # Sobald der lokale Prospekt online ist, greift wieder der Inhaltsabgleich (same_flyer).
@@ -745,7 +784,10 @@ def fetch_sortiment(regional=None):
                     log(f"  {store}: Vorschau nächste Woche aus Prospekt(en) {sorted(preview)}")
             ok = ok | preview
             accepted[store] = ok
-            kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in ok]
+            # aus übernommenen fremden Prospekten keine Artikel, die im lokalen Prospekt einen anderen Preis haben
+            kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in ok
+                          and (str((it.get("parentContent") or {}).get("id")) in base | preview
+                               or kd_price(it) in ref.get(flyer_key(it), {kd_price(it)}))]
         else:
             kept_items = found
         n0 = len(out)
