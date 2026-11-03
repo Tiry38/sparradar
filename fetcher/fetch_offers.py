@@ -1076,9 +1076,39 @@ def fetch_prospektangebote():
                     got.append(o)
             if not new:
                 break
+        if not got:
+            got = pc_rows(store, food, today)
         log(f"  prospektangebote {store}: {len(got)} Angebote ({skipped} künftige ohne Datum übersprungen)")
         out += got
     return out
+
+
+def pc_data(max_days=4):
+    """docs/data/pc-pa.json: prospektangebote.de vom PC zu Hause abgerufen (docs/pc/abruf.py), weil GitHub-Server dort
+    nur „202, leer“ bekommen. Nur nehmen, wenn höchstens max_days alt."""
+    d = load("pc-pa.json", {})
+    try:
+        age = (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(d.get("at"))).total_seconds() / 86400
+    except Exception:
+        return {}
+    if age > max_days:
+        log(f"  ! PC-Abruf ist {age:.1f} Tage alt – wird nicht mehr genommen (PC aus? Schlüssel abgelaufen?)")
+        return {}
+    return d
+
+
+def pc_rows(store, food, today):
+    rows = [r for r in pc_data().get(store) or [] if r.get("p") and (not r.get("t") or r["t"] >= today.isoformat())]
+    got = []
+    for r in rows:
+        o = offer(store, pa_title(html_unescape(r.get("n") or "").strip()), r["p"], old=r.get("o"), img=r.get("img"),
+                  start=today.isoformat(), end=r.get("t"), src="prospektangebote.de (vom PC abgerufen)", url=r.get("u"), food=food)
+        if o:
+            o["pa"] = 1
+            got.append(o)
+    if got:
+        log(f"  prospektangebote {store}: {len(got)} Angebote aus dem PC-Abruf")
+    return got
 
 
 def scheck_pick(rows, kd):

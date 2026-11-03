@@ -296,6 +296,14 @@ def flyers():
         end = f"{m.group(6)}-{m.group(5)}-{m.group(4)}"
         pages = [x["page"] for x in json.loads(pg.group(1))]
         out.append({"id": fid, "from": start, "to": end, "pages": pages, "url": f"{PA}/anzeigen/angebote/{slug}"})
+    if not ids:  # GitHub-Server bekommen von prospektangebote nur „202, leer“ -> Prospektliste vom PC-Abruf (docs/pc/abruf.py)
+        try:
+            pc = json.load(open(os.path.join(DATA, "pc-pa.json"), encoding="utf-8"))
+            if (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(pc["at"])).days <= 4:
+                out = [f for f in pc.get("scheck") or [] if f.get("id") and f.get("pages")]
+                log(f"  Prospektliste vom PC-Abruf ({pc['at']}): {len(out)} Prospekt(e)")
+        except Exception as e:
+            log(f"  kein PC-Abruf da ({e})")
     return out
 
 
