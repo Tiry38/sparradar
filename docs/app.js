@@ -1007,7 +1007,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  134:["Einkaufszettel mit Bildern: Jeder Artikel zeigt jetzt ein kleines Foto. So erkennst du ihn im Laden auf einen Blick und hakst schneller ab."],
+  134:["Einkaufszettel mit Bildern: Jeder Artikel zeigt ein kleines Foto, so erkennst du ihn im Laden auf einen Blick.","Bild antippen = deine Sorte wählen (z. B. genau deine Milch). SparRadar merkt sie sich und zeigt sie ab jetzt immer."],
   133:["Neuer Look: Der Hintergrund hat jetzt grüne Farbverläufe und ein feines Raster – alles bleibt gut lesbar."],
   132:["Merkliste genauer: Bei „verschiedene Sorten“ reicht die Marke allein nicht mehr. Hast du z. B. einen bestimmten More-Sirup gemerkt, meldet SparRadar nicht mehr jedes andere More-Produkt."],
   131:["Scheck-In Center jetzt mit dem ganzen Prospekt statt nur 16 Angeboten: SparRadar liest Name und Preis direkt aus den Prospektseiten. Die Karte zeigt den passenden Ausschnitt, beim Antippen siehst du die ganze Seite zum Nachprüfen."],
@@ -1245,6 +1245,47 @@ function savedHTML(){const sv=savedOn();if(!sv.length)return "";
   const m=sum(sv.filter(x=>x.d.startsWith(mon))),w=sum(sv.filter(x=>x.d>=wk)),all=sum(sv);
   return `<button class="savedc" data-savedopen="1" title="Antippen zum Ansehen oder Löschen"><div><span>Diese Woche</span><b>${eur(w)}</b></div><div><span>Diesen Monat</span><b>${eur(m)}</b></div><div><span>Insgesamt</span><b>${eur(all)}</b></div><p>Gespart mit SparRadar · antippen zum Ansehen oder Löschen</p></button>`}
 // Fenster „Gespart“: jeden Eintrag einzeln löschen (z. B. Test-Abhaken) oder alles auf 0
+// ---------- Zettel: eigenes Artikelbild ("meine Milch") ----------
+// Gemerkt je Artikel-Name auf diesem Gerät (localStorage sr_myimg). Eigene Einträge: gewählt > gemerkt > Strichcode-Foto, sonst Zeichnung.
+const MYIMG=store.get("myimg",{});
+const zKey=o=>typeof o==="string"?norm(o):norm(((o.b&&!norm(o.n).includes(norm(o.b))?o.b+" ":"")+o.n));
+function myImg(k){if(typeof k==="object"&&k){const x=k;if(x.img&&safeUrl(x.img))return x.img;const m=MYIMG[norm(x.n)];if(m&&safeUrl(m.u))return m.u;
+    if(x.ean)return eanImg(x.ean);return ""}
+  const m=MYIMG[k];return m&&safeUrl(m.u)?m.u:""}
+const EANIMG=store.get("eanimg",{});
+function eanImg(code){if(code in EANIMG)return EANIMG[code];EANIMG[code]="";
+  (async()=>{for(const host of ["world.openfoodfacts.org","world.openbeautyfacts.org"]){try{const j=await (await fetch(`https://${host}/api/v2/product/${code}.json?fields=image_front_small_url`)).json();
+    const u=j.status===1&&j.product&&j.product.image_front_small_url;if(u&&safeUrl(u)){EANIMG[code]=u;store.set("eanimg",EANIMG);if(S.tab==="list")render();return}}catch(e){}}})();return ""}
+const ZP={id:"",q:"",qd:"",off:[],busy:false};
+function zpTarget(){const id=ZP.id;if(id.startsWith("x-")){const x=S.extra.find(e=>e.id===id);return x?{x,name:x.n,key:norm(x.n)}:null}
+  const o=byId(id);return o?{o,name:(o.b&&!norm(o.n).includes(norm(o.b))?o.b+" ":"")+o.n,key:zKey(o)}:null}
+function zpSearch(q){q=q.trim();if(!q||ZP.qd===q)return;ZP.qd=q;ZP.off=[];ZP.busy=true;
+  fetch("https://world.openfoodfacts.org/cgi/search.pl?"+new URLSearchParams({search_terms:q,search_simple:1,action:"process",json:1,page_size:40,tagtype_0:"countries",tag_contains_0:"contains",tag_0:"germany",fields:"product_name,product_name_de,brands,quantity,image_front_small_url"}))
+    .then(r=>r.json()).then(d=>{if(ZP.qd!==q)return;const seen=new Set();
+      ZP.off=(d.products||[]).filter(p=>p.image_front_small_url&&safeUrl(p.image_front_small_url)&&(p.product_name_de||p.product_name)).map(p=>({u:p.image_front_small_url,t:[(p.brands||"").split(",")[0].trim(),(p.product_name_de||p.product_name).trim(),p.quantity||""].filter(Boolean).join(" ")})).filter(r=>!seen.has(norm(r.t))&&seen.add(norm(r.t)))})
+    .catch(()=>{}).finally(()=>{if(ZP.qd===q){ZP.busy=false;if(S.sheet==="zpick")render()}})}
+function zpPick(u,t){const g=zpTarget();if(!g)return;
+  if(!u){delete MYIMG[g.key];if(g.x)delete g.x.img}else{MYIMG[g.key]={u,t:t||"",at:Date.now()};if(g.x)g.x.img=u}
+  const ks=Object.keys(MYIMG);if(ks.length>500)ks.sort((a,b)=>MYIMG[a].at-MYIMG[b].at).slice(0,ks.length-500).forEach(k=>delete MYIMG[k]);
+  store.set("myimg",MYIMG);save();S.sheet=null;toast(u?"Gemerkt – dieses Bild zeigt der Zettel ab jetzt immer für „"+g.name+"“":"Bild zurückgesetzt");render()}
+function renderZpick(){const g=zpTarget();if(!g)return `<div class="sheet"><div class="sheet-h"><h2>Bild wählen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div></div>`;
+  const q=ZP.q||g.name;zpSearch(q);const cur=g.x?myImg(g.x):myImg(g.key),seen=new Set(),tile=(u,t,src)=>{if(!u||seen.has(u))return "";seen.add(u);
+    return `<button class="zpt${u===cur?" on":""}" data-zpu="${esc(u)}" data-zpt="${esc(t)}"><img src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.parentNode.remove()"><span>${esc(t)}</span>${src?`<em>${esc(src)}</em>`:""}</button>`};
+  const own=[g.o&&g.o.img?tile(sharp(g.o.img),g.name,"dieses Angebot"):"",...(g.o?.ims||[]).map(u=>tile(sharp(u),g.name,"dieses Angebot"))].join("");
+  const kw=exWords(q),lw=kw[kw.length-1],tr=o=>{if(!lw)return 1;const ws=exWords(o.n);return kw.every(k=>ws.some(w=>exEq(w,k)))?(exHead(o.n).some(w=>exEq(w,lw))?3:2):1};
+  const hs=weekOffers().filter(o=>o.img&&watchMatch(o,q)).map(o=>[o,tr(o)]),tt=Math.max(0,...hs.map(h=>h[1])),offs=hs.filter(h=>h[1]===tt).map(h=>h[0]).slice(0,24).map(o=>tile(sharp(o.img),(o.b&&!norm(o.n).includes(norm(o.b))?o.b+" ":"")+o.n,sname(o.s))).join("");
+  const sug=SIMG?suggest(q).filter(x=>tr({n:x.t})>=Math.max(2,tt)).map(x=>tile(sugImg(x.t),x.t,"")).join(""):"";
+  const off=ZP.off.map(r=>tile(r.u,r.t,"")).join("");
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Deine Sorte wählen">
+   <div class="sheet-h"><span class="newsico">🖼️</span><h2>Welche Sorte kaufst du?</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <p style="margin:-6px 0 8px;color:var(--muted)">Tippe auf das Bild von <b>deinem</b> Artikel „${esc(g.name)}“. SparRadar merkt es sich und zeigt es ab jetzt immer auf dem Zettel. Nicht dabei? Oben Marke oder Sorte eintippen, z. B. „Weihenstephan Milch“.</p>
+   <form class="addrow" id="zpForm"><input id="zpIn" value="${esc(q)}" placeholder="Marke oder Sorte" autocomplete="off"><button class="btn" type="submit">Suchen</button></form>
+   ${own?`<h4 class="svd">Dieses Angebot</h4><div class="zpgrid">${own}</div>`:""}
+   ${offs?`<h4 class="svd">Gerade im Angebot</h4><div class="zpgrid">${offs}</div>`:""}
+   ${sug||off?`<h4 class="svd">Aus der Produktdatenbank</h4><div class="zpgrid">${sug}${off}</div>`:""}
+   ${ZP.busy?`<p style="color:var(--muted)">Suche weitere Bilder …</p>`:!own&&!offs&&!sug&&!off?`<p>Keine Bilder gefunden – probier eine andere Schreibweise oder die Marke.</p>`:""}
+   ${cur?`<div class="factions" style="grid-template-columns:1fr"><button class="btn ghost" data-zpu="" data-zpt="">Gemerktes Bild entfernen</button></div>`:""}
+  </div>`}
 function renderSaved(){const sv=savedOn().slice().sort((a,b)=>b.d.localeCompare(a.d)),days=[...new Set(sv.map(x=>x.d))];
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Gespart">
    <div class="sheet-h"><span class="newsico">💰</span><h2>Gespart: ${eur(sv.reduce((t,x)=>t+x.v,0))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
@@ -1674,11 +1715,12 @@ function renderList(){
   const cpBtn=id=>{if(id.startsWith("x-")||done(id))return "";const o=byId(id);if(!o||!o.p)return "";const c=couponsFor(o)[0];
     return `<button class="cpbtn${c?" on":""}" data-cpqlist="${esc(id)}" aria-label="${c?"Coupon "+esc(cpValueTxt(c)):"Coupon eintragen"}" title="${c?"Coupon eingerechnet":"Ich habe einen Coupon dafür"}">🎟️${c?`<small>${esc(cpValueTxt(c))}</small>`:""}</button>`};
   const stepper=id=>done(id)?"":`<span class="qstep"><button data-qm="${esc(id)}" aria-label="weniger">−</button><b>${qty(id)}</b><button data-qp="${esc(id)}" aria-label="mehr">+</button></span>`;
-  // Kleines Artikelbild: beim Einkaufen erkennt man den Artikel schneller
-  const zImg=id=>{if(!id.startsWith("x-")){const o=byId(id);if(!o)return "";return `<b class="zimg">${imgTag(o)}</b>`}
-    const x=extra.find(e=>e.id===id);if(!x)return "";const t=x.n,o=OFFERS.find(y=>y.img&&watchMatch(y,t)&&norm(y.n).startsWith(norm(t)));
-    const u=sugImg(t)||simImg(t)||(SIMG&&CATALOG_N?liveImg(t):"")||(o?sharp(o.img):"");
-    return `<b class="zimg">${u&&safeUrl(u)?`<img src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createRange().createContextualFragment(ILL.sonstiges))">`:ILL.sonstiges}</b>`};
+  // Kleines Artikelbild: beim Einkaufen erkennt man den Artikel schneller. Antippen = eigene Sorte wählen (wird gemerkt).
+  const zImg=id=>{const o=id.startsWith("x-")?null:byId(id),x=o?null:extra.find(e=>e.id===id);if(!o&&!x)return "";
+    const u=myImg(o?zKey(o):x);const pick=`data-zpick="${esc(id)}" role="button" tabindex="0" aria-label="Bild antippen: deine Sorte wählen" title="Antippen: deine Sorte wählen"`;
+    if(u)return `<b class="zimg" ${pick}><img src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></b>`;
+    if(o)return `<b class="zimg" ${pick}>${imgTag(o)}</b>`;
+    return `<b class="zimg none" ${pick}>${ILL.sonstiges}<small>Sorte wählen</small></b>`};
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i>${zImg(id)}<span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineT(o),0),r=os.reduce((a,o)=>a+lineR(o)+linePf(o),0),p=r2(os.reduce((a,o)=>a+linePf(o),0));return `<div class="rsub"><span>Summe ${os.length} Artikel${p?` · inkl. ${eur(p)} Pfand`:""}${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
@@ -2218,7 +2260,7 @@ function render(){optSync();memoReset();quickCheck();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&S._shown==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen (nur wenn das Fenster schon offen ist)
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,detail:renderDetail,trip:renderTrip,cbget:renderCbGet,bon:renderBon,connect:renderConnect}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,zpick:renderZpick,detail:renderDetail,trip:renderTrip,cbget:renderCbGet,bon:renderBon,connect:renderConnect}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -2237,6 +2279,7 @@ document.addEventListener("click",e=>{
   if(e.target.id==="cheapAsk"){e.target.hidden=true;return}
   // Vollbild: Produktbild schließt bei Tipp, Prospektseite nur über ✕ (dort wird gescrollt und gezoomt)
   if(e.target.closest("#lbClose")||(e.target.closest("#lightbox")&&!e.target.closest("#lightbox.pg"))){S.lightbox=null;render();return}
+  const zp=e.target.closest("[data-zpick]");if(zp){e.preventDefault();e.stopPropagation();ZP.id=zp.dataset.zpick;ZP.q="";ZP.qd="";ZP.off=[];S.sheet="zpick";render();return}
   const b=e.target.closest("button");
   if(!e.target.closest(".sugg,#q,#kwIn"))hideSugg();
   // Artikel antippen (nicht auf Knöpfe/Links) = Detailansicht
@@ -2331,6 +2374,7 @@ document.addEventListener("click",e=>{
   if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
   if(b.id==="zMic"){Voice.start();return}
   if(b.id==="scanBtn"||b.id==="zScan"){Object.assign(Scan,{mode:b.id==="zScan"?"list":"",last:"",res:"",added:[],unknown:"",cart:null,msgT:""});S.sheet="scan";render();return}
+  if(b.dataset.zpu!=null){zpPick(b.dataset.zpu,b.dataset.zpt);return}
   if(b.dataset.zq){const id=b.dataset.zq;S.qty[id]=Math.min(49,qty(id)+1);save();zPaint();return}
   if(b.dataset.zundo){zUndo(b.dataset.zundo);return}
   if(b.dataset.ztake){const [x,o]=b.dataset.ztake.split("|");zTake(x,o);return}
@@ -2391,6 +2435,7 @@ document.addEventListener("submit",e=>{
     if(!/^(ghp_|github_pat_)/.test(t)&&!/^SR-[A-Za-z0-9]{20}$/.test(t)){toast("Das sieht nicht wie ein SparRadar-Code aus (beginnt mit SR-).");return}
     const pick=store.get("syncPick",null)||DEF_PICK;
     toast("Verbinde …");Sync.connect(t,pick).then(()=>{toast(`Verbunden! Geteilt: ${Sync.on().map(p=>Sync.PARTS[p].n).join(", ")||"nichts"}`);render()},err=>toast("Verbinden fehlgeschlagen: "+err.message));return}
+  if(e.target.id==="zpForm"){e.preventDefault();ZP.q=document.getElementById("zpIn").value.trim();render();return}
   if(e.target.id==="eanForm"){e.preventDefault();const inp=document.getElementById("eanIn"),v=inp.value;Scan.last=v.replace(/\D/g,"");Scan.lookup(v);if(Scan.mode==="list")inp.value="";return}
   if(e.target.id==="zNameForm"){e.preventDefault();const n=document.getElementById("zNameIn").value.trim(),c=Scan.unknown;if(!n)return;
     if(c){const m=store.get("ean",{});m[c]=n;const k=Object.keys(m);if(k.length>400)delete m[k[0]];store.set("ean",m)}
