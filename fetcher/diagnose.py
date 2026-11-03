@@ -7,11 +7,12 @@ import urllib.request
 import fetch_offers as f
 
 for url in (f"{f.PA}/geschaefte/mueller/angebote", f"{f.PA}/geschaefte/mueller/angebote?page=2",
-            f"{f.PA}/anzeigen/angebote/edeka-prospekt-3875720", f"{f.PW}/rewe", f"{f.PA}/robots.txt"):
+            f"{f.PA}/anzeigen/angebote/edeka-prospekt-3875720", f"{f.PW}/rewe", f"{f.PA}/robots.txt",
+            "https://img.offers-cdn.net/assets/uploads/flyers/3882973/large/scheck-in-center-1-1-6ae85339aec31.jpeg"):
     req = urllib.request.Request(url, headers={"User-Agent": f.UA, "Accept-Language": "de-DE,de;q=0.9"})
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            st, hd, h = r.status, dict(r.headers), r.read().decode("utf-8", "replace")
+            st, hd, h = r.status, dict(r.headers), r.read().decode("latin-1")
     except urllib.error.HTTPError as e:
         st, hd, h = e.code, dict(e.headers), e.read().decode("utf-8", "replace")
     except Exception as e:
