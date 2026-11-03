@@ -31,6 +31,14 @@ PATTERNS = [
     ("kd", "www.kaufda.de/Lidl/Sortiment/*"),
     ("kd", "www.kaufda.de/Netto-Marken-Discount/Sortiment/*"),
 ]  # Händlerseiten Wörth und Aldi-Angebotsseiten: im Archiv nicht vorhanden (geprüft 01.11.)
+# Oktober (03.11.: Sortiment-Seiten gibt es dort nur als Übersicht ohne Preise). Gefunden per diagnose.py:
+# 64 bundesweite kaufDA-Stichwortseiten (/Angebote/Butter, /Hackfleisch, /Kaffee …) ca. 8× täglich 09.–26.10.,
+# dazu ~250 Aldi-Produktseiten (Preis in schema.org-Daten). Je Stichwortseite 1 Schnappschuss pro Tag,
+# weil kaufDA bei jedem Aufruf andere Angebote zeigt.
+PATTERNS_OCT = [
+    ("kd", "www.kaufda.de/Angebote/*", "20261001", "20261102"),
+    ("ap", "www.aldi-sued.de/produkt/*", "20260901", "20261102"),
+]
 KEEP = {"lidl", "netto", "aldi"}
 
 
@@ -69,6 +77,8 @@ def thin(snaps):
             continue
         d = time.strptime(ts[:8], "%Y%m%d")
         half = f"{time.strftime('%G-%V', d)}-{0 if d.tm_wday < 3 else 1}"
+        if "/Angebote/" in url:
+            half = ts[:8]
         key = (url.split("?")[0].rstrip("/").lower(), half)
         if key in seen:
             continue
@@ -77,11 +87,11 @@ def thin(snaps):
     return out
 
 
-def cdx(pattern):
+def cdx(pattern, fr=None, to=None):
     """Alle Schnappschüsse (Status 200) im Zeitraum, seitenweise über den Fortsetzungs-Schlüssel."""
     out, key = [], None
     while True:
-        q = {"url": pattern, "from": FROM, "to": TO, "output": "json", "fl": "timestamp,original,digest",
+        q = {"url": pattern, "from": fr or FROM, "to": to or TO, "output": "json", "fl": "timestamp,original,digest",
              "filter": "statuscode:200", "collapse": "digest", "limit": "5000", "showResumeKey": "true"}
         if key:
             q["resumeKey"] = key
@@ -134,6 +144,37 @@ def offers_aldi(html, url):
     return out
 
 
+def offers_ap(html):
+    """Aldi-Produktseite: Name, Marke, Preis aus den schema.org-Daten (Preis am Tag des Schnappschusses)."""
+    out = []
+    for m in re.finditer(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', html, re.S):
+        try:
+            d = json.loads(m.group(1))
+        except Exception:
+            continue
+        for x in d if isinstance(d, list) else [d]:
+            of = isinstance(x, dict) and x.get("offers")
+            if isinstance(of, list):
+                of = of[0] if of else None
+            if not isinstance(of, dict) or not x.get("name"):
+                continue
+            try:
+                price = float(str(of.get("price") or "0").replace(",", "."))
+            except ValueError:
+                continue
+            br = x.get("brand")
+            br = br.get("name") if isinstance(br, dict) else br
+            br = re.sub(r"^[\s·•]+|[\s·•]+$", "", br or "")
+            try:
+                o = f.offer("aldi", x["name"], price, brand=None if br in (None, "", "BIO", "no-brand", "ALDI SÜD") else br,
+                            src="aldi-sued.de")
+            except Exception:
+                o = None
+            if o:
+                out.append(o)
+    return out
+
+
 def day_of(o, snap):
     """Preis gilt ab Prospektstart; liegt der weit vor dem Schnappschuss (Dauerangebot), zählt der Schnappschuss-Tag."""
     fr = str(o.get("from") or "")[:10]
@@ -146,8 +187,20 @@ def day_of(o, snap):
 def collect(path):
     t0 = time.time()
     st = json.load(open(STATE)) if os.path.exists(STATE) else {"done": [], "snaps": None}
-    if st.get("v") != 2:  # alte Liste (mit Übersichtsseiten, ungepackt gelesen = 0 Preise) neu aufbauen
+    if st.get("v") not in (2, 3):  # alte Liste (mit Übersichtsseiten, ungepackt gelesen = 0 Preise) neu aufbauen
         st = {"v": 2, "done": [], "snaps": None}
+    if st.get("v") == 2 and st.get("snaps") is not None:  # September fertig -> Oktober-Quellen dazunehmen
+        extra = []
+        for kind, pat, fr, to in PATTERNS_OCT:
+            got = cdx(pat, fr, to)
+            log(f"{pat}: {len(got)} Schnappschüsse")
+            extra += [[kind, r[0], r[1]] for r in got]
+        extra = thin(extra)
+        log(f"Oktober dazu: {len(extra)} Schnappschüsse")
+        if extra:
+            st["snaps"] += extra
+            st["v"] = 3
+            json.dump(st, open(STATE, "w"))
     done = set(st["done"])
     rows = json.load(open(path)) if os.path.exists(path) else {}
     if st.get("snaps") is None:
@@ -181,7 +234,8 @@ def collect(path):
                 continue
         else:
             ok += 1
-        offs = (offers_kd(html) if kind == "kd" else offers_aldi(html, url)) if html else []
+        offs = ((offers_kd(html) if kind == "kd" else offers_ap(html) if kind == "ap" else offers_aldi(html, url))
+                if html else [])
         for o in offs:
             k = f"{o['s']}|{f.norm(o['n'])[:40]}"
             d = day_of(o, ts)
