@@ -73,4 +73,11 @@ jobs:
           git add docs/data
           git diff --cached --quiet || git commit -m "Angebote $(date +%F)"
           git pull --rebase -X theirs --autostash   # bei Überschneidung mit einem anderen Lauf gelten die neuen Daten
+          # Nachgetragene Archiv-Preise (preisverlauf.yml) wieder einsortieren: lief der Nachtrag während dieses Abrufs,
+          # hätte „theirs“ seine history.json überschrieben (03.11. passiert)
+          if [ -f fetcher/backfill-rows.json ]; then
+            (cd fetcher && python backfill_history.py --merge backfill-rows.json)
+            git add docs/data/history.json
+            git diff --cached --quiet || git commit -qm "Preisverlauf: Archiv-Preise wieder eingetragen"
+          fi
           git push
