@@ -91,9 +91,9 @@ def future_marks(grow=False):
     if grow:
         items = f.aldi_items(h)
         if dt.datetime.now(dt.timezone.utc).minute < 15:  # Tagesseiten nur einmal pro Stunde (je Seite 1 Aufruf)
-            for day, path in days:
-                time.sleep(f.PAUSE)
-                items += f.aldi_items(f.http(f"https://www.aldi-sued.de{path}"), day)
+            for day, path in days:  # mit Folgeseiten (je Seite nur 30 Artikel) + Rubrik Wochenangebote
+                items += f.aldi_pages(f"https://www.aldi-sued.de{path}", day)
+            items += f.aldi_pages(f.ALDI_WEEK)
         SEEN.extend(o for o in map(f.aldi_offer, items) if o)
     m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
     if m:

@@ -389,6 +389,8 @@ def fetch_lidl():
               "&q=shampoo", "&q=zahncreme", "&q=toilettenpapier", "&q=kosmetik"):
         for it in pages(q):
             g = (it.get("gridbox") or {}).get("data") or {}
+            if g.get("store") is False:
+                continue  # nur online erhältlich (lidl.de: store=false) -> nicht im Markt
             pr = g.get("price") or {}
             dd = pr.get("discount") or {}
             # „statt“-Preis: oldPrice, sonst deletedPrice (z. B. bei UVP-Angeboten fehlt oldPrice)
@@ -466,6 +468,29 @@ def aldi_items(html, day=None):
     return out
 
 
+# Rubrik „Wochenangebote“ (Frische-, Marken-, Eigenmarken-Angebote der Woche, ~125 Artikel; die Unterrubriken sind Teilmengen)
+ALDI_WEEK = "https://www.aldi-sued.de/produkte/wochenangebote/k/1588161426582123"
+
+
+def aldi_pages(url, day=None, first=None, limit=15):
+    """Aldi-Seite samt allen Folgeseiten (?page=2 …). Tages- und Rubrikseiten zeigen nur 30 Artikel je Seite
+    (03.11.: Fr 06.11. = 103 Artikel auf 5 Seiten, bis dahin wurde nur Seite 1 gelesen)."""
+    out, skus = [], set()
+    for p in range(1, limit + 1):
+        if p == 1 and first is not None:
+            h = first
+        else:
+            time.sleep(PAUSE)
+            h = http(url + (("&" if "?" in url else "?") + f"page={p}" if p > 1 else ""))
+        got = aldi_items(h, day)
+        new = [it for it in got if it.get("sku") not in skus]
+        if not new:
+            break
+        skus.update(it.get("sku") for it in new)
+        out += new
+    return out
+
+
 def fetch_aldi():
     out, seen = [], set()
     h = http("https://www.aldi-sued.de/de/angebote.html")
@@ -474,23 +499,24 @@ def fetch_aldi():
     items = aldi_items(h)
     if not items:
         log("  ! Aldi: keine Daten in der Seite gefunden")
-    # zusätzlich jede verlinkte Tagesseite, vor allem die künftigen (nächste Woche)
+    # zusätzlich jede verlinkte Tagesseite, vor allem die künftigen (nächste Woche), mit allen Folgeseiten
     today = dt.date.today().isoformat()
     for day, path in aldi_days(h):
         if day < today:
             continue
-        time.sleep(PAUSE)
-        got = []
-        for url in (f"https://www.aldi-sued.de{path}", f"https://www.aldi-sued.de/de/angebote/{day}.html"):
-            got = aldi_items(http(url), day)
-            if got:
-                break
+        got = aldi_pages(f"https://www.aldi-sued.de{path}", day)
+        if not got:
+            got = aldi_pages(f"https://www.aldi-sued.de/de/angebote/{day}.html", day)
         log(f"  Aldi Tagesseite {day}: {len(got)} Artikel")
         items += got
+    got = aldi_pages(ALDI_WEEK)
+    log(f"  Aldi Wochenangebote: {len(got)} Artikel")
+    items += got
+    dated = {it.get("sku") for it in items if it.get("onSaleDate")}
     for it in items:
         key = (it.get("sku"), str(it.get("onSaleDate"))[:10])
-        if key in seen:
-            continue
+        if key in seen or (not it.get("onSaleDate") and it.get("sku") in dated):
+            continue  # ohne Datum doppelt zu einer Tagesseite -> die mit Datum behalten
         seen.add(key)
         o = aldi_offer(it)
         if o:
@@ -501,6 +527,11 @@ def fetch_aldi():
 
 def aldi_offer(it):
     """Ein Aldi-Artikel aus __NUXT_DATA__ -> Angebot (auch vom Prospekt-Wächter genutzt)."""
+    if it.get("isDropship"):
+        return None  # Online-Ware (Lieferung direkt vom Hersteller), nicht im Markt
+    if any(re.search(r"regional verf|nur online", str(b.get("displayText") or ""), re.I)
+           for g in it.get("badges") or [] if isinstance(g, dict) for b in g.get("items") or [] if isinstance(b, dict)):
+        return None  # „Regional verfügbar“: nicht sicher, dass es das in Wörth gibt (Kevin 03.11.)
     pr = it.get("price") or {}
     amount = pr.get("amountRelevant") or pr.get("amount")
     if not amount:
@@ -600,7 +631,31 @@ APP_LABEL = {"lidl": "Lidl Plus", "edeka": "Edeka-App", "netto": "Netto-App", "r
 APP_HINT = re.compile(r"(?:mit\s+(?:der\s+)?app|app[- ]preis|rewe\s+bonus|lidl\s+plus|netto[- ]app)[^0-9]{0,25}(\d+)[,.](\d\d)", re.I)
 
 
+# Kevin 03.11.: keine Online-Angebote, nur was man direkt im Markt bekommt (gilt für alle Märkte)
+ONLINE_ONLY = re.compile(r"nur\s+(?:im\s+)?online(?:[- ]?shop)?\b|online[- ]?exklusiv|exklusiv\s+online|nur\s+im\s+online[- ]?shop"
+                         r"|nicht\s+in\s+(?:der|den)\s+filiale|nur\s+auf\s+\w+\.de\b", re.I)
+
+
+def online_only(txt):
+    return bool(ONLINE_ONLY.search(txt or ""))
+
+
+ONLINE_IDS = set()  # Angebots-IDs, die kaufDA als „Nur online“ führt -> auch gespeicherte Exemplare fliegen raus
+
+
 def kd_offer(it):
+    """kaufDA-Angebot; „Nur online“ (prices.description/conditions) -> None (Kevin 03.11.: nur was man im Markt bekommt,
+    „Auch online“ bleibt)."""
+    pr = it.get("prices") or {}
+    o = _kd_offer(it)
+    if o and online_only(" ".join([str(pr.get("description") or ""), it.get("description") or "", it.get("title") or ""]
+                                  + [str(c.get("other") or "") for c in pr.get("conditions") or [] if isinstance(c, dict)])):
+        ONLINE_IDS.add(o["id"])
+        return None
+    return o
+
+
+def _kd_offer(it):
     store = kd_store(it)
     if not store:
         return None
@@ -701,11 +756,16 @@ def fetch_kaufda():
 # Sie sind bundesweit -> nur Angebote aus Prospekten behalten, die auch für Wörth/Jockgrim gelten.
 KD_PUB_IDS = {"edeka": "DE-220164", "rewe": "DE-1062"}  # kaufDA-Händlerkennung der Region (Edeka Südwest, Rewe)
 KD_SLUGS = {"lidl": ["Lidl"], "netto": ["Netto-Marken-Discount"], "rewe": ["REWE"], "edeka": ["Edeka"],
-            "dm": ["dm-drogerie-markt", "Dm"], "mueller": ["Mueller"]}
-# zusätzliche Sortiment-Begriffe je Markt (Müller: Drogerie, Parfümerie, Spielwaren, Schreibwaren)
-KD_TERMS = {"mueller": """Parfum Duft Make-up Lippenstift Nagellack Mascara Haarfarbe Haarpflege Gesichtspflege Bodylotion Sonnenschutz
-Pflaster Vitamine Nahrungsergaenzung Babynahrung Schnuller Playmobil Schleich Barbie Puzzle Brettspiele Spiele Pluesch Kinderspielzeug
-Schreibwaren Basteln Buecher Socken Strumpfhosen Handtaschen Schmuck Uhren Haushaltswaren Deko Weihnachten Adventskalender""".split()}
+            "dm": ["DM"], "mueller": ["Mueller"]}
+# dm heißt bei kaufDA „DM“ (/DM/Sortiment/…); „dm-drogerie-markt“ und „Dm“ = 404 -> bis 03.11. nie Sortiment-Seiten für dm
+# zusätzliche Sortiment-Begriffe je Markt (Müller/dm: Drogerie, Parfümerie, Spielwaren, Schreibwaren)
+_DROG = """Parfum Duft Make-up Lippenstift Nagellack Mascara Haarfarbe Haarpflege Gesichtspflege Bodylotion Sonnenschutz
+Pflaster Vitamine Nahrungsergaenzung Babynahrung Schnuller Adventskalender""".split()
+KD_TERMS = {"mueller": _DROG + """Playmobil Schleich Barbie Puzzle Brettspiele Spiele Pluesch Kinderspielzeug
+Schreibwaren Basteln Buecher Socken Strumpfhosen Handtaschen Schmuck Uhren Haushaltswaren Deko Weihnachten""".split(),
+            "dm": _DROG + """Zahncreme Mundspuelung Rasierklingen Handcreme Gesichtscreme Haarspray Spuelung Deodorant Sonnencreme
+Feuchttuecher Wattepads Tampons Binden Kondome Seife Badezusatz Serum Gesichtsmaske Bartpflege Fusscreme Concealer Puder
+Lidschatten Pinsel Foehn Glaetteisen Epilierer Magnesium Proteinriegel Duftkerze Geschenkset Allzweckreiniger""".split()}
 SORTIMENT = """Butter Milch Kaese Joghurt Quark Sahne Eier Mozzarella Margarine Pudding Skyr Frischkaese Gouda
 Hackfleisch Haehnchen Putenbrust Schweinefleisch Rindfleisch Steak Schnitzel Bratwurst Wuerstchen Salami Schinken Wurst Lachs Fisch Garnelen Thunfisch
 Obst Gemuese Tomaten Aepfel Bananen Kartoffeln Paprika Zwiebeln Salat Trauben Mandarinen Beeren Pilze
@@ -837,7 +897,7 @@ def fetch_sortiment(regional=None):
             kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in ok
                           and (str((it.get("parentContent") or {}).get("id")) in base | preview
                                or kd_price(it) in ref.get(flyer_key(it), {kd_price(it)}))]
-        elif store == "mueller":
+        elif store in ("mueller", "dm"):
             # bundesweite Seite: nur Prospekte, die auch die Wörther Händlerseite zeigt (bzw. flyers.json)
             base = {b for b in local.get("brochures", set()) if b and b != "None"} | local_flyers(store)
             kept_items = [it for it in found if str((it.get("parentContent") or {}).get("id")) in base] if base else found
@@ -1533,6 +1593,11 @@ def fix_bad_images(offers):
 def finalize(offers, save_uvp=False):
     today = dt.date.today().isoformat()
     offers = drop_previews(merge(offers))
+    n0 = len(offers)
+    offers = [o for o in offers if o.get("id") not in ONLINE_IDS
+              and not online_only(" ".join(str(o.get(k) or "") for k in ("n", "d", "inf")))]
+    if len(offers) < n0:
+        log(f"  Online-Angebote entfernt: {n0 - len(offers)}")
     fix_bad_images(offers)
     for o in offers:  # auch schon gespeicherte Angebote nach den Geräte-Regeln einordnen
         dev = special(o.get("n"), o.get("b"), o.get("cat")) or appliance(o.get("n"), o.get("cat"))
