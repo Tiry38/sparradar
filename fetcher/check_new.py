@@ -40,13 +40,14 @@ def future_marks(grow=False):
             continue
         pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
         br = pi.get("brochures") or {}
+        f.note_online(br)
         home[store] = f._ids([br.get("viewer"), br.get("publisher")], set()) | f.local_flyers(store)
         f.KD_INFO.setdefault(url, {})["brochures"] = home[store]  # für kd_store (Scheck-In = Prospekt-ID der Wörther „EDEKA“-Seite)
         for key in ("viewer", "publisher"):  # nur Prospekte dieses Händlers, nicht die „sector“-Werbung anderer
             lst = (pi.get("brochures") or {}).get(key)
             for b in lst if isinstance(lst, list) else []:
                 start = str((b or {}).get("validFrom") or "")[:10]
-                if start >= today:
+                if start >= today and not re.search(r"online", str(b.get("title") or ""), re.I):
                     marks[f"{store}:{b.get('id') or b.get('contentId')}"] = start
         for it in ((pi.get("offers") or {}).get("main") or {}).get("items") or []:
             start = str(it.get("validFrom") or "")[:10]

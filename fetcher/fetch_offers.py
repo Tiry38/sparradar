@@ -592,6 +592,7 @@ def kd_page(url):
     main = (pi.get("offers") or {}).get("main") or {}
     items = main.get("items") or []
     br = pi.get("brochures") or {}
+    note_online(br)
     links = ((((pi.get("template") or {}).get("content") or {}).get("OfferLinkbox") or {}).get("PublisherOfferLinkbox") or {}).get("links") or []
     KD_INFO[url] = {
         "brochures": _ids([br.get("viewer"), br.get("publisher")], set()) | {str((it.get("parentContent") or {}).get("id")) for it in items},
@@ -641,6 +642,15 @@ def online_only(txt):
 
 
 ONLINE_IDS = set()  # Angebots-IDs, die kaufDA als „Nur online“ führt -> auch gespeicherte Exemplare fliegen raus
+ONLINE_BIDS = set()  # Prospekt-IDs reiner Online-Prospekte (03.11.: Netto „netto-online.de - Exklusive Angebote“)
+
+
+def note_online(br):
+    """Online-Prospekte aus den Prospekt-Listen einer kaufDA-Seite merken (Titel mit „online“, z. B. netto-online.de)."""
+    for key in ("viewer", "publisher"):
+        for b in br.get(key) if isinstance(br.get(key), list) else []:
+            if isinstance(b, dict) and re.search(r"online", str(b.get("title") or ""), re.I):
+                ONLINE_BIDS.update(str(b[k]) for k in ("id", "contentId", "legacyId") if b.get(k))
 
 
 def kd_offer(it):
@@ -648,6 +658,9 @@ def kd_offer(it):
     „Auch online“ bleibt)."""
     pr = it.get("prices") or {}
     o = _kd_offer(it)
+    if o and str((it.get("parentContent") or {}).get("id")) in ONLINE_BIDS:
+        ONLINE_IDS.add(o["id"])
+        return None
     if o and online_only(" ".join([str(pr.get("description") or ""), it.get("description") or "", it.get("title") or ""]
                                   + [str(c.get("other") or "") for c in pr.get("conditions") or [] if isinstance(c, dict)])):
         ONLINE_IDS.add(o["id"])
@@ -1594,7 +1607,7 @@ def finalize(offers, save_uvp=False):
     today = dt.date.today().isoformat()
     offers = drop_previews(merge(offers))
     n0 = len(offers)
-    offers = [o for o in offers if o.get("id") not in ONLINE_IDS
+    offers = [o for o in offers if o.get("id") not in ONLINE_IDS and str(o.get("bid")) not in ONLINE_BIDS
               and not online_only(" ".join(str(o.get(k) or "") for k in ("n", "d", "inf")))]
     if len(offers) < n0:
         log(f"  Online-Angebote entfernt: {n0 - len(offers)}")
