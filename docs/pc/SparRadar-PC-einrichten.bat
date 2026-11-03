@@ -35,7 +35,13 @@ choice /c JN /n /m "  Ein GitHub-Schlüssel ist schon gespeichert. Neuen eintrag
 if errorlevel 2 goto :tokenok
 :asktoken
 echo.
-echo   [2/4] GitHub-Schlüssel einfügen: Strg+V oder Rechtsklick, dann Enter.
+rem Schlüssel zuerst aus der Zwischenablage nehmen (Strg+V geht in der versteckten Eingabe nicht, nur Rechtsklick)
+powershell -NoProfile -Command "$t=((Get-Clipboard -Raw) + '').Trim(); if($t -notmatch '^(github_pat_|ghp_)[A-Za-z0-9_]+$'){exit 1}; [IO.File]::WriteAllText($env:DIR+'\token.txt',$t); Set-Clipboard -Value ' '"
+if not errorlevel 1 (
+  echo   [2/4] Schlüssel aus der Zwischenablage übernommen.
+  goto :tokenok
+)
+echo   [2/4] GitHub-Schlüssel auf github.com kopieren und hier mit RECHTSKLICK einfügen, dann Enter.
 echo         Man sieht dabei nur Sternchen - das ist richtig so.
 powershell -NoProfile -Command "$s=Read-Host '  Schluessel' -AsSecureString; $t=[Net.NetworkCredential]::new('',$s).Password.Trim(); if($t -notmatch '^(github_pat_|ghp_)[A-Za-z0-9_]+$'){exit 1}; [IO.File]::WriteAllText($env:DIR+'\token.txt',$t)"
 if errorlevel 1 (
