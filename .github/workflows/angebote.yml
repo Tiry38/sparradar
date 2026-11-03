@@ -36,6 +36,13 @@ jobs:
         working-directory: fetcher
         run: python check_new.py --snap || true
 
+      - name: Scheck-In-Prospekt lesen (Texterkennung, läuft parallel zum Abruf)
+        if: steps.gate.outputs.skip != '1'
+        # Nur neue Prospekte werden gelesen (ca. 20 min), sonst fertig in Sekunden. Fehler stoppen den Abruf nicht.
+        run: |
+          (sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-deu >/dev/null && pip install -q numpy opencv-python-headless \
+            && OMP_THREAD_LIMIT=1 timeout 50m python fetcher/fetch_scheck.py; touch "$RUNNER_TEMP/scheck.done") > "$RUNNER_TEMP/scheck.log" 2>&1 &
+
       - name: Angebote holen
         if: steps.gate.outputs.skip != '1'
         # SR_EARLY_PUSH: neue Angebote eines Markts sofort als Zwischenstand hochladen, nicht erst am Ende (ca. 40 min)
@@ -44,7 +51,8 @@ jobs:
         run: |
           git config user.name "SparRadar Bot"
           git config user.email "actions@users.noreply.github.com"
-          python fetcher/fetch_offers.py
+          SR_SCHECK_DONE="$RUNNER_TEMP/scheck.done" python fetcher/fetch_offers.py
+          echo "--- Scheck-In-Prospekt ---"; cat "$RUNNER_TEMP/scheck.log" || true
 
       - name: Sichtbare Prospekte merken (für den Prospekt-Wächter)
         if: steps.gate.outputs.skip != '1'

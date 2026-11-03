@@ -9,6 +9,7 @@ Quellen (nur öffentliche Seiten, ohne Login, ein Abruf pro Seite und Tag):
 Ergebnis: docs/data/offers.json und docs/data/history.json (Preisverlauf).
 """
 import datetime as dt
+import html as _html
 import json
 import os
 import re
@@ -919,6 +920,163 @@ def fetch_prospektewoche(shop="rewe", store="rewe"):
     return out
 
 
+# ---------- prospektangebote.de (Folderz) ----------
+# Öffentliche Angebotslisten je Händler (/geschaefte/<händler>/angebote?page=N, robots.txt erlaubt genau dieses
+# Blättern; Suche/Klick-Links sind gesperrt und werden nicht genutzt). Für Müller deutlich mehr als bei kaufDA
+# (02.11.: ~860 statt 183). Liste zeigt nur gerade gültige Angebote: Name, Preis, „statt“, Bild, Restlaufzeit
+# („5 Tage“ = bis heute + 5). Künftige („Gültig in …“) ohne genaues Startdatum werden übersprungen.
+# Eigener Server -> eigene Pause, läuft parallel zu kaufDA. Doppelte zu kaufDA fliegen in pa_dedupe() raus.
+PA = "https://www.prospektangebote.de"
+PA_STORES = {"mueller": ("mueller", False)}  # Markt -> (Händler-Kürzel bei prospektangebote, Lebensmittel-Markt?)
+PA_PAUSE = 2.0
+PA_KEEP = {"DIN", "RC", "HO", "H0", "LED", "USB", "TV", "XXL", "XL", "XS", "DM", "PC", "HD", "UV", "SPF", "LSF", "BIO", "3D", "PS5", "PS4", "II", "III"}
+
+
+def html_unescape(t):
+    return _html.unescape(t or "")
+
+
+def pa_title(t):
+    """GROSSBUCHSTABEN-Namen lesbar machen („KUSCHEL-BADEMANTEL“ -> „Kuschel-Bademantel“), Abkürzungen bleiben."""
+    def w(m):
+        x = m.group(0)
+        if x in PA_KEEP or len(x) <= 2 or not re.search(r"[A-ZÄÖÜ]{2}", x):
+            return x
+        return "-".join(p[:1] + p[1:].lower() for p in x.split("-"))
+    return re.sub(r"[A-ZÄÖÜÉÈÔÂÎ0-9][A-ZÄÖÜÉÈÔÂÎ0-9&'!.-]*", w, t)
+
+
+def pa_money(v):
+    m = re.search(r"(\d+(?:\.\d{3})*),(\d\d)", v or "")
+    return float(m.group(1).replace(".", "") + "." + m.group(2)) if m else None
+
+
+def pa_until(txt, today):
+    """Restlaufzeit -> letzter Gültigkeitstag (eher zu kurz als zu lang: Monate = 30 Tage, Wochen = 7)."""
+    t = (txt or "").strip().lower()
+    if not t or t.startswith("gültig in") or "bald" in t:
+        return None, True  # beginnt erst später
+    m = re.match(r"(\d+)\s*(tag|tage|woche|wochen|monat|monate)\b", t)
+    if m:
+        n, u = int(m.group(1)), m.group(2)
+        return (today + dt.timedelta(days=n * (30 if u.startswith("monat") else 7 if u.startswith("woche") else 1))).isoformat(), False
+    if t in ("heute", "letzter tag", "endet heute"):
+        return today.isoformat(), False
+    return None, False
+
+
+def fetch_prospektangebote():
+    today = dt.date.today()
+    out = []
+    for store, (slug, food) in PA_STORES.items():
+        got, seen, skipped = [], set(), 0
+        for page in range(1, 61):
+            url = f"{PA}/geschaefte/{slug}/angebote" + (f"?page={page}" if page > 1 else "")
+            h = http(url)
+            time.sleep(PA_PAUSE)
+            blocks = (h or "").split('<a class="js-offer-link-item')[1:]
+            if not blocks:
+                break
+            new = 0
+            for b in blocks:
+                b = b.split("</a>")[0]
+                mid = re.search(r'href="(/geschaefte/[^"]+-angebot-(\d+)/)"', b)
+                if not mid or mid.group(2) in seen:
+                    continue
+                seen.add(mid.group(2))
+                new += 1
+                name = re.search(r'product__name[^>]*>([^<]*)<', b)
+                price = pa_money((re.search(r'product__price-offer[^>]*>([^<]*)<', b) or [None, ""])[1])
+                old = pa_money((re.search(r'product__price-normal[^>]*>([^<]*)<', b) or [None, ""])[1])
+                until, future = pa_until((re.search(r'product-date[^>]*>([^<]*)<', b) or [None, ""])[1], today)
+                if future:
+                    skipped += 1
+                    continue
+                img = re.search(r'src="(https://img\.offers-cdn\.net/assets/uploads/offers/[^"]+?)-thumb[^"]*"', b)
+                title = pa_title(html_unescape(name.group(1)).strip()) if name else ""
+                o = offer(store, title, price, old=old, img=(img.group(1) + "-normal.jpeg") if img else None,
+                          start=today.isoformat(), end=until, src="prospektangebote.de", url=PA + mid.group(1), food=food)
+                if o:
+                    o["pa"] = 1  # Quelle prospektangebote (Restlaufzeit gerundet, Start = heute)
+                    got.append(o)
+            if not new:
+                break
+        log(f"  prospektangebote {store}: {len(got)} Angebote ({skipped} künftige ohne Datum übersprungen)")
+        out += got
+    return out
+
+
+def scheck_pick(rows, kd):
+    """Scheck-In druckt mehrere Regional-Ausgaben (02.11.: Pfalz und Baden, ~90 % gleich, andere Weine/Brauereien
+    und Preise). Pro Zeitraum gilt nur eine: die mit den meisten Treffern zu den Wörther kaufDA-Angeboten
+    (gleicher Preis + gemeinsames Wort), bei Gleichstand die mit mehr „Pfalz“ als „Baden“."""
+    W = lambda t: set(re.findall(r"[a-zäöüß]{4,}", (t or "").lower()))
+    fl = {}
+    for r in rows:
+        fl.setdefault(r.get("fid"), []).append(r)
+    def score(rs):
+        hit = sum(any(abs(r["p"] - o["p"]) < 0.005 and W(o["n"] + " " + (o.get("b") or "")) & W(r["n"]) for r in rs) for o in kd)
+        txt = " ".join(f"{r['n']} {r.get('d') or ''}" for r in rs).lower()
+        return (hit, txt.count("pfalz") - txt.count("baden"))
+    sc = {f: score(rs) for f, rs in fl.items()}
+    keep = set()
+    for f, rs in sorted(fl.items(), key=lambda x: sc[x[0]], reverse=True):
+        a, b = rs[0].get("from") or "", rs[0].get("to") or ""
+        if any((fl[k][0].get("from") or "") <= b and a <= (fl[k][0].get("to") or "") for k in keep):
+            log(f"  Scheck-In-Prospekt {f}: andere Regional-Ausgabe {sc[f]} – nicht genommen")
+            continue
+        keep.add(f)
+        log(f"  Scheck-In-Prospekt {f}: genommen {sc[f]}")
+    return [r for r in rows if r.get("fid") in keep]
+
+
+def load_scheck(kd=()):
+    """Scheck-In-Prospekt, aus den Seitenbildern gelesen (fetch_scheck.py -> docs/data/scheck-ocr.json).
+    kaufDA zeigt davon nur 16 Angebote; doppelte zu kaufDA fallen über pa_dedupe raus."""
+    today = dt.date.today().isoformat()
+    out = []
+    rows = [r for r in (load("scheck-ocr.json", {}).get("offers") or []) if r.get("p") and (r.get("to") or "9") >= today]
+    for r in scheck_pick(rows, [o for o in kd if o.get("s") == "scheck"]):
+        n = re.sub(r"^[^\wÄÖÜäöü]+|\s+[a-z]$", "", (r.get("n") or "").strip())
+        n = re.sub(r"(?<=[A-Za-z])&(?=[a-z]|\s|$)", "é", n)  # „Ros&“ -> „Rosé“, „Nescaf&“ -> „Nescafé“
+        if not re.search(r"[A-ZÄÖÜ][a-zäöüß]{3,}", n) or re.search(r"APP-PREIS|ERHÄLTLICH|%|[<>]", n, re.I):
+            continue  # kein Artikelname erkannt (Störer, Hinweis-Kasten)
+        o = offer("scheck", n, r["p"], desc=r.get("d") or "", img=r.get("img"), img_large=r.get("il"),
+                  start=r.get("from"), end=r.get("to"), src="prospektangebote.de (Prospekt gelesen)", url=r.get("url"), page=r.get("pg"))
+        if o:
+            o["pa"], o["ocr"] = 1, 1
+            if isinstance(r.get("cr"), list) and len(r["cr"]) == 4:
+                o["cr"] = r["cr"]  # Ausschnitt der Prospektseite (oben, rechts, unten, links in %)
+            out.append(o)
+    log(f"  Scheck-In aus Prospekt gelesen: {len(out)} Angebote")
+    return out
+
+
+def pa_dedupe(offers):
+    """prospektangebote-Angebote raus, wenn kaufDA denselben Artikel im selben Markt zum selben Preis hat
+    (kaufDA hat Marke, Beschreibung, Grundpreis und Prospekt-ID)."""
+    def toks(o):
+        return {norm(t) for t in re.findall(r"[a-zäöüß0-9]{3,}", f"{o.get('b') or ''} {o.get('n')} {o.get('d') or ''}".lower())} - {""}
+    idx = {}
+    for o in offers:
+        if not o.get("pa"):
+            idx.setdefault((o["s"], o["p"]), []).append(toks(o))
+    keep, drop = [], 0
+    for o in offers:
+        if o.get("pa"):
+            t = toks(o)
+            # aus dem Prospekt gelesene Namen sind oft länger („Familienbraten oder Schweinerücken“) -> reicht, wenn
+            # die kaufDA-Wörter weitgehend drinstecken
+            if t and any(len(t & k) >= max(1, round(min(len(t), len(k)) * 0.6) if o.get("ocr") else round(len(t) * 0.6))
+                         for k in idx.get((o["s"], o["p"]), [])):
+                drop += 1
+                continue
+        keep.append(o)
+    if drop:
+        log(f"  prospektangebote: {drop} doppelte zu kaufDA entfernt")
+    return keep
+
+
 def load(name, default):
     try:
         with open(os.path.join(DATA, name), encoding="utf-8") as f:
@@ -980,7 +1138,7 @@ def merge(offers):
             cur.pop("pv", None)  # derselbe Artikel steht auch im bestätigten Prospekt
         if "ou" not in cur and "ou" in o and (not cur.get("o") or cur.get("o") == o.get("o")):
             cur["ou"] = o["ou"]  # 0 = eigener früherer Preis (zählt, obwohl „falsch“ im Sinne von Python)
-        for f in ("b", "o", "gp", "img", "il", "ims", "iw", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url"):
+        for f in ("b", "o", "gp", "img", "il", "ims", "iw", "inf", "cat", "pg", "bid", "from", "to", "ap", "ao", "url", "cr"):
             if not cur.get(f) and o.get(f):
                 cur[f] = o[f]
         if o.get("x") and not cur.get("x"):
@@ -1316,12 +1474,12 @@ def better_images(offers):
     best = {}
     for o in offers:
         k = name_key(o)
-        if k and img_px(o) >= 450 and img_px(o) > img_px(best.get(k, {})):
+        if k and not o.get("cr") and img_px(o) >= 450 and img_px(o) > img_px(best.get(k, {})):  # ganze Prospektseite ist kein Produktfoto
             best[k] = o
     n = 0
     for o in offers:
         px = img_px(o)
-        if not o.get("img") or not px or px >= 300:
+        if not o.get("img") or not px or px >= 300 or o.get("cr"):
             continue
         b = best.get(name_key(o) or "")
         if b and b is not o and b.get("img") != o["img"]:
@@ -1418,7 +1576,7 @@ def early_save(why):
     if os.environ.get("SR_EARLY_PUSH") != "1" or not OLD_OFFERS:
         return
     with LOCK:
-        offers = finalize([dict(o) for o in COLLECTED] + [dict(o) for o in OLD_OFFERS])
+        offers = finalize(pa_dedupe([dict(o) for o in COLLECTED] + [dict(o) for o in OLD_OFFERS]))
         fut = future_counts(offers)
         gained = {s: n - LAST_FUT.get(s, 0) for s, n in fut.items() if n - LAST_FUT.get(s, 0) >= 10}
         if not gained:
@@ -1453,13 +1611,24 @@ def main():
             early_save(name)
 
     threads = [threading.Thread(target=run, args=a) for a in
-               (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("Rewe-Vorschau", fetch_prospektewoche))]
+               (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("Rewe-Vorschau", fetch_prospektewoche),
+                ("prospektangebote", fetch_prospektangebote))]
     for t in threads:
         t.start()
     run("kaufDA", fetch_kaufda)
     for t in threads:
         t.join()
-    new = [o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau") for o in results.get(name, [])]
+    # Scheck-In-Prospekt liest fetch_scheck.py parallel (Workflow, ca. 20 min je neuem Prospekt) -> auf das Ende warten
+    done = os.environ.get("SR_SCHECK_DONE")
+    if done:
+        for _ in range(180):
+            if os.path.exists(done):
+                break
+            time.sleep(10)
+        else:
+            log("  ! Scheck-In-Prospekt noch nicht fertig gelesen – letzter Stand wird genommen")
+    run("Scheck-In-Prospekt", lambda: load_scheck(results.get("kaufDA") or []))
+    new = pa_dedupe([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau", "prospektangebote", "Scheck-In-Prospekt") for o in results.get(name, [])])
     # Sortiment-Abgleich: Jeder Abruf baut die Liste neu auf – neue Artikel kommen dazu, verschwundene fliegen raus.
     # Ausnahme: Liefert ein Markt plötzlich fast nichts (Seite kurz down, Sperre, Umbau), bleiben seine noch gültigen
     # alten Angebote stehen, statt dass der ganze Markt bis zum nächsten Abruf leer ist.

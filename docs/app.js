@@ -342,7 +342,9 @@ function fixImg(o){const all=[o.img,o.il,...(o.ims||[])];if(!all.some(badImg))re
 // Winzige Prospekt-Ausschnitte (kaufDA, z. B. 150 px) nicht auf Kartengröße aufblasen – das macht sie pixelig.
 // Größe kommt vom Abruf (o.iw) oder wird beim Laden gemessen (lowres()).
 const LOWPX=320;
-const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}${o.iw&&Math.max(...o.iw)<LOWPX?" lowres":""}" data-cat="${o.c}">` : (ILL[o.c]||ILL.sonstiges);
+// Aus dem Prospekt gelesene Angebote (Scheck-In, o.cr = Ausschnitt oben/rechts/unten/links in %): Karte zeigt nur den Ausschnitt.
+const crSt = (o,u) => o.cr&&o.cr.length===4&&/offers-cdn\.net\//.test(o.img||"")&&(!u||sharp(u)===sharp(o.img)) ? ` style="object-view-box:inset(${o.cr.map(v=>(+v||0).toFixed(1)+"%").join(" ")})"` : "";
+const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}${o.iw&&Math.max(...o.iw)<LOWPX?" lowres":""}" data-cat="${o.c}"${crSt(o)}>` : (ILL[o.c]||ILL.sonstiges);
 // Beschriftung für kommende Angebote: „Nächste Woche“, oder „Ab Donnerstag“, wenn etwas noch diese Woche startet
 // Kevin 01.11.: konkretes Datum statt „Nächste Woche“ (sonntags sonst mit „Ab Montag“ zu verwechseln)
 function nextLabel(){return "Ab "+NEXTMON.slice(8,10)+"."+NEXTMON.slice(5,7)+"."}
@@ -948,7 +950,7 @@ const Voice={rec:null,on:false,err:"",
   paint(){const b=document.getElementById("zMic");if(b){b.classList.toggle("on",this.on);b.setAttribute("aria-pressed",this.on);b.innerHTML=this.on?"🎤 Ich höre zu …":"🎤 Sprechen"}}};
 
 // ---------- Detailansicht eines Artikels ----------
-const dImages = o => [...new Set([o.il||o.img,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
+const dImages = o => [...new Set([o.cr?o.img:o.il||o.img,o.cr?o.il:null,o.img,...(o.ims||[])].filter(u=>safeUrl(u)).map(sharp))];
 function renderDetail(){
   const o=byId(S.detail);if(!o)return `<div class="sheet"><div class="sheet-h"><h2>Artikel</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div><div class="empty"><b>Nicht mehr im Angebot</b></div></div>`;
   const ims=dImages(o),cur=ims[Math.min(S.dImg||0,ims.length-1)],inL=S.list.includes(o.id),fav=S.watch.some(w=>norm(w.k)===norm(o.n)),vd=verdict(o),st=steps(o);
@@ -956,12 +958,13 @@ function renderDetail(){
   const share=`${o.n}${o.b?" ("+o.b+")":""} bei ${sname(o.s)}: ${o.bo?eur(o.bo)+" Bonus":eur(fin(o))}${offPct(o)?` (−${offPct(o)} %)`:""}${validTxt(o)?", "+validTxt(o):""}\n\nGefunden mit SparRadar: ${APP_URL}`;
   return `<div class="sheet detail" role="dialog" aria-modal="true" aria-label="${esc(o.n)}">
    <div class="sheet-h">${sb(o.s,true)}<h2>${esc(sname(o.s))}</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
-   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span><button class="badimg" data-badimg="${esc(cur)}" title="Bild zeigt einen anderen Artikel? Dann hier ausblenden.">Falsches Bild?</button>`:""}</div>
-   ${ims.length>1?`<div class="dthumbs">${ims.map((u,i)=>`<button data-dimg="${i}" aria-pressed="${u===cur}" aria-label="Bild ${i+1}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb="1"></button>`).join("")}</div>`:""}
+   <div class="dpic" style="--cc:${CC[o.c]||CC.sonstiges}">${cur?`<button class="dzoom" data-zoom="${esc(cur)}" aria-label="Bild groß anzeigen"><img src="${esc(cur)}" alt="${esc(o.n)}" referrerpolicy="no-referrer" data-cat="${o.c}"${crSt(o,cur)}></button>`:(ILL[o.c]||ILL.sonstiges)}${offPct(o)?`<span class="off${dealWarn(o)?" q":""}"${dealWarn(o)?' title="Rabatt widerlegt – Details antippen"':""}>−${offPct(o)} %${dealWarn(o)?" ?":""}</span>`:""}${cur?`<span class="zhint">Antippen zum Vergrößern</span><button class="badimg" data-badimg="${esc(cur)}" title="Bild zeigt einen anderen Artikel? Dann hier ausblenden.">Falsches Bild?</button>`:""}</div>
+   ${ims.length>1?`<div class="dthumbs">${ims.map((u,i)=>`<button data-dimg="${i}" aria-pressed="${u===cur}" aria-label="Bild ${i+1}"><img src="${esc(u)}" alt="" loading="lazy" referrerpolicy="no-referrer" data-thumb="1"${crSt(o,u)}></button>`).join("")}</div>`:""}
    <div class="dinfo">
     ${o.b?`<span class="store">${esc(o.b)}</span>`:""}
     <h3 class="dtitle">${esc(o.n)}</h3>
     ${o.d?`<p class="dsub">${esc(o.d)}</p>`:""}
+    ${o.ocr?`<p class="dsub">📖 Aus dem Prospekt gelesen – Name und Preis bitte kurz im Prospektbild prüfen (zweites Bild = ganze Seite).</p>`:""}
     ${o.ao?`<span class="aonly">${IC.bag}Preis nur mit ${esc(o.ao)}</span>`:""}
     <div class="dprice">${o.bo?`<div class="bonustag"><b>${eur(o.bo)}</b><small>Bonus-Guthaben</small></div>`:`<div class="tag xl">${tagHTML(fin(o))}</div>`}
      <div>${ref(o)>fin(o)&&!o.bo?`<s>${wasLbl(o)} ${eur(ref(o))}</s><br><b style="color:var(--save)">Du sparst ${eur(ref(o)-fin(o))}</b>`:perk(o)&&perk(o).w?`<s>${perk(o).s}</s>`:cmpPrice(o)?`<div class="cmpp${cmpPrice(o).hi?" hi":""}">${esc(cmpPrice(o).l)}</div>`:""}${unitTxt(o)?`<div class="gp">${esc(unitTxt(o))}</div>`:""}${pf(o)?`<div class="gp">zzgl. ${eur(pf(o))} Pfand</div>`:""}</div></div>
@@ -999,6 +1002,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  131:["Scheck-In Center jetzt mit dem ganzen Prospekt statt nur 16 Angeboten: SparRadar liest Name und Preis direkt aus den Prospektseiten. Die Karte zeigt den passenden Ausschnitt, beim Antippen siehst du die ganze Seite zum Nachprüfen."],
   130:["Neu: Müller und Scheck-In Center im Maximilian-Center Wörth. Die beiden Märkte stehen oben bei den Märkten (gestrichelter Rahmen) und erscheinen nur, wenn du sie antippst – sonst bleibt alles wie gewohnt."],
   129:["🍏 SparRadar gibt es jetzt auch fürs iPhone und iPad: In den Einstellungen unter „SparRadar verschenken“ kannst du die App an Freunde mit Apple-Geräten schicken – per WhatsApp, iMessage oder als Link."],
   128:["📥 Edeka, dm und Rewe zeigen online immer nur einen Teil ihrer Angebote. SparRadar sammelt jetzt über den ganzen Tag weiter und ergänzt fehlende Angebote automatisch."],
