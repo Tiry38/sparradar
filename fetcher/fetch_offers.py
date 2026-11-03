@@ -714,8 +714,88 @@ def _kd_offer(it):
                  uvp=pr.get("secondaryPriceIsUVP") if isinstance(pr.get("secondaryPriceIsUVP"), bool) else None)
 
 
+# ---------- meinprospekt.de (gleiche Bonial-Daten wie kaufDA, andere Auswahl) ----------
+# 03.11. (Kevin: „mehr Edeka und dm, legal“): meinprospekt.de zeigt dieselben Prospekt-Angebote wie kaufDA, aber
+# - je Ort eine feste andere Auswahl von 12 (Edeka Jockgrim + Nachbarorte: 71 Jockgrim-Angebote, davon 12 neu) und
+# - Stichwortseiten /angebote/<begriff>/dm-de (804 Begriffe laut Sitemap; Vollscan 03.11.: 43 Angebote aus dem
+#   dm-Prospekt, davon 24 neu). Edeka-Stichwortseiten zeigen nur Südbayern (München) -> nicht nutzen.
+# robots.txt erlaubt /angebote/… und Ortsseiten (verboten: /shelf, /contentViewer, /search, /webapp …).
+# Die Angebote laufen durch dieselben Filter wie kaufDA (dm: nur eigene Prospekt-IDs, Edeka: same_flyer).
+# Gedächtnis docs/data/mp-terms.json: Begriffe mit Treffer jedes Mal, die übrigen reihum (MP_ROTATE je Lauf).
+MP = "https://www.meinprospekt.de"
+MP_CITY = {"edeka": ["jockgrim", "kandel", "hagenbach", "bellheim", "ruelzheim", "bad-bergzabern", "karlsruhe"],
+           "dm": ["kandel", "germersheim", "bad-bergzabern", "karlsruhe"]}
+MP_TERM_SLUG = {"dm": "dm-de"}
+MP_ROTATE = int(os.environ.get("SR_MP_ROTATE", "220"))
+MP_PAUSE = 2.0
+MP_ITEMS = {}  # Markt -> Bonial-Angebote (füllt der Thread, fetch_kaufda reicht sie an fetch_sortiment weiter)
+
+
+def mp_items(url):
+    h = http(url)
+    time.sleep(MP_PAUSE)
+    m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
+    if not m:
+        return None
+    try:
+        pi = json.loads(m.group(1))["props"]["pageProps"]["pageInformation"]
+    except Exception:
+        return None
+    return ((pi.get("offers") or {}).get("main") or {}).get("items") or []
+
+
+def mp_terms(slug, mem):
+    """Stichwortseiten eines Händlers aus der Sitemap (rpp-sitemap-N.xml); fällt sie aus, die gemerkte Liste"""
+    terms = []
+    for n in range(1, 6):
+        x = http(f"{MP}/sitemaps/rpp-sitemap-{n}.xml")
+        time.sleep(MP_PAUSE)
+        if not x or "<loc>" not in x:
+            break
+        terms += re.findall(rf"<loc>{re.escape(MP)}/angebote/([^/<]+)/{re.escape(slug)}</loc>", x)
+    return list(dict.fromkeys(terms)) or list(mem.get("all", []))
+
+
+def fetch_meinprospekt():
+    mem = load("mp-terms.json", {})
+    today = dt.date.today().isoformat()
+    for store, cities in MP_CITY.items():
+        n = 0
+        for c in cities:
+            items = mp_items(f"{MP}/{c}/{'edeka' if store == 'edeka' else 'dm-de'}") or []
+            MP_ITEMS.setdefault(store, []).extend(items)
+            n += len(items)
+        log(f"  meinprospekt {store}: {n} Angebote von {len(cities)} Ortsseiten")
+    for store, slug in MP_TERM_SLUG.items():
+        m = mem.setdefault(store, {})
+        terms = mp_terms(slug, m)
+        m["all"] = terms
+        hit, chk = m.setdefault("hit", {}), m.setdefault("chk", {})
+        old = (dt.date.today() - dt.timedelta(days=21)).isoformat()
+        hot = [t for t in terms if hit.get(t, "") >= old]
+        cold = sorted((t for t in terms if t not in hot), key=lambda t: chk.get(t, ""))[:MP_ROTATE]
+        got = 0
+        for t in hot + cold:
+            items = mp_items(f"{MP}/angebote/{urllib.parse.quote(t)}/{slug}")
+            if items is None:
+                continue
+            chk[t] = today
+            if items:
+                hit[t] = today
+                got += len(items)
+                MP_ITEMS.setdefault(store, []).extend(items)
+        for d in (hit, chk):  # Begriffe, die es nicht mehr gibt, vergessen
+            for t in [t for t in d if t not in terms]:
+                d.pop(t)
+        log(f"  meinprospekt {store}: {got} Angebote von {len(hot)} Treffer- + {len(cold)} weiteren Stichwortseiten"
+            f" ({len(terms)} Begriffe)")
+    save("mp-terms.json", mem)
+
+
 def fetch_kaufda():
     out = []
+    mp = threading.Thread(target=fetch_meinprospekt, daemon=True)
+    mp.start()
     pages = list(KD_STORES.values())
     near = {f"https://www.kaufda.de/{city}/{'/'.join(KD_STORES[st].split('/')[4:])}": st for st, cities in KD_NEAR.items() for city in cities}
     pages += list(near)
@@ -758,6 +838,9 @@ def fetch_kaufda():
         if n % 20 == 0:
             log(f"  kaufDA: {n}/{len(pages)} Seiten")
     log(f"  kaufDA Nachbarorte (gleicher Prospekt): {near_n} Angebote")
+    mp.join(timeout=1800)
+    for st, items in list(MP_ITEMS.items()):  # meinprospekt: dieselben Filter wie die Sortiment-Seiten
+        regional.setdefault(st, []).extend(it for it in items if kd_store(it) == st)
     more, accepted = fetch_sortiment(regional)
     out += more
     log("kaufDA:", len(out), "(vor Duplikat-Bereinigung)")
