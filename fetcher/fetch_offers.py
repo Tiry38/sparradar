@@ -1049,6 +1049,8 @@ def fetch_prospektangebote():
             time.sleep(PA_PAUSE)
             blocks = (h or "").split('<a class="js-offer-link-item')[1:]
             if not blocks:
+                if page == 1 and not h:  # 03.11.: GitHub-Server bekommen nur „202, leer“ (Bot-Schutz von CloudFront)
+                    log(f"  ! prospektangebote {store}: leere Antwort (Bot-Schutz für Rechenzentrums-Server) – nicht umgehen")
                 break
             new = 0
             for b in blocks:
