@@ -656,7 +656,7 @@ function liveImg(t){const k=norm(t),c=WIMG[k];if(c&&(c.u||Date.now()-c.at<14*864
         const pt=wTokens((p.brands||"").split(",")[0]+" "+(p.product_name_de||p.product_name||""));
         if(pt[0]!==w[0]||!(pt.includes(w[1])))continue;const n=w.filter(x=>pt.includes(x)).length,sc=n/Math.max(w.length,pt.length);
         if(n>=Math.min(2,w.length)&&n>=w.length*.6&&sc>best){best=sc;u=im}}
-      WIMG[k]={u,at:Date.now()};store.set("wimg",WIMG);if(u&&S.tab==="watch")render()})
+      WIMG[k]={u,at:Date.now()};store.set("wimg",WIMG);if(u&&(S.tab==="watch"||S.tab==="list"))render()})
     .catch(()=>{}).finally(()=>wimgBusy--);return ""}
 // Kein Bild für genau diesen Namen? Ähnlichster Artikel im Artikelstamm (gleiche Marke = erstes Wort, mind. 3 gleiche Wörter)
 function simImg(t){if(!SIMG||!CATALOG||!SIMG.cat.length)return "";const w=wTokens(t);if(w.length<3)return "";
@@ -1007,6 +1007,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  134:["Einkaufszettel mit Bildern: Jeder Artikel zeigt jetzt ein kleines Foto. So erkennst du ihn im Laden auf einen Blick und hakst schneller ab."],
   133:["Neuer Look: Der Hintergrund hat jetzt grüne Farbverläufe und ein feines Raster – alles bleibt gut lesbar."],
   132:["Merkliste genauer: Bei „verschiedene Sorten“ reicht die Marke allein nicht mehr. Hast du z. B. einen bestimmten More-Sirup gemerkt, meldet SparRadar nicht mehr jedes andere More-Produkt."],
   131:["Scheck-In Center jetzt mit dem ganzen Prospekt statt nur 16 Angeboten: SparRadar liest Name und Preis direkt aus den Prospektseiten. Die Karte zeigt den passenden Ausschnitt, beim Antippen siehst du die ganze Seite zum Nachprüfen."],
@@ -1640,6 +1641,8 @@ function renderConnect(){const close=`<button class="ibtn" id="closeSheet" aria-
 
 function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;if(extra.length)loadDauer();
+  // Bilder für eigene Einträge: Bilder-Liste + Artikelstamm erst hier laden
+  if(extra.length&&(!SIMG||!CATALOG_N)){const again=()=>{if(S.tab==="list"&&SIMG&&CATALOG_N)render()};if(!SIMG)loadSugImgs(again);if(!CATALOG_N)loadCatalog(again)}
   const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button>${Voice.ok()?`<button class="btn ghost zmic${Voice.on?" on":""}" type="button" id="zMic" aria-pressed="${Voice.on}" aria-label="Artikel sprechen, z. B. Milch, Butter und drei Eier" title="Artikel sprechen">${Voice.on?"🎤 Ich höre zu …":"🎤 Sprechen"}</button>`:""}</form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
   if(!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
@@ -1671,7 +1674,12 @@ function renderList(){
   const cpBtn=id=>{if(id.startsWith("x-")||done(id))return "";const o=byId(id);if(!o||!o.p)return "";const c=couponsFor(o)[0];
     return `<button class="cpbtn${c?" on":""}" data-cpqlist="${esc(id)}" aria-label="${c?"Coupon "+esc(cpValueTxt(c)):"Coupon eintragen"}" title="${c?"Coupon eingerechnet":"Ich habe einen Coupon dafür"}">🎟️${c?`<small>${esc(cpValueTxt(c))}</small>`:""}</button>`};
   const stepper=id=>done(id)?"":`<span class="qstep"><button data-qm="${esc(id)}" aria-label="weniger">−</button><b>${qty(id)}</b><button data-qp="${esc(id)}" aria-label="mehr">+</button></span>`;
-  const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i><span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
+  // Kleines Artikelbild: beim Einkaufen erkennt man den Artikel schneller
+  const zImg=id=>{if(!id.startsWith("x-")){const o=byId(id);if(!o)return "";return `<b class="zimg">${imgTag(o)}</b>`}
+    const x=extra.find(e=>e.id===id);if(!x)return "";const t=x.n,o=OFFERS.find(y=>y.img&&watchMatch(y,t)&&norm(y.n).startsWith(norm(t)));
+    const u=sugImg(t)||simImg(t)||(SIMG&&CATALOG_N?liveImg(t):"")||(o?sharp(o.img):"");
+    return `<b class="zimg">${u&&safeUrl(u)?`<img src="${esc(u)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createRange().createContextualFragment(ILL.sonstiges))">`:ILL.sonstiges}</b>`};
+  const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i>${zImg(id)}<span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=os=>{const t=os.reduce((a,o)=>a+lineT(o),0),r=os.reduce((a,o)=>a+lineR(o)+linePf(o),0),p=r2(os.reduce((a,o)=>a+linePf(o),0));return `<div class="rsub"><span>Summe ${os.length} Artikel${p?` · inkl. ${eur(p)} Pfand`:""}${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
   return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${endSoonHTML(items)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items,extra,sum)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>

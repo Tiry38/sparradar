@@ -101,6 +101,10 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .rline.done .rcheck i::after{content:"";width:5px;height:9px;border:solid #fff;border-width:0 2px 2px 0;transform:translateY(-1px) rotate(45deg)}
 .rline.done .rcheck span,.rline.done>span{text-decoration:line-through;color:var(--muted)}
 .rline .rcheck span{min-width:0;overflow-wrap:anywhere}
+.rline .zimg{flex:none;width:46px;height:46px;border-radius:9px;background:#fff;border:1px solid var(--line,rgba(0,0,0,.08));overflow:hidden;display:grid;place-items:center}
+.rline .zimg img{width:100%;height:100%;object-fit:contain;display:block}
+.rline .zimg svg{width:80%;height:80%}
+.rline.done .zimg{opacity:.45;filter:grayscale(.6)}
 .rs svg{width:16px;height:16px}
 .rhint{text-align:center;color:var(--muted);font-size:.72rem;margin:-8px 0 12px}
 .valid.last{color:var(--alert);font-weight:800}
