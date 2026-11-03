@@ -1007,6 +1007,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  133:["Neuer Look: Der Hintergrund hat jetzt grüne Farbverläufe und ein feines Raster – alles bleibt gut lesbar."],
   132:["Merkliste genauer: Bei „verschiedene Sorten“ reicht die Marke allein nicht mehr. Hast du z. B. einen bestimmten More-Sirup gemerkt, meldet SparRadar nicht mehr jedes andere More-Produkt."],
   131:["Scheck-In Center jetzt mit dem ganzen Prospekt statt nur 16 Angeboten: SparRadar liest Name und Preis direkt aus den Prospektseiten. Die Karte zeigt den passenden Ausschnitt, beim Antippen siehst du die ganze Seite zum Nachprüfen."],
   130:["Neu: Müller und Scheck-In Center im Maximilian-Center Wörth. Die beiden Märkte stehen oben bei den Märkten (gestrichelter Rahmen) und erscheinen nur, wenn du sie antippst – sonst bleibt alles wie gewohnt."],

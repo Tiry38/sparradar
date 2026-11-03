@@ -22,13 +22,26 @@
   --grad-title:linear-gradient(135deg,#ECEFED 0%,#ECEFED 25%,#4ADE80 100%);
 }
 
-/* Hintergrund: sanfte Farbwolken */
-body{background:
-  radial-gradient(900px 520px at 0% -8%,var(--glow-a),transparent 70%),
-  radial-gradient(700px 460px at 100% -4%,var(--glow-b),transparent 70%),
-  radial-gradient(800px 600px at 50% 110%,var(--glow-c),transparent 70%),
-  var(--bg);
-  background-repeat:no-repeat;min-height:100vh}
+/* Hintergrund (v132, Kevin 03.11.: „grüne Farbverläufe, mehr Struktur“): feste Ebene hinter allem –
+   grüne Lichtwolken, schräge Lichtbahnen und ein feines Raster, das nach unten ausblendet. Scrollt nicht mit. */
+:root{--bgg1:rgba(34,197,94,.20);--bgg2:rgba(16,185,129,.14);--bgg3:rgba(132,204,22,.10);--bgg4:rgba(21,128,61,.16);--bgln:rgba(22,163,74,.07);--bgbeam:rgba(74,222,128,.06)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bgg1:rgba(34,197,94,.22);--bgg2:rgba(16,185,129,.15);--bgg3:rgba(132,204,22,.08);--bgg4:rgba(21,128,61,.24);--bgln:rgba(74,222,128,.055);--bgbeam:rgba(74,222,128,.05)}}
+:root[data-theme="dark"]{--bgg1:rgba(34,197,94,.22);--bgg2:rgba(16,185,129,.15);--bgg3:rgba(132,204,22,.08);--bgg4:rgba(21,128,61,.24);--bgln:rgba(74,222,128,.055);--bgbeam:rgba(74,222,128,.05)}
+html{background:var(--bg)}
+body{background:transparent;min-height:100vh}
+html::before,html::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none}
+html::before{background:
+  radial-gradient(60vmax 45vmax at 0% 0%,var(--bgg1),transparent 62%),
+  radial-gradient(50vmax 40vmax at 100% 30%,var(--bgg2),transparent 65%),
+  radial-gradient(55vmax 45vmax at 10% 100%,var(--bgg4),transparent 65%),
+  radial-gradient(40vmax 30vmax at 85% 95%,var(--bgg3),transparent 70%),
+  linear-gradient(115deg,transparent 0 38%,var(--bgbeam) 44%,transparent 52%,transparent 62%,var(--bgbeam) 66%,transparent 72%),
+  var(--bg)}
+html::after{background:
+  linear-gradient(var(--bgln) 1px,transparent 1px) 0 0/44px 44px,
+  linear-gradient(90deg,var(--bgln) 1px,transparent 1px) 0 0/44px 44px;
+  -webkit-mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,rgba(0,0,0,.5) 45%,transparent 85%);
+  mask-image:radial-gradient(120% 80% at 50% 0%,#000 0%,rgba(0,0,0,.5) 45%,transparent 85%)}
 header.top{background:transparent}
 
 /* Logo und Titel */
@@ -77,3 +90,5 @@ nav.tabs{box-shadow:var(--shadow)}
 .sheet{background:linear-gradient(180deg,color-mix(in oklab,var(--bg) 85%,#1E9E5A 15%) 0,var(--bg) 160px)}
 .sheet-h{background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(8px)}
 .panel,.tip,.hero{box-shadow:var(--shadow)}
+/* angeheftete Leiste am PC: Glas statt Vollfläche, damit der Hintergrund durchscheint */
+@media (min-width:721px){.pinbar.pinned,.pinbar.pinned::before{background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}}
