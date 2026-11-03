@@ -723,10 +723,13 @@ def _kd_offer(it):
 # Die Angebote laufen durch dieselben Filter wie kaufDA (dm: nur eigene Prospekt-IDs, Edeka: same_flyer).
 # Gedächtnis docs/data/mp-terms.json: Begriffe mit Treffer jedes Mal, die übrigen reihum (MP_ROTATE je Lauf).
 MP = "https://www.meinprospekt.de"
-MP_CITY = {"edeka": ["jockgrim", "kandel", "hagenbach", "bellheim", "ruelzheim", "bad-bergzabern", "karlsruhe"],
+# Edeka: jeder Ort zeigt 12 Angebote, Orte mit gleichem Prospekt teils andere 12 (Scan 03.11. über 130 Orte)
+MP_CITY = {"edeka": ["jockgrim", "kandel", "hagenbach", "bellheim", "ruelzheim", "bad-bergzabern", "karlsruhe",
+                     "germersheim", "lingenfeld", "steinweiler", "leimersheim", "scheibenhardt", "hoerdt", "rastatt",
+                     "bruchsal", "linkenheim-hochstetten", "eggenstein-leopoldshafen"],
            "dm": ["kandel", "germersheim", "bad-bergzabern", "karlsruhe"]}
 MP_TERM_SLUG = {"dm": "dm-de"}
-MP_ROTATE = int(os.environ.get("SR_MP_ROTATE", "220"))
+MP_ROTATE = int(os.environ.get("SR_MP_ROTATE", "1000"))  # 03.11.: alle Begriffe je Abruf (läuft parallel zu kaufDA, ~27 min)
 MP_PAUSE = 2.0
 MP_ITEMS = {}  # Markt -> Bonial-Angebote (füllt der Thread, fetch_kaufda reicht sie an fetch_sortiment weiter)
 
@@ -774,8 +777,11 @@ def fetch_meinprospekt():
         old = (dt.date.today() - dt.timedelta(days=21)).isoformat()
         hot = [t for t in terms if hit.get(t, "") >= old]
         cold = sorted((t for t in terms if t not in hot), key=lambda t: chk.get(t, ""))[:MP_ROTATE]
-        got = 0
+        got, t_end = 0, time.time() + 25 * 60  # rechtzeitig vor dem Warten in fetch_kaufda (30 min) fertig werden
         for t in hot + cold:
+            if time.time() > t_end:
+                log(f"  meinprospekt {store}: Zeit um, Rest beim nächsten Abruf")
+                break
             items = mp_items(f"{MP}/angebote/{urllib.parse.quote(t)}/{slug}")
             if items is None:
                 continue
