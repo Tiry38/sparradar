@@ -19,6 +19,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import fetch_offers as f  # noqa: E402
@@ -216,39 +217,45 @@ def collect(path):
     log(f"Offen: {len(todo)} von {len(st['snaps'])} Schnappschüssen")
     n_new, ok, miss = 0, 0, 0
     fail = st.setdefault("fail", {})
-    for i, (kind, ts, url) in enumerate(todo):
+    todo.sort(key=lambda s: (s[0] != "kd", s[1]))  # kaufDA-Stichwortseiten zuerst (viele Angebote je Seite)
+    # 03.11.: Archiv brauchte für die großen Seiten oft > 15 s (106 von 178 ohne Antwort) -> 45 s und 3 gleichzeitig
+    pool = ThreadPoolExecutor(3)
+    i = 0
+    for c0 in range(0, len(todo), 3):
         if (time.time() - t0) / 60 > MAX_MIN:
             log("Zeit um – nächster Lauf macht weiter")
             break
-        # 1 Versuch, 15 s: Antwortet das Archiv, dann in Sekunden; sonst kostete jede Seite ~1 min (Etappe 1: 34 von 40 min Warten)
-        html = get(f"https://web.archive.org/web/{ts}id_/{url}", tries=1, timeout=15)
+        chunk = todo[c0:c0 + 3]
+        htmls = list(pool.map(lambda s: get(f"https://web.archive.org/web/{s[1]}id_/{s[2]}", tries=1, timeout=45), chunk))
         time.sleep(PAUSE)
-        key = f"{ts}|{url}"
-        if not html:  # Archiv hat nicht geantwortet: in der nächsten Etappe noch einmal, danach aufgeben
-            miss += 1
-            fail[key] = fail.get(key, 0) + 1
-            if fail[key] < 2:
-                if miss >= 30 and ok == 0:
-                    log("Internet-Archiv antwortet gerade nicht – Etappe beendet")
-                    break
-                continue
-        else:
-            ok += 1
-        offs = ((offers_kd(html) if kind == "kd" else offers_ap(html) if kind == "ap" else offers_aldi(html, url))
-                if html else [])
-        for o in offs:
-            k = f"{o['s']}|{f.norm(o['n'])[:40]}"
-            d = day_of(o, ts)
-            bk, q = f.hist_tag(o)
-            dk = json.dumps([d, bk, q])  # Tag + Marke + Menge (gleicher Artikel)
-            cur = rows.setdefault(k, {})
-            if dk not in cur or o["p"] < cur[dk]:
-                cur[dk] = o["p"]; n_new += 1
-        done.add(key)
-        fail.pop(key, None)
-        if i % 100 == 99:
+        for (kind, ts, url), html in zip(chunk, htmls):
+            i += 1
+            key = f"{ts}|{url}"
+            if not html:  # Archiv hat nicht geantwortet: in der nächsten Etappe noch einmal, danach aufgeben
+                miss += 1
+                fail[key] = fail.get(key, 0) + 1
+                if fail[key] < 2:
+                    continue
+            else:
+                ok += 1
+            offs = ((offers_kd(html) if kind == "kd" else offers_ap(html) if kind == "ap" else offers_aldi(html, url))
+                    if html else [])
+            for o in offs:
+                k = f"{o['s']}|{f.norm(o['n'])[:40]}"
+                d = day_of(o, ts)
+                bk, q = f.hist_tag(o)
+                dk = json.dumps([d, bk, q])  # Tag + Marke + Menge (gleicher Artikel)
+                cur = rows.setdefault(k, {})
+                if dk not in cur or o["p"] < cur[dk]:
+                    cur[dk] = o["p"]; n_new += 1
+            done.add(key)
+            fail.pop(key, None)
+        if miss >= 30 and ok == 0:
+            log("Internet-Archiv antwortet gerade nicht – Etappe beendet")
+            break
+        if c0 % 99 == 0 and c0:
             st["done"] = sorted(done); json.dump(st, open(STATE, "w")); json.dump(rows, open(path, "w"))
-            log(f"  {i + 1}/{len(todo)} · {len(rows)} Artikel · {n_new} Preise")
+            log(f"  {i}/{len(todo)} · {len(rows)} Artikel · {n_new} Preise · {miss} ohne Antwort")
     st["done"] = sorted(done)
     json.dump(st, open(STATE, "w"))
     json.dump(rows, open(path, "w"))
