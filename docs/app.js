@@ -1007,7 +1007,8 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
-  134:["Einkaufszettel mit Bildern: Jeder Artikel zeigt ein kleines Foto, so erkennst du ihn im Laden auf einen Blick.","Bild antippen = deine Sorte wählen (z. B. genau deine Milch). SparRadar merkt sie sich und zeigt sie ab jetzt immer."],
+  135:["Bild auf dem Zettel antippen = deine Sorte wählen (z. B. genau deine Milch). SparRadar merkt sie sich und zeigt sie ab jetzt immer."],
+  134:["Einkaufszettel mit Bildern: Jeder Artikel zeigt ein kleines Foto, so erkennst du ihn im Laden auf einen Blick."],
   133:["Neuer Look: Der Hintergrund hat jetzt grüne Farbverläufe und ein feines Raster – alles bleibt gut lesbar."],
   132:["Merkliste genauer: Bei „verschiedene Sorten“ reicht die Marke allein nicht mehr. Hast du z. B. einen bestimmten More-Sirup gemerkt, meldet SparRadar nicht mehr jedes andere More-Produkt."],
   131:["Scheck-In Center jetzt mit dem ganzen Prospekt statt nur 16 Angeboten: SparRadar liest Name und Preis direkt aus den Prospektseiten. Die Karte zeigt den passenden Ausschnitt, beim Antippen siehst du die ganze Seite zum Nachprüfen."],
