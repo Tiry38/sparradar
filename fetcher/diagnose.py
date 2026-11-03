@@ -1,39 +1,54 @@
-"""Diagnose (03.11.): Hat das Internet-Archiv Schnappschüsse aus Oktober 2026 von Seiten mit Angebotspreisen?
-(Kevin: Preisverlauf der letzten 2-3 Wochen nachtragen. Die kaufDA-Sortiment-Seiten Lidl/Netto gibt es nur vom September.)"""
+"""Diagnose (03.11.): Taugen Oktober-Schnappschüsse im Internet-Archiv für den Preisverlauf?
+Geprüft: welche kaufDA-Seiten unter /Angebote… liegen, und was alte lidl.de-/aldi-sued.de-Produktseiten an Preis/Datum enthalten."""
 import collections
+import gzip
 import json
+import re
 import time
 import urllib.parse
 import urllib.request
 
 UA = "SparRadar/1.0 (+https://github.com/Tiry38/sparradar; private Angebots-App)"
-PATTERNS = [
-    "www.kaufda.de/Lidl/Sortiment/*", "www.kaufda.de/Netto-Marken-Discount/Sortiment/*", "www.kaufda.de/REWE/Sortiment/*",
-    "www.kaufda.de/Edeka/Sortiment/*", "www.kaufda.de/DM/Sortiment/*", "www.kaufda.de/Mueller/Sortiment/*",
-    "www.kaufda.de/Karlsruhe/*", "www.kaufda.de/Woerth-am-Rhein/*", "www.kaufda.de/Jockgrim/*", "www.kaufda.de/Angebote/*",
-    "www.kaufda.de/Lidl", "www.kaufda.de/Aldi-Sued*", "www.meinprospekt.de/angebote/*", "www.meinprospekt.de/karlsruhe/*",
-    "www.meinprospekt.de/jockgrim/*", "www.aldi-sued.de/de/angebote*", "www.aldi-sued.de/produkt/*", "www.lidl.de/p/*",
-    "www.lidl.de/c/*", "www.lidl.de/q/*", "www.netto-online.de/*", "www.rewe.de/angebote/*", "www.prospektangebote.de/*",
-    "www.prospektewoche.de/*", "www.marktguru.de/*", "www.discounto.de/*", "www.wogibtswas.de/*",
-]
-for pat in PATTERNS:
-    q = urllib.parse.urlencode({"url": pat, "from": "20261005", "to": "20261031", "output": "json",
-                                "fl": "timestamp,original,statuscode", "filter": "statuscode:200", "limit": "20000"})
-    rows = None
+
+
+def get(u, timeout=90):
     for i in range(3):
         try:
-            req = urllib.request.Request("https://web.archive.org/cdx/search/cdx?" + q, headers={"User-Agent": UA})
-            rows = json.loads(urllib.request.urlopen(req, timeout=120).read().decode() or "[]")[1:]
-            break
+            raw = urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": UA}), timeout=timeout).read()
+            return (gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw).decode("utf-8", "replace")
         except Exception as e:
-            print("  Fehler", pat, e)
-            time.sleep(15 * (i + 1))
-    if rows is None:
-        print(f"=== {pat}: keine Antwort")
-        continue
-    days = collections.Counter(r[0][:8] for r in rows)
-    print(f"=== {pat}: {len(rows)} Schnappschüsse, {len({r[1] for r in rows})} Seiten")
-    print("   Tage:", " ".join(f"{d[6:8]}.{d[4:6]}:{n}" for d, n in sorted(days.items())))
-    for r in rows[:4]:
-        print("   z. B.", r[0], r[1][:120])
-    time.sleep(3)
+            print("  Fehler", u[:100], e)
+            time.sleep(10 * (i + 1))
+    return None
+
+
+def cdx(pat, limit=20000):
+    q = urllib.parse.urlencode({"url": pat, "from": "20261005", "to": "20261031", "output": "json",
+                                "fl": "timestamp,original", "filter": "statuscode:200", "limit": str(limit)})
+    t = get("https://web.archive.org/cdx/search/cdx?" + q, 150)
+    return json.loads(t or "[]")[1:]
+
+
+rows = cdx("www.kaufda.de/Angebote*")
+urls = collections.Counter(r[1].split("?")[0] for r in rows)
+print("=== kaufDA /Angebote*: verschiedene Seiten", len(urls))
+for u, n in urls.most_common(100):
+    print("  ", n, u)
+
+for pat, words in (("www.lidl.de/p/*", ("hackfleisch", "milch", "butter", "kaese", "joghurt", "banane")),
+                   ("www.aldi-sued.de/produkt/*", ("hackfleisch", "milch", "butter", "kaese", "joghurt"))):
+    rows = cdx(pat, 8000)
+    pick = [r for r in rows if any(w in r[1].lower() for w in words)][:3] or rows[:3]
+    print(f"=== {pat}: {len(rows)} Schnappschüsse, Probe:")
+    for ts, u in pick:
+        h = get(f"https://web.archive.org/web/{ts}id_/{u}")
+        print("  ---", ts, u[:140], len(h or ""), "Zeichen")
+        if not h:
+            continue
+        for m in re.finditer(r'<script[^>]*application/ld\+json[^>]*>(.*?)</script>', h, re.S):
+            print("   LD:", re.sub(r"\s+", " ", m.group(1))[:900])
+        for k in ("price", "Price", "validFrom", "valid_from", "startDate", "gültig", "ab ", "statt", "UVP", "isDropship",
+                  "onSaleDate", "wasPrice", "strikePrice", "oldPrice", "inStore", "filial"):
+            for m in list(re.finditer(re.escape(k), h))[:2]:
+                print(f"   [{k}]", re.sub(r"\s+", " ", h[max(0, m.start() - 120):m.start() + 200]))
+        time.sleep(3)
