@@ -289,7 +289,12 @@ function watchMatch(o,k){
     ||wd.some(v=>v.startsWith(x)&&/^(|e|n|en|s|es|er|ern|ns)$/.test(v.slice(x.length))); // Beschreibung: nur ganzes Wort/Mehrzahl, keine Wortteile
   if(t.every(inW))return true;
   // „versch. Sorten“: Marke/Produktlinie reicht – aber nur als ganzes Wort oder Wortanfang, mind. 4 Buchstaben
-  return t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&w.some(v=>v===t[0]||(v.startsWith(t[0])&&t[0].length>=5))&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))}
+  if(!(t.length>1&&t[0].length>=4&&!WATCH_WEAK.has(t[0])&&w.some(v=>v===t[0]||(v.startsWith(t[0])&&t[0].length>=5))&&/versch|sorten|oderweitere/.test(norm(o.d)+norm(o.n))))return false;
+  // Das Wort direkt hinter der Marke ist die Produktlinie und muss auch gemerkt sein (v132, Kevin 03.11.:
+  // gemerkt „More Barista Zerup …“, Treffer war „More Fizi, versch. Sorten“ = ganz anderes Produkt)
+  const nw=toks(`${o.b||""} ${hyph(o.n)}`),i=nw.findIndex(v=>v===t[0]||v.startsWith(t[0]));
+  const nx=nw.slice(i+1).find(v=>v.length>1&&!WATCH_FILL.test(v)&&!/^(versch|verschiedene|sorten|oder|weitere|je)$/.test(v));
+  return !nx||t.some(x=>x===nx||nx.startsWith(x)||x.startsWith(nx))}
 const WMC=new WeakMap(),wMatch=(o,k)=>{let m=WMC.get(o);if(!m)WMC.set(o,m=new Map());let r=m.get(k);if(r===undefined){r=watchMatch(o,k);m.set(k,r)}return r};
 const hitW = (o,w) => wMatch(o,w.k) && (!w.max || (unit(o)!=null && unit(o)<=w.max+1e-9));
 const TOMORROW=(d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date(Date.now()+864e5));
@@ -1002,6 +1007,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  132:["Merkliste genauer: Bei „verschiedene Sorten“ reicht die Marke allein nicht mehr. Hast du z. B. einen bestimmten More-Sirup gemerkt, meldet SparRadar nicht mehr jedes andere More-Produkt."],
   131:["Scheck-In Center jetzt mit dem ganzen Prospekt statt nur 16 Angeboten: SparRadar liest Name und Preis direkt aus den Prospektseiten. Die Karte zeigt den passenden Ausschnitt, beim Antippen siehst du die ganze Seite zum Nachprüfen."],
   130:["Neu: Müller und Scheck-In Center im Maximilian-Center Wörth. Die beiden Märkte stehen oben bei den Märkten (gestrichelter Rahmen) und erscheinen nur, wenn du sie antippst – sonst bleibt alles wie gewohnt."],
   129:["🍏 SparRadar gibt es jetzt auch fürs iPhone und iPad: In den Einstellungen unter „SparRadar verschenken“ kannst du die App an Freunde mit Apple-Geräten schicken – per WhatsApp, iMessage oder als Link."],
