@@ -1021,6 +1021,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  143:["Kassenbon: Wird ein Bon zum Einkauf vom Zettel eingelesen, bleiben die Angebote (z. B. McCain Kroketten), Bilder und das Gespart erhalten. Bon-Artikel landen beim Zurückholen im richtigen Markt statt unter „Sonstiges“."],
   142:["Einkaufszettel: Der Kasten „Einkauf vom Kassenbon eintragen“ steht jetzt auch da, wenn ein Markt-Logo gewählt und der Zettel leer ist."],
   141:["Einkaufszettel: Die Markt-Logos stehen jetzt direkt im Zettel über den Artikeln (nur Logos). Logo antippen = darunter steht nur der Zettel dieses Markts."],
   140:["Einkaufszettel je Markt: Oben im Zettel stehen die Markt-Logos. Logo antippen = nur der Zettel dieses Markts. Was du dort eintippst, landet auf diesem Zettel, und die Vorschläge kommen nur aus dem Sortiment dieses Markts. „Alle“ zeigt wieder den ganzen Zettel."],
@@ -1401,7 +1402,7 @@ function finishTrip(ids,auto){
   if(!items.length&&!ex.length)return;
   const t={id:"t"+Date.now(),d:TODAY,at:new Date().toISOString(),
     items:items.map(o=>({id:o.id,n:o.n,b:o.b||"",s:o.s,q:qty(o.id),p:lineP(o),r:lineR(o),...(pf(o)?{pf:linePf(o)}:{})})),
-    extra:ex.map(x=>({id:x.id,n:x.n,q:qty(x.id),p:extraP(x)}))};
+    extra:ex.map(x=>({id:x.id,n:x.n,q:qty(x.id),p:extraP(x),...(x.s?{s:x.s}:{})}))};
   const pfs=r2(t.items.reduce((a,x)=>a+(x.pf||0),0));if(pfs)t.pf=pfs;
   t.paid=r2(t.items.reduce((a,x)=>a+x.p,0)+t.extra.reduce((a,x)=>a+x.p,0)+pfs);t.saved=r2(t.items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
   S.trips.unshift(t);S.trips=S.trips.slice(0,400);
@@ -1414,9 +1415,9 @@ function finishTrip(ids,auto){
   save();render();tripPop(t,auto)}
 // Einkauf zurück auf den Zettel holen (zum Nachlesen oder weil noch etwas fehlt) – alles bleibt abgehakt
 function restoreTrip(id){const t=S.trips.find(x=>x.id===id);if(!t)return;
-  t.items.forEach(it=>{let k=it.id;if(!byId(k)&&!OLD.has(k)){k="x-r"+it.id;if(!S.extra.some(x=>x.id===k))S.extra.push({id:k,n:it.n,p:it.q?r2(it.p/it.q):it.p})}else if(!S.list.includes(k))S.list.push(k);
+  t.items.forEach(it=>{let k=it.id;if(!byId(k)&&!OLD.has(k)){k="x-r"+it.id;if(!S.extra.some(x=>x.id===k))S.extra.push({id:k,n:it.n,p:it.q?r2(it.p/it.q):it.p,...(it.s&&STORES[it.s]?{s:it.s}:{})})}else if(!S.list.includes(k))S.list.push(k);
     S.qty[k]=it.q||1;if(!S.checked.includes(k))S.checked.push(k)});
-  t.extra.forEach(x=>{if(!S.extra.some(e=>e.id===x.id))S.extra.push({id:x.id,n:x.n,p:x.q&&x.p?r2(x.p/x.q):0});S.qty[x.id]=x.q||1;if(!S.checked.includes(x.id))S.checked.push(x.id)});
+  t.extra.forEach(x=>{if(!S.extra.some(e=>e.id===x.id))S.extra.push({id:x.id,n:x.n,p:x.q&&x.p?r2(x.p/x.q):0,...(x.s&&STORES[x.s]?{s:x.s}:{})});S.qty[x.id]=x.q||1;if(!S.checked.includes(x.id))S.checked.push(x.id)});
   S.trips=S.trips.filter(x=>x.id!==id);S.tab="list";S.sheet=null;hideTripPop();save();render();scrollTo({top:0});
   toast("Einkauf ist wieder auf dem Zettel")}
 // Nach dem Einkauf die Kunden-App des Markts öffnen (Kundenkarte/Code an der Kasse zeigen). Nur Android, nur geprüfte Paketnamen.
@@ -1862,8 +1863,9 @@ function parseBon(raw){
 // Wie gut ist ein Leseergebnis? Summe passt = sicher richtig, sonst möglichst kleine Abweichung und viele Artikel
 const bonScore=r=>!r.items.length?-1e9:(r.total&&Math.abs(r.sum-r.total)<.011?1e6:0)+r.items.length*10-(r.total?Math.abs(r.sum-r.total)*100:50);
 // Bon-Artikel einem Angebot desselben Markts zuordnen (gleicher Preis + Wortanfang passt) -> „gespart“ wird echt
-function bonMatch(x,s){const u=r2(x.p/(x.q||1)),w=(x.n.toLowerCase().match(/[a-zäöüß]{3,}/g)||[]).map(t=>t.slice(0,3));if(!w.length)return null;
-  return [...ALLO,...OLD.values()].find(o=>o.s===s&&[o.p,o.ap].some(v=>v&&Math.abs(v-u)<.005)&&(o.n+" "+(o.b||"")).toLowerCase().match(/[a-zäöüß]{3,}/g)?.some(t=>w.includes(t.slice(0,3))))||null}
+// Bon-Zeile -> Angebot: gleicher Markt, gleicher Preis und ein gemeinsamer Wortanfang von 6 Buchstaben (3 waren zu wenig: „Somat Salz“ fand „Salami“)
+function bonMatch(x,s){const u=r2(x.p/(x.q||1)),w=bToks(x.n).filter(t=>t.length>=6).map(t=>t.slice(0,6));if(!w.length)return null;
+  return [...ALLO,...OLD.values()].find(o=>o.s===s&&[o.p,o.ap].some(v=>v&&Math.abs(v-u)<.005)&&bToks(o.n+" "+(o.b||"")).some(t=>t.length>=6&&w.includes(t.slice(0,6))))||null}
 const BON={st:null};
 // Intelligenter Scan: mehrere Durchgänge mit anderer Bildaufbereitung, bis die Summe zum Bon passt. Bestes Ergebnis gewinnt.
 async function bonOCR(file){const w=await loadOCR(),passes=[{mode:"gray",psm:"4"},{mode:"bin",psm:"6",scale:1.5},{mode:"bin",psm:"4",scale:2},{mode:"gray",psm:"6",scale:1.3}];
@@ -1890,17 +1892,22 @@ async function bonRead(file,text){BON.st="work";BON.pct=0;BON.pass=1;BON.err="";
 function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   if(r.total){const d=r2(r.total-r.items.filter(x=>x.on).reduce((a,x)=>a+x.p,0));if(Math.abs(d)>=.01)r.items.push({n:"Sonstiges (nicht erkannt)",q:1,p:d,on:true})}
   const d=r.d&&/^\d{4}-\d\d-\d\d$/.test(r.d)?r.d:TODAY,at=new Date(d+"T"+(r.t||"12:00")+":00").toISOString();
-  const items=r.items.filter(x=>x.on).map((x,i)=>{const o=bonMatch(x,r.s),q=x.q||1;
-    const reg=o&&o.o>x.p/q+.004?r2(o.o*q):r2(x.p+(x.disc||0));
-    return {id:"bon-"+Date.now().toString(36)+i,n:x.n,b:"",s:r.s,q,p:r2(x.p),r:Math.max(r2(x.p),reg),...(o?{o:o.n}:{})}});
+  // Gleicher Tag + gleicher Markt schon als Einkauf vom Zettel? Der Bon ist genauer und ersetzt ihn – Angebote/Namen/Gespart vom Zettel bleiben erhalten.
+  const dup=S.trips.find(x=>!x.bon&&x.d===d&&(x.items.some(i=>i.s===r.s)||x.extra.some(e=>e.s===r.s)));
+  const zi=dup?dup.items.filter(i=>i.s===r.s).map(i=>({...i})):[],ze=dup?dup.extra.map(e=>({...e})):[];
+  const zTake=(arr,x)=>{const q=x.q||1,u=r2(x.p/q),w=bToks(x.n);
+    const c=arr.filter(i=>!i._u&&(Math.abs(i.p-x.p)<.01||Math.abs(r2(i.p/(i.q||1))-u)<.01));
+    const f=c.find(i=>bToks((i.b||"")+" "+i.n).some(t=>t.length>=5&&w.some(v=>v.length>=5&&v.slice(0,5)===t.slice(0,5))))||null;if(f)f._u=1;return f};
+  const items=r.items.filter(x=>x.on).map((x,i)=>{const o=bonMatch(x,r.s),q=x.q||1,z=zTake(zi,x),ze1=z?null:zTake(ze,x);
+    const reg=o&&o.o>x.p/q+.004?r2(o.o*q):r2(x.p+(x.disc||0)),rz=z&&z.r>z.p?r2(x.p+(z.r-z.p)*(q/(z.q||1))):0;
+    const oid=z?z.id:o?o.id:null;
+    return {id:oid&&(byId(oid)||OLD.has(oid))?oid:"bon-"+Date.now().toString(36)+i,n:z?z.n:o?o.n:ze1?ze1.n:x.n,b:z?z.b||"":o?o.b||"":"",bn:x.n,s:r.s,q,p:r2(x.p),r:Math.max(r2(x.p),reg,rz),...(o?{o:o.n}:{})}});
   if(!items.length)return;
   const t={id:"t"+Date.now(),d,at,bon:1,items,extra:[]};
   t.paid=r2(items.reduce((a,x)=>a+x.p,0));t.saved=r2(items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));
   // Kassen-Kontrolle: Artikel teurer bezahlt als im Angebot desselben Markts (gültig am Einkaufstag)?
   const chk=r.items.filter(x=>x.on&&!bonMatch(x,r.s)).map(x=>{const o=bonOffer(x,r.s,d),q=x.q||1;return o?{n:x.n,q,paid:r2(x.p/q),off:o.p,on:(o.b?o.b+" ":"")+o.n}:null}).filter(Boolean);
   if(chk.length)t.chk=chk;
-  // Gleicher Tag + gleicher Markt schon als Einkauf vom Zettel? Der Bon ist genauer und ersetzt ihn.
-  const dup=S.trips.find(x=>!x.bon&&x.d===d&&x.items.some(i=>i.s===r.s));
   if(dup)S.trips=S.trips.filter(x=>x!==dup);
   S.trips.unshift(t);S.trips.sort((a,b)=>b.at.localeCompare(a.at));S.trips=S.trips.slice(0,400);
   save();BON.st=null;S.tripId=t.id;S.sheet="trip";render();toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:dup?"✓ Bon gespeichert – ersetzt den Einkauf vom Zettel":"✓ Bon gespeichert: "+items.length+" Artikel, "+eur(t.paid))}
