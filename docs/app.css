@@ -711,6 +711,13 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 
 /* v138 Markt-Auswahl für eigene Einträge auf dem Zettel */
 .addrow .zmkt{flex:0 1 150px;min-width:0;border:1px solid var(--line);background:var(--surface2);color:inherit;border-radius:12px;padding:8px 10px;font:inherit}
-@media(max-width:559px){#extraForm .zmkt{flex:1 1 100%}}
 .xmk{padding:0 8px 6px 52px}
 .xmkt{font:inherit;font-size:.82em;border:1px solid var(--line);background:var(--surface2);color:inherit;border-radius:8px;padding:3px 6px;max-width:100%}
+/* v140 Zettel-Reiter je Markt */
+.ztabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 10px}
+.ztab{display:flex;align-items:center;gap:6px;padding:6px 10px 6px 6px;border:1px solid var(--line);border-radius:12px;background:var(--surface2);color:inherit;font:inherit;font-size:.86em;cursor:pointer;flex:none}
+.ztab b{font-weight:600}.ztab em{font-style:normal;font-size:.8em;font-weight:700;background:var(--save,#16A34A);color:#fff;border-radius:999px;padding:1px 7px}
+.ztab.empty{opacity:.6}.ztab[aria-selected="true"]{opacity:1;border-color:var(--save,#16A34A);box-shadow:0 0 0 2px color-mix(in srgb,var(--save,#16A34A) 35%,transparent);background:color-mix(in srgb,var(--save,#16A34A) 14%,var(--surface2))}
+.ztab .sb{flex:none}
+@media (hover:none) and (pointer:coarse){.ztabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-4px;padding:2px 4px}.ztabs::-webkit-scrollbar{display:none}}
+.sugg .snone{margin:0;padding:10px 12px;font-size:.9em;opacity:.8}

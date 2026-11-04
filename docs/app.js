@@ -672,7 +672,7 @@ function sugImg(t){
   if(CATALOG_N&&SIMG.cat.length){if(!CAT_IDX){CAT_IDX=new Map();CATALOG_N.forEach((x,i)=>{if(!CAT_IDX.has(x))CAT_IDX.set(x,i)})}
     const c=SIMG.cat[CAT_IDX.get(k)];if(c)return (c[0]==="b"?"https://images.openbeautyfacts.org":"https://images.openfoodfacts.org")+"/images/products/"+c.slice(2)+".jpg"}
   return ""}
-function suggest(q){
+function suggest(q,st){if(st)return suggestSt(q,st);
   const k=norm(q),tk=(q.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(Boolean);if(k.length<2)return [];
   const out=[],seen=new Set(),add=t=>{const n=norm(t);if(!n||seen.has(n))return;seen.add(n);out.push(t)};
   const hasAll=n=>tk.every(x=>n.includes(x));
@@ -683,9 +683,21 @@ function suggest(q){
   if(CATALOG_N){const a=[],b=[];for(let i=0;i<CATALOG_N.length&&a.length+b.length<400;i++){const n=CATALOG_N[i];if(n.startsWith(k))a.push(CATALOG[i]);else if(hasAll(n))b.push(CATALOG[i])}
     a.sort((x,y)=>x.length-y.length);b.sort((x,y)=>x.length-y.length);[...a,...b].forEach(add)}
   const wo=weekOffers();return out.slice(0,30).map(t=>({t,n:wo.filter(o=>watchMatch(o,t)).length}))}
+// Zettel-Reiter eines Markts: Vorschläge nur aus dessen Sortiment (Angebote + docs/data/names-store.json, Aldi inkl. Dauersortiment)
+let NST=null,NST_LOAD=false;
+function loadNst(then){if(NST||NST_LOAD)return;NST_LOAD=true;fetch("data/names-store.json",{cache:"no-cache"}).then(r=>r.ok?r.json():{}).catch(()=>({})).then(d=>{NST={};for(const k in d||{})NST[k]=Object.keys(d[k]||{});then&&then()})}
+const zWO=st=>ALLO.filter(o=>o.s===st&&(S.week?isNextWk(o):!isNextWk(o)));
+function suggestSt(q,st){const k=norm(q),tk=(q.toLowerCase().match(/[a-zäöüß0-9]+/g)||[]).map(norm).filter(Boolean);if(k.length<2)return [];
+  const out=[],seen=new Set(),add=t=>{const n=norm(t);if(!n||seen.has(n))return;seen.add(n);out.push(t)},hasAll=n=>tk.every(x=>n.includes(x));
+  const starts=a=>a.filter(t=>norm(t).startsWith(k)),inside=a=>a.filter(t=>{const n=norm(t);return !n.startsWith(k)&&hasAll(n)});
+  const wo=zWO(st),live=wo.map(o=>o.b&&!norm(o.n).includes(norm(o.b))?o.b+" "+o.n:o.n),all=(NST&&NST[st])||[];
+  const short=a=>a.sort((x,y)=>x.length-y.length);
+  [starts(live),inside(live),short(starts(all)),short(inside(all))].forEach(a=>a.forEach(add));
+  return out.slice(0,30).map(t=>({t,n:wo.filter(o=>watchMatch(o,t)).length}))}
 const SUGG_BOX={q:"qSugg",kw:"kwSugg",ex:"exSugg"},SUGG_IN={q:"q",kw:"kwIn",ex:"extraIn"};
 const suggQ=kind=>{const v=document.getElementById(SUGG_IN[kind])?.value||"";return kind==="q"?S.q:kind==="ex"?parseExtra(v).n:v};
-function suggHTML(q,kind){const list=suggest(q);if(!list.length)return "";
+function suggHTML(q,kind){const st=kind==="ex"&&S.zMkt&&STORES[S.zMkt]?S.zMkt:"";if(st&&!NST)loadNst(()=>{const inp=document.getElementById("extraIn");if(inp&&document.activeElement===inp)showSugg("exSugg",suggQ("ex"),"ex")});
+  const list=suggest(q,st);if(!list.length)return st&&q.trim().length>1?`<div class="sugg"><p class="snone">Im ${esc(sname(st))}-Sortiment nichts gefunden – mit „Dazu“ trotzdem eintragen.</p></div>`:"";
   if(!SIMG)loadSugImgs(()=>{const box=document.getElementById(SUGG_BOX[kind]);if(box&&box.innerHTML)showSugg(box.id,suggQ(kind),kind)});
   return `<div class="sugg" role="listbox" aria-label="Vorschläge">${list.map(x=>{const im=sugImg(x.t);return `<button type="button" role="option" data-sugg="${kind}" data-v="${esc(x.t)}"><i class="simg">${im?`<img src="${esc(im)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="this.remove()">`:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>'}</i><span class="st">${esc(x.t)}</span>${x.n?`<em class="on">${x.n} im Angebot</em>`:`<em>nicht im Angebot</em>`}</button>`}).join("")}</div>`}
 function showSugg(id,q,kind){const el=document.getElementById(id);if(!el)return;el.innerHTML=suggHTML(q,kind);
@@ -1009,6 +1021,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  140:["Einkaufszettel je Markt: Oben im Zettel stehen die Markt-Logos. Logo antippen = nur der Zettel dieses Markts. Was du dort eintippst, landet auf diesem Zettel, und die Vorschläge kommen nur aus dem Sortiment dieses Markts. „Alle“ zeigt wieder den ganzen Zettel."],
   139:["Einkaufszettel aufgeräumt: Unter eigenen Einträgen steht kein „Im Angebot …“-Kasten mehr dazwischen."],
   138:["Einkaufszettel: Neben dem Eingabefeld wählst du jetzt den Markt. Eigene Einträge (z. B. „Brot“) landen dann direkt im Abschnitt dieses Markts. Unter jedem eigenen Eintrag kannst du den Markt auch später noch ändern."],
   137:["Kein falscher Hinweis „Noch kein Prospekt“ mehr, wenn der Prospekt eines Markts erst später in dieser Woche startet (z. B. Zookauf ab Samstag)."],
@@ -1319,7 +1332,7 @@ function planHTML(items,extra,now){const p=planOf(items)||{free:[],freeV:0,extra
   const row=({o,x})=>`<div class="swap"><span><b>${esc(o.n)}</b><small>${esc(sname(o.s))} ${eur(fin(o))} → ${esc(sname(x.s))} ${eur(fin(x))} · ${eur(fin(o)-fin(x))} weniger${qty(o.id)>1?" je Stück":""}</small></span><button class="btn ghost sm" data-swap="${esc(o.id)}|${esc(x.id)}">Tauschen</button></div>`;
   const all=rs=>rs.map(r=>r.o.id+"|"+r.x.id).join(",");
   return `<section class="panel swaps plan"><h3>🧮 Spar-Check${oneV>=.01?`: ${eur(oneV)} sparen`:""}</h3>
-   ${n1?`<p class="pcsum">${now!=null&&oneV>=.01?`Dein Zettel jetzt <b>${eur(now)}</b> → mit den Tipps <b class="sv">${eur(now-oneV)}</b>. `:""}${ex.length?`${ex.length} ${ex.length===1?"eigener Eintrag ist":"eigene Einträge sind"} gerade im Angebot (💡 beim Artikel). `:""}Ohne Umweg, nur bei Märkten, zu denen du sowieso gehst.</p>
+   ${n1?`<p class="pcsum">${now!=null&&oneV>=.01?`Dein Zettel jetzt <b>${eur(now)}</b> → mit den Tipps <b class="sv">${eur(now-oneV)}</b>. `:""}${ex.length?`${ex.length} ${ex.length===1?"eigener Eintrag ist":"eigene Einträge sind"} gerade im Angebot. `:""}Ohne Umweg, nur bei Märkten, zu denen du sowieso gehst.</p>
    <button class="btn big pcall" data-sparall="1">✓ ${n1===1?"Tipp":`Alle ${n1} Tipps`} übernehmen${oneV>=.01?` (${eur(oneV)} sparen)`:""}</button>`:""}
    ${p.free.length?`<h4>Gleicher Artikel günstiger: ${eur(p.freeV)} sparen</h4><p class="ph">Derselbe Artikel in gleicher Menge kostet bei einem Markt, zu dem du sowieso gehst, weniger.</p><div class="rows">${p.free.map(row).join("")}</div>`:""}
    ${p.extra?`<h4>Mit Abstecher zu ${esc(sname(p.extra.s))}: noch ${eur(p.extra.v)} sparen</h4><p class="ph">Lohnt sich, wenn ${esc(sname(p.extra.s))} auf deinem Weg liegt.</p><div class="rows">${p.extra.rs.map(row).join("")}</div>${p.extra.rs.length>1?`<button class="btn ghost sm" data-swapall="${esc(all(p.extra.rs))}">Alle ${p.extra.rs.length} zu ${esc(sname(p.extra.s))} (${eur(p.extra.v)} sparen)</button>`:""}`:""}
@@ -1691,10 +1704,14 @@ function renderConnect(){const close=`<button class="ibtn" id="closeSheet" aria-
    <div class="factions"><button class="btn ghost" data-connect="0">Nicht jetzt</button><button class="btn big" data-connect="1">✓ Verbinden</button></div></div>`}
 
 function renderList(){
-  const items=S.list.map(byId).filter(Boolean),extra=S.extra;if(extra.length)loadDauer();
+  const zm=S.zMkt&&STORES[S.zMkt]?S.zMkt:"",allI=S.list.map(byId).filter(Boolean);
+  const zc=k=>allI.filter(o=>o.s===k).length+S.extra.filter(x=>x.s===k).length;
+  const ztabs=`<div class="ztabs" role="tablist" aria-label="Einkaufszettel je Markt"><button class="ztab all" role="tab" data-ztab="" aria-selected="${!zm}"><span class="sb">${IC.layers}</span><b>Alle</b><em>${allI.length+S.extra.length}</em></button>${Object.keys(STORES).map(k=>{const n=zc(k);return `<button class="ztab${n?"":" empty"}" role="tab" data-ztab="${k}" aria-selected="${zm===k}" title="Einkaufszettel ${esc(sname(k))}">${sb(k)}<b>${esc(sname(k))}</b>${n?`<em>${n}</em>`:""}</button>`}).join("")}</div>`;
+  const items=zm?allI.filter(o=>o.s===zm):allI,extra=zm?S.extra.filter(x=>x.s===zm):S.extra;if(extra.length)loadDauer();
   // Bilder für eigene Einträge: Bilder-Liste + Artikelstamm erst hier laden
   if(extra.length&&(!SIMG||!CATALOG_N)){const again=()=>{if(S.tab==="list"&&SIMG&&CATALOG_N)render()};if(!SIMG)loadSugImgs(again);if(!CATALOG_N)loadCatalog(again)}
-  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off">${mktSel("zMkt",S.zMkt,"zmkt","Für welchen Markt? Neue Einträge landen dort auf dem Zettel")}<button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button>${Voice.ok()?`<button class="btn ghost zmic${Voice.on?" on":""}" type="button" id="zMic" aria-pressed="${Voice.on}" aria-label="Artikel sprechen, z. B. Milch, Butter und drei Eier" title="Artikel sprechen">${Voice.on?"🎤 Ich höre zu …":"🎤 Sprechen"}</button>`:""}</form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
+  const addRow=`${ztabs}<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${zm?PH(`${sname(zm)}: Artikel suchen oder eintippen, z. B. Brot 1,99`,`${sname(zm)}: z. B. Brot`):PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button>${Voice.ok()?`<button class="btn ghost zmic${Voice.on?" on":""}" type="button" id="zMic" aria-pressed="${Voice.on}" aria-label="Artikel sprechen, z. B. Milch, Butter und drei Eier" title="Artikel sprechen">${Voice.on?"🎤 Ich höre zu …":"🎤 Sprechen"}</button>`:""}</form><div id="exSugg"></div><p class="exhint">${zm?`Vorschläge nur aus dem Sortiment von ${esc(sname(zm))}. Alles, was du hier einträgst, steht auf dem ${esc(sname(zm))}-Zettel.`:"Tipp: Oben ein Markt-Logo antippen = Zettel nur für diesen Markt, Vorschläge nur aus seinem Sortiment."}</p>`;
+  if(zm&&!items.length&&!extra.length)return `${addRow}<div class="empty"><b>Noch nichts für ${esc(sname(zm))} auf dem Zettel</b>Tippe oben einen Artikel ein – die Vorschläge kommen nur aus dem Sortiment von ${esc(sname(zm))}.</div>`;
   if(!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const xg={},xs=x=>x.s&&STORES[x.s]?x.s:"";extra.forEach(x=>{const k=xs(x);if(k){(xg[k]=xg[k]||[]).push(x);groups[k]=groups[k]||[]}});const xRest=extra.filter(x=>!xs(x));
@@ -2301,7 +2318,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.detail){S.detail=b.dataset.detail;S.dImg=0;S.sheet="detail";S._shown=null;render();return}
   if(b.dataset.sugg==="q"){const v=b.dataset.v;S.q=v;document.getElementById("q").value=v;S.limit=60;hideSugg();S.tab="offers";render();return}
   if(b.dataset.sugg==="ex"){const inp=document.getElementById("extraIn"),x=parseExtra(inp?.value||""),v=b.dataset.v,k=norm(v);hideSugg();
-    const o=weekOffers().find(o=>norm(o.n)===k||norm((o.b||"")+o.n)===k);
+    const o=(S.zMkt&&STORES[S.zMkt]?zWO(S.zMkt):weekOffers()).find(o=>norm(o.n)===k||norm((o.b||"")+o.n)===k);
     if(o){if(!S.list.includes(o.id))S.list.push(o.id);if(x.q>1)S.qty[o.id]=x.q;toast(`${o.n} im Angebot bei ${sname(o.s)} – auf den Zettel gesetzt`)}
     else{const id="x-"+Date.now();S.extra.push(x.p?{id,n:v,p:x.p,...exS()}:{id,n:v,...exS()});if(x.q>1)S.qty[id]=x.q;toast(`${v} auf den Zettel gesetzt`)}
     save();render();document.getElementById("extraIn")?.focus();return}
@@ -2423,6 +2440,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.tpclose){hideTripPop();return}
   if(b.dataset.readd){readd(b.dataset.readd);return}
   if(b.dataset.budget){const v=prompt("Budget für diesen Einkauf in Euro (leer lassen = kein Budget):",S.budget?String(S.budget).replace(".",","):"");if(v===null)return;S.budget=Math.max(0,parseFloat(v.replace(",","."))||0);save();render();return}
+  if(b.dataset.ztab!==undefined){S.zMkt=b.dataset.ztab;save();hideSugg();render();if(S.zMkt&&!NST)loadNst();return}
   if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
   if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}

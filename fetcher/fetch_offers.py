@@ -363,6 +363,7 @@ def offer(store, title, price, *, brand=None, desc="", old=None, base=None, img=
 
 # Alle Artikelnamen, die beim Abruf vorbeikommen (auch ohne Rabatt): für die Vorschläge in Suche und Merkliste
 SEEN_NAMES = {}  # Name -> Bild (für die Vorschläge beim Tippen)
+SEEN_ST = {}  # Name -> Markt (Vorschläge im Zettel nur aus dem Sortiment des gewählten Markts)
 
 
 # ---------- Lidl ----------
@@ -404,7 +405,9 @@ def fetch_lidl():
                 if isinstance(v, (int, float)):
                     plus = v
             if g.get("fullTitle") or g.get("title"):
-                SEEN_NAMES[re.sub(r"\s+", " ", (g.get("fullTitle") or g.get("title")).strip())] = g.get("image") or ""
+                _t = re.sub(r"\s+", " ", (g.get("fullTitle") or g.get("title")).strip())
+                SEEN_NAMES[_t] = g.get("image") or ""
+                SEEN_ST[_t] = "lidl"
             if not (disc or (old and p and old > p) or plus):
                 continue  # nur Angebote
             kf = g.get("keyfacts") or {}
@@ -1078,6 +1081,7 @@ def fetch_prospektewoche(shop="rewe", store="rewe"):
                     o["pv"] = 1
                     out.append(o)
                     SEEN_NAMES.setdefault(title, o["img"])
+                    SEEN_ST.setdefault(title, store)
     log(f"  prospektewoche {shop}: {len(out)} Vorschau-Angebote")
     return out
 
@@ -1551,6 +1555,26 @@ def update_names(offers, today):
     names = {k: v for k, v in names.items() if v >= cutoff}
     names = dict(sorted(names.items(), key=lambda kv: kv[1], reverse=True)[:6000])
     save("names.json", names)
+    # Sortiment je Markt (Kevin 04.11.: im Zettel-Reiter eines Markts nur Vorschläge aus dessen Sortiment)
+    nst = load("names-store.json", {})
+    def put(st, t):
+        if st and t:
+            nst.setdefault(st, {})[t[:80]] = today
+    for o in offers:
+        n, b = o["n"], (o.get("b") or "").strip()
+        put(o.get("s"), n if not b or norm(b) in norm(n) else f"{b} {n}")
+    for n, st in SEEN_ST.items():
+        put(st, n)
+    for r in (load("dauerpreise.json", {}) or {}).get("items") or []:
+        if r and r[0]:
+            b = (r[1] or "").strip()
+            put("aldi", r[0] if not b or norm(b) in norm(r[0]) else f"{b} {r[0]}")
+    for r in (load("zookauf-ocr.json", {}) or {}).get("offers") or []:
+        if r.get("n"):
+            put("zookauf", f"{r['b']} {r['n']}" if r.get("b") and norm(r["b"]) not in norm(r["n"]) else r["n"])
+    for st in list(nst):
+        nst[st] = dict(sorted(((k, v) for k, v in nst[st].items() if v >= cutoff), key=lambda kv: kv[1], reverse=True)[:5000])
+    save("names-store.json", nst)
     bad = load("img-bad.json", {})
     save("names-img.json", {k: v for k, v in imgs.items() if k in names and isinstance(v, str) and v.startswith("https://") and img_id(v) not in bad})
 
