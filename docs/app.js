@@ -1009,6 +1009,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  139:["Einkaufszettel aufgeräumt: Unter eigenen Einträgen steht kein „Im Angebot …“-Kasten mehr dazwischen."],
   138:["Einkaufszettel: Neben dem Eingabefeld wählst du jetzt den Markt. Eigene Einträge (z. B. „Brot“) landen dann direkt im Abschnitt dieses Markts. Unter jedem eigenen Eintrag kannst du den Markt auch später noch ändern."],
   137:["Kein falscher Hinweis „Noch kein Prospekt“ mehr, wenn der Prospekt eines Markts erst später in dieser Woche startet (z. B. Zookauf ab Samstag)."],
   136:["Neuer Markt: Zookauf in Wörth. Oben die Kachel „Zookauf“ antippen, dann siehst du die Angebote aus dem Zookauf-Prospekt (Futter, Streu, Zubehör). Bei „Alle“ bleibt er ausgeblendet – genau wie Müller und Scheck-In."],
@@ -1732,7 +1733,7 @@ function renderList(){
     if(o)return `<b class="zimg" ${pick}>${imgTag(o)}</b>`;
     return `<b class="zimg none" ${pick}>${ILL.sonstiges}<small>Sorte wählen</small></b>`};
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i>${zImg(id)}<span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
-  const xLine=x=>line(x.id,x.n,x.p?eur(extraP(x)):paidOf(x)?`<i class="rca" title="geschätzt: zuletzt bezahlt">ca. ${eur(extraT(x))}</i>`:"",x.dp?` <em class="rsoon">${esc(x.dp)}</em>`:"")+(done(x.id)?"":`<div class="xmk">${mktSel("",xs(x),"xmkt","Markt für „"+x.n+"“ ändern").replace("<select ",`<select data-xmkt="${esc(x.id)}" `)}</div>`)+exHintHTML(x);
+  const xLine=x=>line(x.id,x.n,x.p?eur(extraP(x)):paidOf(x)?`<i class="rca" title="geschätzt: zuletzt bezahlt">ca. ${eur(extraT(x))}</i>`:"",x.dp?` <em class="rsoon">${esc(x.dp)}</em>`:"")+(done(x.id)?"":`<div class="xmk">${mktSel("",xs(x),"xmkt","Markt für „"+x.n+"“ ändern").replace("<select ",`<select data-xmkt="${esc(x.id)}" `)}</div>`);
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
   const grpTot=(os,xx=[])=>{const xt=xx.reduce((a,x)=>a+extraT(x),0),t=os.reduce((a,o)=>a+lineT(o),0)+xt,r=os.reduce((a,o)=>a+lineR(o)+linePf(o),0)+xt,p=r2(os.reduce((a,o)=>a+linePf(o),0));return `<div class="rsub"><span>Summe ${os.length+xx.length} Artikel${p?` · inkl. ${eur(p)} Pfand`:""}${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
   return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${endSoonHTML(items)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items,extra,sum)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(xRest.length?1:0)} ${Object.keys(groups).length+(xRest.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
