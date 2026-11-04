@@ -752,7 +752,7 @@ function kracherBtn(){const k=ranked()[0];if(!k)return"";
 const catNames=()=>[...S.cats].filter(k=>CATS[k]).map(k=>CATS[k]);
 const catTitle=()=>{const n=catNames();return n.length>3?`${n.length} Kategorien`:n.join(" · ")};
 function missingHTML(){if(S.q.trim()||S.cats.size)return "";
-  const have=new Set((S.week||WEEKEND?weekOffers():OFFERS.filter(o=>!o.from||o.from<=SHOP)).map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s)&&(!OPT.has(s)||S.stores.has(s)));
+  const have=new Set((S.week||WEEKEND?weekOffers():OFFERS.filter(o=>!o.from||o.from<=SHOP)).map(o=>o.s)),soon=new Set(weekOffers().map(o=>o.s)),miss=Object.keys(STORES).filter(s=>!have.has(s)&&!soon.has(s)&&(!OPT.has(s)||S.stores.has(s)));
   if(!miss.length)return "";
   const dm=miss.includes("dm")?` <span class="dmnote">dm veröffentlicht seine Aktionen nicht vorab und hat sonst Dauerpreise (mind. 4 Monate garantiert) – ohne Aktion lohnt kein Warten.</span>`:"";
   return `<p class="catoff miss">Noch kein Prospekt ${S.week?"dafür":WEEKEND?"für nächste Woche":"für heute"} online: <b>${miss.map(s=>esc(sname(s))).join(", ")}</b>. Sobald er veröffentlicht ist, holt SparRadar ihn automatisch.${dm}</p>`}
@@ -1009,6 +1009,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  137:["Kein falscher Hinweis „Noch kein Prospekt“ mehr, wenn der Prospekt eines Markts erst später in dieser Woche startet (z. B. Zookauf ab Samstag)."],
   136:["Neuer Markt: Zookauf in Wörth. Oben die Kachel „Zookauf“ antippen, dann siehst du die Angebote aus dem Zookauf-Prospekt (Futter, Streu, Zubehör). Bei „Alle“ bleibt er ausgeblendet – genau wie Müller und Scheck-In."],
   135:["Bild auf dem Zettel antippen = deine Sorte wählen (z. B. genau deine Milch). SparRadar merkt sie sich und zeigt sie ab jetzt immer."],
   134:["Einkaufszettel mit Bildern: Jeder Artikel zeigt ein kleines Foto, so erkennst du ihn im Laden auf einen Blick."],
