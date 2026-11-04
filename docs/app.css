@@ -721,3 +721,14 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .ztab .sb{flex:none}
 @media (hover:none) and (pointer:coarse){.ztabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-inline:-4px;padding:2px 4px}.ztabs::-webkit-scrollbar{display:none}}
 .sugg .snone{margin:0;padding:10px 12px;font-size:.9em;opacity:.8}
+.receipt .ztabs{margin:10px 0 12px;padding-bottom:10px;border-bottom:1px dashed var(--line);font-family:inherit}
+.receipt .ztab{color:var(--ink,inherit)}
+.receipt .zempty{padding:14px 4px;text-align:center;font-size:.92em}.receipt .zempty b{display:block;margin-bottom:4px}
+.rs.rsapp{justify-content:flex-end}
+.receipt .ztab{padding:5px;min-width:44px;min-height:44px;justify-content:center}
+.receipt .ztab .sb{transform:scale(1.25)}
+.receipt .ztab.all{padding:5px 12px}
+.receipt .ztabs{padding-top:9px}
+.receipt .ztab{position:relative;overflow:visible}
+.receipt .ztab em{position:absolute;top:-9px;right:-6px;min-width:20px;text-align:center;padding:1px 6px;font-size:.72em;line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:1}
+@media (hover:none) and (pointer:coarse){.receipt .ztabs{padding:10px 8px 10px}}
