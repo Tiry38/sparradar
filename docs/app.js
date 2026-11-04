@@ -63,7 +63,7 @@ const IC = {
 // ---------- Zustand ----------
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0},store.get("flt",{}),store.get("fltq")?{}:{cb:0}),useApp:store.get("useApp",true),
-  watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
+  watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),wdel:store.get("wdel",{}),list:store.get("list",[]),
   coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),act:store.get("act",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),zMkt:store.get("zMkt",""),sheet:null,limit:60};
 let OFFERS = [], ALLO = [], OPTK = null, RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
@@ -99,7 +99,9 @@ let tt; function toast(m){const t=document.getElementById("toast");t.textContent
 // Scheck-In/Serpa und „Angebot eintragen“ wurden entfernt: alte Einträge vom Gerät löschen
 try{localStorage.removeItem("sr_manual")}catch(e){}
 S.coupons=S.coupons.filter(c=>c.s==="all"||STORES[c.s]);
-const save = () => {memoReset();store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);store.set("act",S.act);store.set("saved",S.saved);store.set("trips",S.trips);store.set("qty",S.qty);store.set("budget",S.budget);store.set("zMkt",S.zMkt);Sync.changed()};
+// Merkliste: Hinzufügen mit Zeitstempel, Entfernen mit Löschmarke – so führt der Abgleich Geräte zusammen, ohne dass etwas verloren geht
+const wAdd=w=>{const k=norm(w.k);delete S.wdel[k];S.watch.push({...w,at:Date.now()})},wDel=i=>{const w=S.watch[i];if(!w)return;S.wdel[norm(w.k)]=Date.now();S.watch.splice(i,1)};
+const save = () => {memoReset();store.set("watch2",S.watch);store.set("wdel",S.wdel);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);store.set("act",S.act);store.set("saved",S.saved);store.set("trips",S.trips);store.set("qty",S.qty);store.set("budget",S.budget);store.set("zMkt",S.zMkt);Sync.changed()};
 
 // ---------- Geräte verbinden (Handy <-> PC) ----------
 // Merkliste, Einkaufszettel und Coupons liegen zusätzlich in einem geheimen Gist im
@@ -115,12 +117,12 @@ const Sync = {
     const d=Object.fromEntries(Object.entries(this.devices||{}).filter(([k,v])=>v&&v.at>old&&k!==this.devId()));d[this.devId()]=me;return d},
   // Bereiche: jedes Gerät wählt selbst, was es mit den anderen teilt (Kevins Wunsch: Familie teilt den Einkaufszettel,
   // die Merkliste nur, wer sie teilen will). Jeder Bereich hat einen eigenen Zeitstempel -> nichts wird überschrieben.
-  PARTS:{list:{n:"Einkaufszettel",keys:["list","extra","checked","qty","trips","saved"]},watch:{n:"Merkliste",keys:["watch"]},coupons:{n:"Coupons",keys:["coupons"]}},
+  PARTS:{list:{n:"Einkaufszettel",keys:["list","extra","checked","qty","trips","saved"]},watch:{n:"Merkliste",keys:["watch","wdel"]},coupons:{n:"Coupons",keys:["coupons"]}},
   SKEY:{watch:"watch2"},
   share(){const d=store.get("syncParts",null);return d||(this.cfg()?.gist?{list:true,watch:true,coupons:true}:{list:true,watch:false,coupons:false})},
   on(){const sh=this.share();return Object.keys(this.PARTS).filter(p=>sh[p])},
   get(p){return Object.fromEntries(this.PARTS[p].keys.map(k=>[k,S[k]]))},
-  set(p,d){this.PARTS[p].keys.forEach(k=>{S[k]=d[k]??(k==="qty"?{}:[]);store.set(this.SKEY[k]||k,S[k])})},
+  set(p,d){this.PARTS[p].keys.forEach(k=>{S[k]=d[k]??(k==="qty"||k==="wdel"?{}:[]);store.set(this.SKEY[k]||k,S[k])})},
   pick(d,p){return Object.fromEntries(this.PARTS[p].keys.filter(k=>d&&d[k]!=null).map(k=>[k,d[k]]))},
   snap(p){return JSON.stringify(this.get(p))},
   // alte Datei {updatedAt,data} (vor Version 67) in Bereiche umrechnen; ist „data“ neuer, gewinnt es
@@ -152,7 +154,8 @@ const Sync = {
     return {parts:this.norm(r),devices:r.devices||{}}},
   // beide Seiten geändert: nichts verlieren, alles zusammenführen
   merge(a,b){const u=(x,y,k)=>{const m=new Map();[...x,...y].forEach(e=>m.set(k(e),e));return [...m.values()]};
-    return {watch:u(a.watch||[],b.watch||[],w=>norm(w.k)),list:[...new Set([...(a.list||[]),...(b.list||[])])],
+    const wd={...(a.wdel||{})};Object.entries(b.wdel||{}).forEach(([k,t])=>{if(!(wd[k]>=t))wd[k]=t});
+    return {wdel:wd,watch:u(a.watch||[],b.watch||[],w=>norm(w.k)).filter(w=>!(wd[norm(w.k)]>(w.at||0))),list:[...new Set([...(a.list||[]),...(b.list||[])])],
       coupons:u(a.coupons||[],b.coupons||[],c=>[c.id||"",c.s,c.k,c.t,c.v,c.to].join("|")),
       extra:u(a.extra||[],b.extra||[],x=>x.id),checked:[...new Set([...(a.checked||[]),...(b.checked||[])])],saved:(()=>{const m=new Map();[...(a.saved||[]),...(b.saved||[])].forEach(e=>{const k=e.id+"|"+e.d,o=m.get(k);m.set(k,o&&(o.off||e.off)?{...e,off:1}:e)});return [...m.values()]})(), // gelöscht (off) bleibt gelöscht
       trips:u(a.trips||[],b.trips||[],x=>x.id).sort((x,y)=>(y.at||"").localeCompare(x.at||"")),qty:{...(a.qty||{}),...(b.qty||{})}}},
@@ -174,7 +177,7 @@ const Sync = {
     try{const {parts}=await this.load(),at=store.get("syncAt",{}),sn=store.get("syncSnaps",{});let push=false,changed=false;
       for(const p of this.on()){const rp=parts[p],localNew=this.snap(p)!==sn[p],fresh=at[p]==null||at[p]<0;
         if(rp&&(rp.at||0)>(at[p]||0)){
-          if(localNew||fresh){this.set(p,this.mergeP(p,rp.d,this.get(p)));push=true}else this.set(p,{...this.get(p),...rp.d});
+          if(localNew||fresh||p==="watch"){const m=this.mergeP(p,rp.d,this.get(p));if(p==="watch"&&JSON.stringify(m)!==JSON.stringify(rp.d))push=true;this.set(p,m);if(localNew||fresh)push=true}else this.set(p,{...this.get(p),...rp.d});
           at[p]=rp.at;if(!push)sn[p]=this.snap(p);changed=true}
         else if(localNew||!rp)push=true}
       store.set("syncAt",at);store.set("syncSnaps",sn);
@@ -1021,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  144:["Merkliste: Der Abgleich zwischen Handy und PC führt jetzt immer zusammen – was ein Gerät noch hat, geht nicht mehr verloren, gelöscht wird nur, was du wirklich entfernst. „Kaufst du oft“ zeigt keine Kassenbon-Kürzel mehr."],
   143:["Kassenbon: Wird ein Bon zum Einkauf vom Zettel eingelesen, bleiben die Angebote (z. B. McCain Kroketten), Bilder und das Gespart erhalten. Bon-Artikel landen beim Zurückholen im richtigen Markt statt unter „Sonstiges“."],
   142:["Einkaufszettel: Der Kasten „Einkauf vom Kassenbon eintragen“ steht jetzt auch da, wenn ein Markt-Logo gewählt und der Zettel leer ist."],
   141:["Einkaufszettel: Die Markt-Logos stehen jetzt direkt im Zettel über den Artikeln (nur Logos). Logo antippen = darunter steht nur der Zettel dieses Markts."],
@@ -1246,7 +1250,7 @@ function renderWatch(){
     <form class="addrow" id="kwForm"><input id="kwIn" placeholder="${PH("z. B. Mozzarella, Felix, Cola","z. B. Butter, Felix")}" autocomplete="off"><input id="kwMax" class="sm" inputmode="decimal" placeholder="max. €/kg" autocomplete="off"><button class="btn" type="submit">${IC.plus}Merken</button></form>
     <div id="kwSugg"></div>
     <div class="wlist">${S.watch.map((w,i)=>{const n=wh[i].hits.length,im=sugImg(w.k)||(wh[i].hits.find(o=>o.img)||{}).img||simImg(w.k)||(SIMG&&CATALOG_N?liveImg(w.k):"")||"",on=S.wsel===i;
-      return `<div class="witem${n?" hit":""}${on?" on":""}"><button class="wmain" data-wsel="${i}" aria-pressed="${on}" title="${esc(w.k)}">${safeUrl(im)?`<img src="${esc(sharp(im))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<span class="wph">${IC.bell}</span>`}<span class="wtx"><b>${esc(w.k)}</b><small>${n?`${n} ${n===1?"Treffer":"Treffer"} im Angebot`:"gerade nicht im Angebot"}${w.max?` · bis ${eur(w.max)}/kg`:""}</small></span></button><button class="wdel" data-delkw="${i}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></div>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
+      return `<div class="witem${n?" hit":""}${on?" on":""}"><button class="wmain" data-wsel="${i}" aria-pressed="${on}" title="${esc(w.k)}">${safeUrl(im)?`<img src="${esc(sharp(im))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.visibility='hidden'">`:`<span class="wph">${IC.bell}</span>`}<span class="wtx"><b>${esc(w.k)}</b><small>${n?`${n} ${n===1?"Treffer":"Treffer"} im Angebot`:"gerade nicht im Angebot"}${w.max?` · bis ${eur(w.max)}/kg`:""}</small></span></button><button class="wdel" data-delkw="${esc(w.k)}" aria-label="${esc(w.k)} entfernen">${IC.x}</button></div>`}).join("")||'<span style="color:var(--muted)">Noch nichts gemerkt.</span>'}</div>
     ${w2lHTML()}${oftenHTML()}
    </section>
    <div class="meta"><h2>${S.wsel!=null?`Treffer für „${esc(S.watch[S.wsel].k)}“`:"Deine Treffer"}</h2><span>${S.wsel!=null?`<button class="linkbtn" data-wsel="${S.wsel}">Alle zeigen</button> · `:""}${hits.length} Angebote</span></div>
@@ -1257,7 +1261,7 @@ function w2lHTML(){if(!S.watch.length)return "";const n=watchHits(S.week).filter
   return n?`<div class="w2l"><button class="btn" data-w2l="1">${IC.plus}Beste Angebote auf den Zettel (${n})</button><small>Legt je Begriff das günstigste Angebot auf deinen Einkaufszettel – nur wenn du antippst.</small></div>`:""}
 // Verknüpfung Einkäufe -> Merkliste: was du oft kaufst (mind. 2 Einkäufe), mit einem Tipp beobachten
 function oftenHTML(){if(!S.trips.length)return "";const have=new Set(S.watch.map(w=>norm(w.k))),c={};
-  S.trips.slice(0,60).forEach(t=>{const one=new Set();[...(t.items||[]),...(t.extra||[])].forEach(x=>{const k=norm(x.n||"");
+  const days={};S.trips.slice(0,60).forEach(t=>{const one=days[t.d]=days[t.d]||new Set();[...(t.items||[]).filter(x=>!t.bon||x.b),...(t.extra||[])].forEach(x=>{const k=norm(x.n||"");
     if(!k||one.has(k)||have.has(k)||x.p<0||/pfand|leergut|tasche|t[uü]te|sonstiges|nicht erkannt/i.test(x.n))return;one.add(k);(c[k]=c[k]||{n:x.n,c:0}).c++})});
   const top=Object.values(c).filter(x=>x.c>=2).sort((a,b)=>b.c-a.c||a.n.length-b.n.length).slice(0,10);if(!top.length)return "";
   return `<div class="freq often"><span>Kaufst du oft – beobachten?</span>${top.map(x=>`<button class="chip plain" data-watchname="${esc(x.n)}">${IC.star}${esc(x.n.length>28?x.n.slice(0,27)+"…":x.n)}</button>`).join("")}</div>`}
@@ -2369,7 +2373,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.cat!==undefined){const k=b.dataset.cat;if(!k)S.cats.clear();else S.cats.has(k)?S.cats.delete(k):S.cats.add(k);S.limit=60;render();return}
   if(b.id==="appSw"){S.useApp=!S.useApp;save();render();return}
   if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
-  if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){S.watch.splice(i,1);toast(`${o.n} von der Merkliste genommen`)}else{S.watch.push({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
+  if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){wDel(i);toast(`${o.n} von der Merkliste genommen`)}else{wAdd({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
   if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{const c=cheaper(byId(id));if(c&&!S.list.includes(c.x.id)){askCheaper(byId(id),c);return}S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
   if(b.dataset.cheap){const id=b.dataset.cheap,n=byId(id);document.getElementById("cheapAsk").hidden=true;if(!S.list.includes(id))S.list.push(id);toast(n?`${sname(n.s)}: auf den Einkaufszettel gesetzt`:"Auf den Einkaufszettel gesetzt");save();render();return}
   if(b.dataset.wsel!=null&&b.dataset.wsel!==""){const i=+b.dataset.wsel;S.wsel=S.wsel===i?null:i;render();return}
@@ -2377,7 +2381,7 @@ document.addEventListener("click",e=>{
     setTimeout(()=>document.querySelector("#sheet .cpq")?.scrollIntoView({block:"center",behavior:"smooth"}),80);return}
   if(b.dataset.cpq!=null){S.cpq=b.dataset.cpq||null;render();return}
   if(b.dataset.cpqset){const [id,t,v]=b.dataset.cpqset.split("|");cpqSave(id,t,+v);return}
-  if(b.dataset.delkw){S.watch.splice(+b.dataset.delkw,1);S.wsel=null;save();render();return}
+  if(b.dataset.delkw){const i=S.watch.findIndex(w=>w.k===b.dataset.delkw);if(i<0)return;wDel(i);S.wsel=null;save();render();return}
   if(b.dataset.cbadd){cbAdd(b.dataset.cbadd);render();return}
   if(b.dataset.cbdone){const c=S.coupons.find(x=>x.id===b.dataset.cbdone);if(c){c.done=TODAY;if(S.sheet==="cbget")S.sheet=null;save();toast("Erledigt – das Geld kommt in ein paar Wochen.");render()}return}
   if(b.dataset.cbtake){if(cbAdd(b.dataset.cbtake,true,b.dataset.cbo)){save();toast("💸 Mitgenommen – nach dem Einkauf zeigt SparRadar dir, wie du das Geld holst.");render()}return}
@@ -2407,7 +2411,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.gocb){toast(quickToggle("cb")?"Filter an: nur Angebote mit Geld zurück – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
   if(b.dataset.golow){toast(quickToggle("low")?"Filter an: nur Preis-Alarme – wechselst du den Markt, geht er von selbst aus":"Filter aus: alle Angebote");return}
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
-  if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))S.watch.push({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
+  if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))wAdd({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
   if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
   if(b.id==="zMic"){Voice.start();return}
@@ -2456,7 +2460,7 @@ document.addEventListener("click",e=>{
   if(b.id==="iosCopy"){copy(inviteUrl(),"Link kopiert – auf dem iPhone in Safari öffnen");return}
   if(b.id==="pcCopy"){copy(inviteUrl(),"Link kopiert – am PC in Chrome oder Edge öffnen");return}
   if(b.id==="shareOther"){navigator.share({title:"Persönliche Einladung zu SparRadar",text:inviteText()}).catch(()=>{});return}
-  if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){S.watch.push({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
+  if(b.dataset.watchname){const k=b.dataset.watchname;if(!S.watch.some(w=>norm(w.k)===norm(k))){wAdd({k});save();toast(`„${k}“ auf der Merkliste. Du siehst es, sobald es im Angebot ist.`)}render();return}
   if(b.dataset.showwelcome){S.sheet="welcome";S._shown=null;render();return}
   if(b.dataset.welcome){if(b.dataset.welcome==="sync"){S.sheet="settings";render();setTimeout(()=>document.getElementById("syncPanel")?.scrollIntoView({block:"start",behavior:"smooth"}),80)}else{S.sheet=null;render()}return}
   if(b.dataset.newsdone){S.sheet=null;if(b.dataset.newsdone==="watch")S.tab="watch";render();return}
@@ -2466,7 +2470,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.lightbox){S.light
   if(e.key==="Enter"&&e.target.matches?.(".card[data-detail]")){S.detail=e.target.dataset.detail;S.dImg=0;S.sheet="detail";render()}});
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
-    if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
+    if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else wAdd(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
   if(e.target.id==="extraForm"){e.preventDefault();hideSugg();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p,...exS()}:{id,n:x.n,...exS()});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
   if(e.target.id==="cpqForm"){e.preventDefault();cpqSave(e.target.dataset.id,document.getElementById("cpqType").value,parseNum(document.getElementById("cpqVal").value));return}
   if(e.target.id==="devForm"){e.preventDefault();const v=document.getElementById("devName").value.trim().slice(0,30);store.set("devName",v);Sync.push().then(()=>{toast(v?`Dieses Gerät heißt jetzt „${v}“`:"Name zurückgesetzt");render()});return}
