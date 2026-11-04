@@ -1024,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  154:["Im Fenster „Alles im Wagen“ steht jetzt das Markt-Logo über dem Knopf „Mit Markt-App abschließen“."],
   153:["Letzter Artikel im Wagen: SparRadar fragt jetzt „Ohne Markt-App abschließen“ (sofort erledigt) oder „Mit Markt-App abschließen“ (App öffnet sich, danach Kassenbon hochladen)."],
   152:["Kassenbon hochladen korrigiert jetzt deinen Einkaufszettel: Dort steht danach genau, was auf dem Bon steht – mit den echten Preisen.","Dann unten „✓ Einkauf abschließen“: Kontrolle mit Rabatten und Gespart ansehen, nochmal abschließen – der Einkauf steht unter „Abgeschlossene Einkäufe“, der Zettel des Markts ist leer.","Ohne Bon geht „✓ Einkauf abschließen“ direkt mit deinen eigenen Einträgen."],
   151:["Einkauf abschließen geht jetzt nur noch über den Kassenbon: Foto, Screenshot oder PDF hochladen → kontrollieren → ganz unten „✓ Einkauf abschließen“. Danach ist der Zettel dieses Markts leer.","Alles abgehakt schließt den Einkauf nicht mehr automatisch ab."],
@@ -1426,7 +1427,7 @@ function renderLastAsk(){const t=buildTrip(S.tripIds||[]);if(!t){S.sheet=null;re
    <p class="bonlead">${t.items.length+t.extra.length} Artikel · <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}${ms&&STORES[ms]?` · ${sb(ms)} ${esc(sname(ms))}`:""}</p>
    <div class="lastask">
     <button class="btn big" data-lastgo="direct">✓ Ohne Markt-App abschließen<small>So wie er jetzt auf dem Zettel steht – sofort erledigt.</small></button>
-    ${app?`<button class="btn big ghost" data-lastgo="app">📱 Mit ${esc(app.n)}-App abschließen<small>${esc(app.n)} öffnet sich (Kundenkarte, digitaler Bon). Danach hier den Kassenbon hochladen – der Zettel zeigt dann die echten Preise.</small></button>`
+    ${app?`<button class="btn big ghost lastapp" data-lastgo="app"><span class="lalogo">${sb(ms)}</span>📱 Mit ${esc(app.n)}-App abschließen<small>${esc(app.n)} öffnet sich (Kundenkarte, digitaler Bon). Danach hier den Kassenbon hochladen – der Zettel zeigt dann die echten Preise.</small></button>`
       :`<button class="btn big ghost" data-lastgo="bon">🧾 Mit Kassenbon abschließen<small>Bon fotografieren oder Screenshot wählen – der Zettel zeigt dann die echten Preise.</small></button>`}
     <button class="btn ghost" data-lastgo="later">Noch nicht</button></div></div>`}
 function renderTripChk(){const t=buildTrip(S.tripIds||[]);if(!t){S.sheet=null;return ""}
