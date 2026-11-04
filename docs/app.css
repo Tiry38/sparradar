@@ -759,3 +759,9 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .treceipt .bonraw{display:block;font-size:.7rem;color:var(--muted);opacity:.85}
 .treceipt .rline.neg{color:#0B8F62}
 .treceipt .ractions{margin-top:10px}
+/* v152 Kassenbon auf dem Zettel */
+.receipt .bonraw{display:block;font-size:.7rem;color:var(--muted);text-decoration:none}
+.rline.done:has(.bonraw) .rcheck span,.rline.done:has(.bonraw)>span{text-decoration:none;color:inherit}
+.rline.done:has(.bonraw) .zimg{opacity:1;filter:none}
+.receipt .bsv{display:block;font-size:.72rem;text-align:right}
+.cart-fin{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.cart-fin .btn{flex:1 1 auto}
