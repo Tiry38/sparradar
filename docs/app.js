@@ -1024,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  153:["Letzter Artikel im Wagen: SparRadar fragt jetzt „Ohne Markt-App abschließen“ (sofort erledigt) oder „Mit Markt-App abschließen“ (App öffnet sich, danach Kassenbon hochladen)."],
   152:["Kassenbon hochladen korrigiert jetzt deinen Einkaufszettel: Dort steht danach genau, was auf dem Bon steht – mit den echten Preisen.","Dann unten „✓ Einkauf abschließen“: Kontrolle mit Rabatten und Gespart ansehen, nochmal abschließen – der Einkauf steht unter „Abgeschlossene Einkäufe“, der Zettel des Markts ist leer.","Ohne Bon geht „✓ Einkauf abschließen“ direkt mit deinen eigenen Einträgen."],
   151:["Einkauf abschließen geht jetzt nur noch über den Kassenbon: Foto, Screenshot oder PDF hochladen → kontrollieren → ganz unten „✓ Einkauf abschließen“. Danach ist der Zettel dieses Markts leer.","Alles abgehakt schließt den Einkauf nicht mehr automatisch ab."],
   150:["Einkauf abschließen in Ruhe: Erst öffnet sich dein Kassenzettel zum Kontrollieren, ganz unten tippst du „✓ Einkauf abschließen“. Danach bist du wieder im leeren Zettel des Markts, der Einkauf steht unter „Abgeschlossene Einkäufe“.","Kassenbon genauso: erst ansehen, dann unten abschließen."],
@@ -1419,6 +1420,15 @@ function buildTrip(ids){const items=S.list.filter(id=>ids.includes(id)).map(byId
   const pfs=r2(t.items.reduce((a,x)=>a+(x.pf||0),0));if(pfs)t.pf=pfs;
   t.paid=r2(t.items.reduce((a,x)=>a+x.p,0)+t.extra.reduce((a,x)=>a+x.p,0)+pfs);t.saved=r2(t.items.reduce((a,x)=>a+Math.max(0,x.r-x.p),0));return t}
 // Kontrolle vor dem Abschließen (Kevin 04.11.: Zettel ansehen, ganz unten „Abschließen“, danach leerer Zettel dieses Markts)
+// Letzter Artikel im Wagen (Kevin 04.11.): ohne Markt-App direkt abschließen – oder Markt-App öffnen und danach mit dem Kassenbon abschließen
+function renderLastAsk(){const t=buildTrip(S.tripIds||[]);if(!t){S.sheet=null;return ""}const ms=tripStore(t),app=ANDROID&&MKT_APP[ms];
+  return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Einkauf abschließen"><div class="sheet-h"><span class="newsico">🛒</span><h2>Alles im Wagen</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
+   <p class="bonlead">${t.items.length+t.extra.length} Artikel · <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}${ms&&STORES[ms]?` · ${sb(ms)} ${esc(sname(ms))}`:""}</p>
+   <div class="lastask">
+    <button class="btn big" data-lastgo="direct">✓ Ohne Markt-App abschließen<small>So wie er jetzt auf dem Zettel steht – sofort erledigt.</small></button>
+    ${app?`<button class="btn big ghost" data-lastgo="app">📱 Mit ${esc(app.n)}-App abschließen<small>${esc(app.n)} öffnet sich (Kundenkarte, digitaler Bon). Danach hier den Kassenbon hochladen – der Zettel zeigt dann die echten Preise.</small></button>`
+      :`<button class="btn big ghost" data-lastgo="bon">🧾 Mit Kassenbon abschließen<small>Bon fotografieren oder Screenshot wählen – der Zettel zeigt dann die echten Preise.</small></button>`}
+    <button class="btn ghost" data-lastgo="later">Noch nicht</button></div></div>`}
 function renderTripChk(){const t=buildTrip(S.tripIds||[]);if(!t){S.sheet=null;return ""}
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Einkauf kontrollieren"><div class="sheet-h"><span class="newsico">🧾</span><h2>Einkauf kontrollieren</h2><button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button></div>
    <p class="bonlead">Stimmt alles? Dann ganz unten auf <b>„✓ Einkauf abschließen“</b>. Der Einkauf landet unter „Abgeschlossene Einkäufe“, der Zettel ist wieder frei.</p>
@@ -2352,7 +2362,7 @@ function render(){optSync();memoReset();quickCheck();
   const sh=document.getElementById("sheet");sh.hidden=!S.sheet;document.body.classList.toggle("lock",!!S.sheet);
   // Scroll-Position nur behalten, wenn dasselbe Fenster neu gezeichnet wird (z. B. nach „Merken“), neues Fenster startet oben
   if(S.sheet==="scan"&&S._shown==="scan"&&document.getElementById("scanVideo")){} // Kamerabild nicht neu aufbauen (nur wenn das Fenster schon offen ist)
-  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,zpick:renderZpick,detail:renderDetail,trip:renderTrip,tripchk:renderTripChk,cbget:renderCbGet,bon:renderBon,connect:renderConnect}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
+  else if(S.sheet){const y=S.sheet===S._shown?(sh.firstElementChild?.scrollTop||0):0;S._shown=S.sheet;sh.innerHTML=({scan:renderScan,filter:renderFilter,news:renderNews,settings:renderSettings,whatsnew:renderWhatsNew,welcome:renderWelcome,saved:renderSaved,zpick:renderZpick,detail:renderDetail,trip:renderTrip,tripchk:renderTripChk,lastask:renderLastAsk,cbget:renderCbGet,bon:renderBon,connect:renderConnect}[S.sheet]||renderKracher)();if(sh.firstElementChild)sh.firstElementChild.scrollTop=y}else S._shown=null;
   document.getElementById("appUpd").innerHTML=appUpdateHTML();
   let lbh=document.getElementById("lbHost");if(!lbh){lbh=document.createElement("div");lbh.id="lbHost";document.body.appendChild(lbh)}
   lbh.innerHTML=renderLightbox();
@@ -2463,6 +2473,11 @@ document.addEventListener("click",e=>{
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))wAdd({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
+  if(b.dataset.lastgo){const g=b.dataset.lastgo,ids=S.tripIds||[];S.sheet=null;
+    if(g==="direct"){finishTrip(ids,false);toast("✓ Einkauf erledigt – steht unter „Abgeschlossene Einkäufe“");return}
+    const t=buildTrip(ids),ms=t&&tripStore(t);S.tripIds=null;if(ms&&STORES[ms])S.zMkt=ms;save();render();
+    if(g==="app"&&ms){openMktApp(ms);toast("Nach dem Bezahlen hier den Kassenbon hochladen – dann „✓ Einkauf abschließen“.")}
+    else if(g==="bon")bonPick(false);return}
   if(b.dataset.findone){S.tripIds=b.dataset.findone.split(",");S.sheet="tripchk";render();return}
   if(b.dataset.tripok){finishTrip(S.tripIds||[],false);toast("✓ Einkauf abgeschlossen – steht unter „Abgeschlossene Einkäufe“");return}
   if(b.dataset.tripno){S.sheet=null;S.tripIds=null;render();return}
@@ -2480,7 +2495,7 @@ document.addEventListener("click",e=>{
       const o=byId(id);if(o){const v=r2((ref(o)-fin(o))*qty(id));if(v>0){S.saved.push({id,n:o.n,s:o.s,v,d:TODAY});toast(`Im Wagen – ${eur(v)} gespart`)}}
       // Handy: letzter Artikel im Wagen -> Einkauf abgeschlossen
       const all=[...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)];
-      if(TOUCH()&&all.length&&all.every(x=>S.checked.includes(x))){const t=buildTrip(all),ms=ANDROID&&t?tripStore(t):null;toast("✓ Alles im Wagen. Nach dem Bezahlen den Kassenbon hochladen – dann wird der Einkauf abgeschlossen.");if(ms&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),350)}}
+      if(TOUCH()&&all.length&&all.every(x=>S.checked.includes(x))){S.tripIds=all;S.sheet="lastask";save();render();return}}
     save();render();return}
   if(b.dataset.qp||b.dataset.qm){const id=b.dataset.qp||b.dataset.qm;S.qty[id]=Math.min(49,Math.max(1,qty(id)+(b.dataset.qp?1:-1)));if(S.qty[id]===1)delete S.qty[id];save();render();return}
   if(b.dataset.mktapp){openMktApp(b.dataset.mktapp);return}
