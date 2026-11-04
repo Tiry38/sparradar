@@ -1024,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  149:["Einkauf abschließen führt jetzt direkt zu „Abgeschlossene Einkäufe“: dein Kassenzettel steht dort aufgeklappt mit allen Preisen und Rabatten – fertig, nichts weiter zu tippen."],
   148:["„Per WhatsApp schicken“ unter dem Einkaufszettel entfernt.","Abgeschlossene Einkäufe: Zurück geht jetzt auch am PC mit der Zurück-Taste von Browser oder Maus und mit Esc."],
   147:["Abgeschlossene Einkäufe als echte Kassenzettel: Markt, Datum, jeder Artikel mit Preis, BEZAHLT und GESPART. Der neueste ist aufgeklappt.","Einkauf nur vom Zettel abgeschlossen? Beim Einkauf „🧾 Kassenbon hochladen“ tippen – der Bon ersetzt ihn mit allen Artikeln und den echten Preisen."],
   146:["Einkaufszettel aufgeräumt: oben nur noch die Markt-Logos. Logo antippen = Zettel dieses Markts, nochmal antippen = alle Märkte.","Abgeschlossene Einkäufe findest du jetzt ganz unten im Zettel. Abgehakte Artikel schließt du oben im Einkaufswagen mit „✓ Einkauf abschließen“ ab."],
@@ -1420,7 +1421,7 @@ function finishTrip(ids,auto){
   S.list=S.list.filter(id=>!ids.includes(id));S.extra=S.extra.filter(x=>!ids.includes(x.id));S.checked=S.checked.filter(id=>!ids.includes(id));
   ids.forEach(id=>delete S.qty[id]);S.act=S.act.filter(id=>S.list.includes(id));
   if(!S.list.length&&!S.extra.length)wakeOff();
-  save();render();tripPop(t,auto)}
+  if(auto){save();render()}else showDone(t.id);tripPop(t,auto)}
 // Einkauf zurück auf den Zettel holen (zum Nachlesen oder weil noch etwas fehlt) – alles bleibt abgehakt
 function restoreTrip(id){const t=S.trips.find(x=>x.id===id);if(!t)return;
   t.items.forEach(it=>{let k=it.id;if(!byId(k)&&!OLD.has(k)){k="x-r"+it.id;if(!S.extra.some(x=>x.id===k))S.extra.push({id:k,n:it.n,p:it.q?r2(it.p/it.q):it.p,...(it.s&&STORES[it.s]?{s:it.s}:{})})}else if(!S.list.includes(k))S.list.push(k);
@@ -1437,13 +1438,16 @@ function openMktApp(s){const a=MKT_APP[s];if(!a)return;const play=`https://play.
   // Chrome/Web-App: intent-Link öffnet die App, fehlt sie, kommt der Play Store. Alte APK-Hülle kennt nur normale Links -> Play Store mit „Öffnen“.
   location.href=IN_APK?play:`intent://#Intent;package=${a.pkg};action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;S.browser_fallback_url=${encodeURIComponent(play)};end`}
 let tpT;
+// Fertiger Einkauf -> direkt in „Abgeschlossene Einkäufe“, dieser Kassenzettel aufgeklappt (Kevin 04.11.: „und dann?“)
+function showDone(id){S.tab="list";S.zMkt="done";S.sheet=null;S.tripId=id;save();render();scrollTo({top:0});
+  setTimeout(()=>{const e=document.querySelector(`.treceipt[data-trip="${id}"]`);if(e&&e.getBoundingClientRect().top>innerHeight*.6)e.scrollIntoView({block:"start",behavior:"smooth"})},60)}
 function tripPop(t,auto){
   let el=document.getElementById("tripPop");
   if(!el){el=document.createElement("div");el.id="tripPop";el.className="trippop";el.setAttribute("role","status");document.body.appendChild(el)}
   const n=t.items.length+t.extra.length,ms=ANDROID?tripStore(t):null;
   el.innerHTML=`<div class="tp-h"><span class="tp-ok">✓</span><b>Einkauf abgeschlossen</b><button class="ibtn" data-tpclose="1" aria-label="Schließen">${IC.x}</button></div>
    <div class="tp-n">${n} Artikel · bezahlt <b>${eur(t.paid)}</b>${t.saved>0?` · gespart <b class="sv">${eur(t.saved)}</b>`:""}</div>
-   <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button><button class="btn sm" data-tripopen="${t.id}">Bericht ansehen</button></div>
+   <div class="tp-a"><button class="btn ghost sm" data-triprestore="${t.id}">Zurückholen</button>${auto?`<button class="btn sm" data-tripopen="${t.id}">Kassenzettel ansehen</button>`:""}</div>
    ${tripCb(t).length?`<div class="tp-cbh">💸 Geld zurück! <b>Kassenbon aufheben</b> (oder den digitalen Bon in der Markt-App) und jetzt oder später hochladen:</div>`:""}${tripCb(t).map(c=>`<button class="btn sm tp-cb" data-cbget="${esc(c.id)}">💸 ${esc(c.n||c.k)}: Geld holen</button>`).join("")}
    ${ms?`<button class="btn tp-app" data-mktapp="${ms}">📱 ${auto&&store.get("openMktApp",true)?`${esc(MKT_APP[ms].n)} öffnet sich – Kundenkarte an der Kasse zeigen`:`${esc(MKT_APP[ms].n)}-App öffnen`}</button>`:""}`;
   el.hidden=false;clearTimeout(tpT);tpT=setTimeout(hideTripPop,ms||tripCb(t).length?15000:auto?9000:6000);
@@ -1512,7 +1516,7 @@ function tripsHTML(only){if(!S.trips.length)return "";
 function tripReceipt(t,open){const g={};t.items.forEach(x=>(g[x.s]=g[x.s]||[]).push(x));const st=Object.keys(g),n=t.items.length+t.extra.length;
   const row=x=>{const sub=x.bn&&norm(x.bn)!==norm(x.n)?x.bn:"";return `<div class="rline${x.p<0?" neg":""}"><span>${x.q>1?`<em class="qx">${x.q}×</em> `:""}${esc(x.n)}${x.pf?` <em class="rpf">+ ${eur(x.pf)} Pfand</em>`:""}${sub?`<small class="bonraw">${esc(sub)}</small>`:""}</span><span>${x.p||x.p===0&&t.bon?eur(x.p):"–"}${x.r>x.p+.004?`<small class="sv">−${eur(x.r-x.p).replace("−","")}</small>`:""}</span></div>`};
   const time=new Date(t.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
-  return `<details class="receipt treceipt"${open?" open":""}><summary><span class="trh">${st.map(x=>sb(x)).join("")}<span><b>${st.length===1?esc(sname(st[0])):st.length?"Mehrere Märkte":"Eigene Einträge"}</b><small>${fmtDate(t.d)} · ${time} Uhr · ${n} Artikel</small></span></span><span class="trp">${t.chk&&t.chk.length?"⚠️ ":""}${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></summary>
+  return `<details class="receipt treceipt" data-trip="${t.id}"${open?" open":""}><summary><span class="trh">${st.map(x=>sb(x)).join("")}<span><b>${st.length===1?esc(sname(st[0])):st.length?"Mehrere Märkte":"Eigene Einträge"}</b><small>${fmtDate(t.d)} · ${time} Uhr · ${n} Artikel</small></span></span><span class="trp">${t.chk&&t.chk.length?"⚠️ ":""}${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></summary>
    <div class="trtag ${t.bon?"bon":"est"}">${t.bon?"🧾 Original-Kassenbon – echte Preise":"✏️ Vom Einkaufszettel – Preise laut Angebot"}</div>
    ${t.bon?"":`<button class="btn sm trbon" data-bonfor="${t.id}">🧾 Kassenbon hochladen = echte Preise &amp; alle Artikel</button>`}
    ${chkHTML(t)}
@@ -1736,7 +1740,7 @@ function renderList(){
   if(zDone){const mk=monKey(TODAY),cur=S.trips.filter(t=>monKey(t.d)===mk),lim=S.tripLimit||10;
     return `${holiHTML()}${cbDueHTML()}<button class="donelink back" data-ztab="">‹ Zurück zum Einkaufszettel</button>${openIds.length?`<div class="receipt"><div class="zempty"><b>${openIds.length} ${openIds.length===1?"Artikel ist":"Artikel sind"} abgehakt, der Einkauf ist aber noch offen</b>Abschließen = Einkauf landet hier, die Artikel verschwinden vom Zettel.<button class="btn" data-findone="${esc(openIds.join(","))}" style="margin-top:10px">✓ Einkauf jetzt abschließen</button></div></div>`:""}
     <h2 class="trtitle">🧾 Abgeschlossene Einkäufe${cur.length?`<small>${esc(monName(mk))}: ${cur.length} × · ${eur(r2(cur.reduce((a,t)=>a+t.paid,0)))}${cur.some(t=>t.saved>0)?` · gespart ${eur(r2(cur.reduce((a,t)=>a+t.saved,0)))}`:""}</small>`:""}</h2>
-    ${S.trips.length?S.trips.slice(0,lim).map((t,i)=>tripReceipt(t,i===0)).join("")+(S.trips.length>lim?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""):openIds.length?"":`<div class="receipt"><div class="zempty"><b>Noch kein Einkauf abgeschlossen</b>Im Markt alles abhaken oder danach den Kassenbon hochladen – dann landet der Einkauf hier und der Zettel ist wieder frei.</div></div>`}
+    ${S.trips.length?S.trips.slice(0,lim).map((t,i)=>tripReceipt(t,S.tripId&&S.trips.some(x=>x.id===S.tripId)?t.id===S.tripId:i===0)).join("")+(S.trips.length>lim?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""):openIds.length?"":`<div class="receipt"><div class="zempty"><b>Noch kein Einkauf abgeschlossen</b>Im Markt alles abhaken oder danach den Kassenbon hochladen – dann landet der Einkauf hier und der Zettel ist wieder frei.</div></div>`}
     ${bonBoxHTML()}${S.trips.length?tripsHTML(1):""}`}
   const items=zm?allI.filter(o=>o.s===zm):allI,extra=zm?S.extra.filter(x=>x.s===zm):S.extra;if(extra.length)loadDauer();
   // Bilder für eigene Einträge: Bilder-Liste + Artikelstamm erst hier laden
@@ -1946,7 +1950,7 @@ function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   if(gone.size){S.list=S.list.filter(id=>!gone.has(id));S.extra=S.extra.filter(x=>!gone.has(x.id));S.checked=S.checked.filter(id=>!gone.has(id));gone.forEach(id=>delete S.qty[id]);S.act=S.act.filter(id=>S.list.includes(id));if(!S.list.length&&!S.extra.length)wakeOff()}
   const left=S.list.map(byId).filter(o=>o&&o.s===r.s).length+S.extra.filter(x=>x.s===r.s).length;
   S.trips.unshift(t);S.trips.sort((a,b)=>b.at.localeCompare(a.at));S.trips=S.trips.slice(0,400);
-  save();BON.st=null;BON.for=null;S.tripId=t.id;S.sheet="trip";render();toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:`✓ ${sname(r.s)}-Einkauf abgeschlossen (${eur(t.paid)})`+(left?` – ${left} Artikel ${left>1?"waren":"war"} nicht auf dem Bon und ${left>1?"bleiben":"bleibt"} auf dem Zettel`:" – Zettel ist wieder frei"))}
+  BON.st=null;BON.for=null;hideTripPop();showDone(t.id);toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:`✓ ${sname(r.s)}-Einkauf abgeschlossen (${eur(t.paid)})`+(left?` – ${left} Artikel ${left>1?"waren":"war"} nicht auf dem Bon und ${left>1?"bleiben":"bleibt"} auf dem Zettel`:" – Zettel ist wieder frei"))}
 // Geteilter Bon (Teilen-Menü -> SparRadar): liegt kurz im Service-Worker-Speicher
 async function bonFromShare(){if(!/[?&]bon=1/.test(location.search))return;history.replaceState(null,"",location.pathname);
   try{const c=await caches.open("sr-share"),f=await c.match("bon-file"),t=await c.match("bon-text");
@@ -2478,7 +2482,7 @@ document.addEventListener("click",e=>{
     if(v!=null){if(!v.trim()){x.on=false}else{const e=parseExtra(v);x.n=e.n;x.q=e.q||1;if(e.p)x.p=e.p;x.on=true}render()}return}
   if(b.dataset.bonstore&&BON.r){BON.r.s=b.dataset.bonstore;render();return}
   if(b.dataset.bonsave){const dv=document.getElementById("bonDate")?.value;if(BON.r&&dv)BON.r.d=dv;bonSave();return}
-  if(b.dataset.tripopen){S.tripId=b.dataset.tripopen;S.sheet="trip";hideTripPop();render();return}
+  if(b.dataset.tripopen){hideTripPop();showDone(b.dataset.tripopen);return}
   if(b.dataset.savedopen){S.sheet="saved";render();return}
   if(b.dataset.saveddel){const x=S.saved[+b.dataset.saveddel];if(x){x.off=1;save();render();toast(`„${x.n}“ zählt nicht mehr`)}return}
   if(b.dataset.savedreset){if(!confirm("Den ganzen Gespart-Zähler auf 0 setzen?"))return;S.saved.forEach(x=>x.off=1);S.sheet=null;save();render();toast("Gespart-Zähler steht wieder auf 0");return}
