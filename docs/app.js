@@ -1024,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  151:["Einkauf abschließen geht jetzt nur noch über den Kassenbon: Foto, Screenshot oder PDF hochladen → kontrollieren → ganz unten „✓ Einkauf abschließen“. Danach ist der Zettel dieses Markts leer.","Alles abgehakt schließt den Einkauf nicht mehr automatisch ab."],
   150:["Einkauf abschließen in Ruhe: Erst öffnet sich dein Kassenzettel zum Kontrollieren, ganz unten tippst du „✓ Einkauf abschließen“. Danach bist du wieder im leeren Zettel des Markts, der Einkauf steht unter „Abgeschlossene Einkäufe“.","Kassenbon genauso: erst ansehen, dann unten abschließen."],
   149:["Einkauf abschließen führt jetzt direkt zu „Abgeschlossene Einkäufe“: dein Kassenzettel steht dort aufgeklappt mit allen Preisen und Rabatten – fertig, nichts weiter zu tippen."],
   148:["„Per WhatsApp schicken“ unter dem Einkaufszettel entfernt.","Abgeschlossene Einkäufe: Zurück geht jetzt auch am PC mit der Zurück-Taste von Browser oder Maus und mit Esc."],
@@ -1563,7 +1564,7 @@ function cartHTML(items,extra){const all=[...items.map(o=>o.id),...extra.map(x=>
   return `<div class="cart${inCart?" on":""}"><div class="cart-h"><span class="cart-i">🛒</span><b>${inCart?`Im Wagen: ${inCart} von ${all.length}`:`${all.length} Artikel auf dem Zettel`}</b><span class="cart-s">${inCart?`${eur(cart)} von ${eur(tot)}`:eur(tot)}</span></div>
    <div class="cart-bar"><i style="width:${pct}%"></i></div>
    <div class="cart-f">${b?`<span class="${left<0?"over":""}">Budget ${eur(b)} · ${left<0?`${eur(-left)} drüber`:`noch ${eur(left)} frei`}</span>`:`<span>${TOUCH()?"Im Laden: Artikel antippen, wenn er im Wagen liegt.":"Am Handy beim Einkaufen abhaken – der letzte Artikel schließt den Einkauf ab."}</span>`}<button class="linkbtn" data-budget="1">${b?"Budget ändern":"Budget festlegen"}</button></div>
-   ${inCart?`<button class="btn sm cart-done" data-findone="${esc(all.filter(id=>S.checked.includes(id)).join(","))}">✓ Einkauf abschließen (${inCart})${inCart<all.length?" – Rest bleibt auf dem Zettel":""}</button>`:""}</div>`}
+   ${inCart?`<button class="btn sm cart-done" data-bonpick="file">🧾 Kassenbon hochladen = Einkauf abschließen</button>`:""}</div>`}
 // ---------- Zettel versteht einfache Wörter (Kevin 01.11.: nur Hinweis + Knopf, NIE automatisch tauschen) ----------
 // Eigener Eintrag „Milch“ -> bestes Angebot der Woche je Markt (gleicher Abgleich wie die Merkliste)
 // Treffer nach Güte: 3 = ganzes Wort im Namen („fettarme Milch“, „H-Milch“), 2 = Wortende („Vollmilch“), 1 = sonst (Marke, Beschreibung …).
@@ -1746,7 +1747,7 @@ function renderList(){
   const doneLink=`<button class="donelink" data-ztab="done">🧾 Abgeschlossene Einkäufe${S.trips.length?` <em>${S.trips.length}</em>`:""}<span>›</span></button>`;
   const openIds=[...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)].filter(x=>S.checked.includes(x));
   if(zDone){const mk=monKey(TODAY),cur=S.trips.filter(t=>monKey(t.d)===mk),lim=S.tripLimit||10;
-    return `${holiHTML()}${cbDueHTML()}<button class="donelink back" data-ztab="">‹ Zurück zum Einkaufszettel</button>${openIds.length?`<div class="receipt"><div class="zempty"><b>${openIds.length} ${openIds.length===1?"Artikel ist":"Artikel sind"} abgehakt, der Einkauf ist aber noch offen</b>Abschließen = Einkauf landet hier, die Artikel verschwinden vom Zettel.<button class="btn" data-findone="${esc(openIds.join(","))}" style="margin-top:10px">✓ Einkauf jetzt abschließen</button></div></div>`:""}
+    return `${holiHTML()}${cbDueHTML()}<button class="donelink back" data-ztab="">‹ Zurück zum Einkaufszettel</button>${openIds.length?`<div class="receipt"><div class="zempty"><b>${openIds.length} ${openIds.length===1?"Artikel ist":"Artikel sind"} abgehakt, der Einkauf ist aber noch offen</b>Abschließen geht über den Kassenbon: hochladen, kontrollieren, unten „✓ Einkauf abschließen“.<button class="btn" data-bonpick="file" style="margin-top:10px">🧾 Kassenbon hochladen</button></div></div>`:""}
     <h2 class="trtitle">🧾 Abgeschlossene Einkäufe${cur.length?`<small>${esc(monName(mk))}: ${cur.length} × · ${eur(r2(cur.reduce((a,t)=>a+t.paid,0)))}${cur.some(t=>t.saved>0)?` · gespart ${eur(r2(cur.reduce((a,t)=>a+t.saved,0)))}`:""}</small>`:""}</h2>
     ${S.trips.length?S.trips.slice(0,lim).map((t,i)=>tripReceipt(t,S.tripId&&S.trips.some(x=>x.id===S.tripId)?t.id===S.tripId:i===0)).join("")+(S.trips.length>lim?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""):openIds.length?"":`<div class="receipt"><div class="zempty"><b>Noch kein Einkauf abgeschlossen</b>Im Markt alles abhaken oder danach den Kassenbon hochladen – dann landet der Einkauf hier und der Zettel ist wieder frei.</div></div>`}
     ${bonBoxHTML()}${S.trips.length?tripsHTML(1):""}`}
@@ -1802,7 +1803,7 @@ function renderList(){
    ${xRest.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(xRest).map(xLine).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${est||items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${pfSum?`<div><span>davon Pfand</span><span>${eur(pfSum)}</span></div>`:""}${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    <div class="rnote">Die Summe ist dein Preis an der Kasse${pfSum?", mit Pfand (das bekommst du bei der Rückgabe der Flaschen zurück)":""}. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.${est?" „ca.“ bei eigenen Einträgen = so viel hast du zuletzt dafür bezahlt.":""}</div></div>
-   <div class="ractions"><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?`<button class="btn" data-findone="${esc([...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).join(","))}">✓ Einkauf abschließen (${nDone})</button>`:""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
+   <div class="ractions"><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?`<button class="btn" data-bonpick="file">🧾 Kassenbon hochladen = abschließen</button>`:""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
    ${bonBoxHTML()}${doneLink}`}
 
 // ---------- Kassenbon einlesen (Foto, Screenshot, PDF oder per „Teilen“ aus der Markt-App) ----------
@@ -1958,7 +1959,7 @@ function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   if(gone.size){S.list=S.list.filter(id=>!gone.has(id));S.extra=S.extra.filter(x=>!gone.has(x.id));S.checked=S.checked.filter(id=>!gone.has(id));gone.forEach(id=>delete S.qty[id]);S.act=S.act.filter(id=>S.list.includes(id));if(!S.list.length&&!S.extra.length)wakeOff()}
   const left=S.list.map(byId).filter(o=>o&&o.s===r.s).length+S.extra.filter(x=>x.s===r.s).length;
   S.trips.unshift(t);S.trips.sort((a,b)=>b.at.localeCompare(a.at));S.trips=S.trips.slice(0,400);
-  BON.st=null;BON.for=null;hideTripPop();S.tab="list";S.sheet=null;S.zMkt=r.s;save();render();scrollTo({top:0});toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:`✓ ${sname(r.s)}-Einkauf abgeschlossen (${eur(t.paid)}) – steht unter „Abgeschlossene Einkäufe“`+(left?`. ${left} Artikel ${left>1?"waren":"war"} nicht auf dem Bon und ${left>1?"bleiben":"bleibt"} auf dem Zettel`:""))}
+  BON.st=null;BON.for=null;hideTripPop();S.tab="list";S.sheet=null;S.zMkt=r.s;save();render();scrollTo({top:0});toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:`✓ Erledigt: ${sname(r.s)}-Einkauf abgeschlossen (${eur(t.paid)}) – steht unter „Abgeschlossene Einkäufe“`+(left?`. ${left} Artikel ${left>1?"waren":"war"} nicht auf dem Bon und ${left>1?"bleiben":"bleibt"} auf dem Zettel`:""))}
 // Geteilter Bon (Teilen-Menü -> SparRadar): liegt kurz im Service-Worker-Speicher
 async function bonFromShare(){if(!/[?&]bon=1/.test(location.search))return;history.replaceState(null,"",location.pathname);
   try{const c=await caches.open("sr-share"),f=await c.match("bon-file"),t=await c.match("bon-text");
@@ -1966,7 +1967,7 @@ async function bonFromShare(){if(!/[?&]bon=1/.test(location.search))return;histo
     if(t)text=await t.text();await Promise.all((await c.keys()).map(k=>c.delete(k)));
     S.tab="list";if(file||text.trim().length>40)bonRead(file,file?"":text);else{BON.st="err";BON.err="Es kam keine Datei an. Teile den Bon bitte als Bild oder PDF – oder mach einen Screenshot und lade ihn hier hoch.";S.sheet="bon";render()}}
   catch(e){BON.st="err";BON.err="Der geteilte Bon konnte nicht gelesen werden.";S.sheet="bon";render()}}
-const bonBoxHTML=()=>`<div class="bonbox"><b>🧾 Einkauf vom Kassenbon eintragen</b><div class="bonbtns"><button class="btn" data-bonpick="cam">📷 Bon fotografieren</button><button class="btn ghost" data-bonpick="file">Bild oder PDF wählen</button></div><small>SparRadar liest den Bon und trägt alles mit den echten Preisen ein. Noch einfacher: in der Markt-App beim Bon auf „Teilen“ → SparRadar.</small></div>`;
+const bonBoxHTML=()=>`<div class="bonbox"><b>🧾 Einkauf abschließen: Kassenbon hochladen</b><div class="bonbtns"><button class="btn" data-bonpick="cam">📷 Bon fotografieren</button><button class="btn ghost" data-bonpick="file">Bild oder PDF wählen</button></div><small>SparRadar liest den Bon und trägt alles mit den echten Preisen ein. Noch einfacher: in der Markt-App beim Bon auf „Teilen“ → SparRadar.</small></div>`;
 const bonOk=r=>r&&r.total&&Math.abs(r2(r.items.filter(x=>x.on).reduce((a,x)=>a+x.p,0))-r.total)<.011;
 function renderBon(){const r=BON.r,close=`<button class="ibtn" id="closeSheet" aria-label="Schließen">${IC.x}</button>`;
   const head=`<div class="sheet-h"><span class="newsico">🧾</span><h2>Kassenbon einlesen</h2>${close}</div>`;
@@ -1977,7 +1978,7 @@ function renderBon(){const r=BON.r,close=`<button class="ibtn" id="closeSheet" a
   const on=r.items.filter(x=>x.on),sum=r2(on.reduce((a,x)=>a+x.p,0)),ok=bonOk(r),diff=r.total?r2(r.total-sum):0;
   const det=BON.more||!r.s;
   return `<div class="sheet" role="dialog" aria-modal="true" aria-label="Kassenbon prüfen">${head}
-   <p class="bonlead">${ok?"✓ Alles erkannt. Bitte kontrollieren und ganz unten abschließen.":r.total?`Fast alles erkannt. Die fehlenden <b>${eur(Math.abs(diff))}</b> trägt SparRadar beim Speichern als „Sonstiges“ ein – dann stimmt die Summe.`:"Bitte kurz ansehen und speichern."}</p>
+   <p class="bonlead">${ok?"✓ Kassenbon erkannt. Bitte kontrollieren und ganz unten auf „✓ Einkauf abschließen“ tippen.":r.total?`Fast alles erkannt. Die fehlenden <b>${eur(Math.abs(diff))}</b> trägt SparRadar beim Speichern als „Sonstiges“ ein – dann stimmt die Summe.`:"Bitte kurz ansehen und speichern."}</p>
    <div class="bonmeta">${r.s?`${sb(r.s)}<b>${esc(sname(r.s))}</b>`:""}<span>${fmtDate(r.d||TODAY)}</span>${r.s?`<button class="linkbtn" data-bonmore="1">${det?"fertig":"ändern"}</button>`:""}</div>
    ${det?`${!r.s?`<p class="bonerr">In welchem Markt warst du? Bitte antippen:</p>`:""}<div class="chips bonmk">${Object.keys(STORES).map(s=>`<button class="chip${r.s===s?" on":""}" data-bonstore="${s}" aria-pressed="${r.s===s}">${sb(s)}${esc(sname(s))}</button>`).join("")}</div>
    <label class="bondate">Einkauf vom <input type="date" id="bonDate" value="${esc(r.d||TODAY)}"></label>`:""}
@@ -2474,7 +2475,7 @@ document.addEventListener("click",e=>{
       const o=byId(id);if(o){const v=r2((ref(o)-fin(o))*qty(id));if(v>0){S.saved.push({id,n:o.n,s:o.s,v,d:TODAY});toast(`Im Wagen – ${eur(v)} gespart`)}}
       // Handy: letzter Artikel im Wagen -> Einkauf abgeschlossen
       const all=[...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)];
-      if(TOUCH()&&all.length&&all.every(x=>S.checked.includes(x))){finishTrip(all,true);return}}
+      if(TOUCH()&&all.length&&all.every(x=>S.checked.includes(x))){const t=buildTrip(all),ms=ANDROID&&t?tripStore(t):null;toast("✓ Alles im Wagen. Nach dem Bezahlen den Kassenbon hochladen – dann wird der Einkauf abgeschlossen.");if(ms&&store.get("openMktApp",true))setTimeout(()=>openMktApp(ms),350)}}
     save();render();return}
   if(b.dataset.qp||b.dataset.qm){const id=b.dataset.qp||b.dataset.qm;S.qty[id]=Math.min(49,Math.max(1,qty(id)+(b.dataset.qp?1:-1)));if(S.qty[id]===1)delete S.qty[id];save();render();return}
   if(b.dataset.mktapp){openMktApp(b.dataset.mktapp);return}
