@@ -1024,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  148:["„Per WhatsApp schicken“ unter dem Einkaufszettel entfernt.","Abgeschlossene Einkäufe: Zurück geht jetzt auch am PC mit der Zurück-Taste von Browser oder Maus und mit Esc."],
   147:["Abgeschlossene Einkäufe als echte Kassenzettel: Markt, Datum, jeder Artikel mit Preis, BEZAHLT und GESPART. Der neueste ist aufgeklappt.","Einkauf nur vom Zettel abgeschlossen? Beim Einkauf „🧾 Kassenbon hochladen“ tippen – der Bon ersetzt ihn mit allen Artikeln und den echten Preisen."],
   146:["Einkaufszettel aufgeräumt: oben nur noch die Markt-Logos. Logo antippen = Zettel dieses Markts, nochmal antippen = alle Märkte.","Abgeschlossene Einkäufe findest du jetzt ganz unten im Zettel. Abgehakte Artikel schließt du oben im Einkaufswagen mit „✓ Einkauf abschließen“ ab."],
   145:["Einkauf abschließen: Kassenbon hochladen schließt den Einkauf in diesem Markt ab – gekaufte Artikel verschwinden vom Zettel, der Zettel ist frei für den nächsten Einkauf.","Neuer Reiter „🧾 Erledigt“ im Einkaufszettel: alle abgeschlossenen Einkäufe mit Kassenzettel. Abgehakte Artikel kannst du auch per Knopf „✓ Einkauf abschließen“ abschließen."],
@@ -1789,7 +1790,7 @@ function renderList(){
    ${xRest.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(xRest).map(xLine).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${est||items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${pfSum?`<div><span>davon Pfand</span><span>${eur(pfSum)}</span></div>`:""}${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    <div class="rnote">Die Summe ist dein Preis an der Kasse${pfSum?", mit Pfand (das bekommst du bei der Rückgabe der Flaschen zurück)":""}. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.${est?" „ca.“ bei eigenen Einträgen = so viel hast du zuletzt dafür bezahlt.":""}</div></div>
-   <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?`<button class="btn" data-findone="${esc([...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).join(","))}">✓ Einkauf abschließen (${nDone})</button>`:""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
+   <div class="ractions"><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?`<button class="btn" data-findone="${esc([...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).join(","))}">✓ Einkauf abschließen (${nDone})</button>`:""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
    ${bonBoxHTML()}${doneLink}`}
 
 // ---------- Kassenbon einlesen (Foto, Screenshot, PDF oder per „Teilen“ aus der Markt-App) ----------
@@ -2239,7 +2240,7 @@ function renderFilter(){
 // Zurück-Taste/-Wischgeste (Handy) und Browser-Zurück: schließt zuerst ein offenes Fenster,
 // dann geht es zurück zu „Angebote“, erst danach wird die App verlassen.
 let NAV=0,IGNORE_POP=0;
-function navSync(){const want=(S.tab!=="offers"?1:0)+(S.sheet?1:0)+(S.lightbox?1:0);
+function navSync(){const want=(S.tab!=="offers"?1:0)+(S.tab==="list"&&S.zMkt==="done"?1:0)+(S.sheet?1:0)+(S.lightbox?1:0);
   while(NAV<want){history.pushState({sr:NAV+1},"");NAV++}
   if(NAV>want){const n=NAV-want;NAV=want;IGNORE_POP++;history.go(-n)}}
 addEventListener("popstate",()=>{
@@ -2247,7 +2248,7 @@ addEventListener("popstate",()=>{
   const ca=document.getElementById("cheapAsk");if(ca&&!ca.hidden){ca.hidden=true;history.pushState(NAV?{sr:NAV}:{sr:"guard"},"");return}
   if(NAV===0){askExit();return}   // ganz am Anfang angekommen: fragen, ob die App geschlossen werden soll
   NAV=Math.max(0,NAV-1);
-  if(S.lightbox)S.lightbox=null;else if(S.sheet)S.sheet=null;else if(S.tab!=="offers"){S.tab="offers";scrollTo({top:0})}
+  if(S.lightbox)S.lightbox=null;else if(S.sheet)S.sheet=null;else if(S.tab==="list"&&S.zMkt==="done"){S.zMkt="";save();scrollTo({top:0})}else if(S.tab!=="offers"){S.tab="offers";scrollTo({top:0})}
   render()});
 
 // Schutz-Eintrag im Verlauf: das letzte „Zurück“ landet hier und fragt nach, statt die App sofort zu schließen
@@ -2486,7 +2487,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.tpclose){hideTripPop();return}
   if(b.dataset.readd){readd(b.dataset.readd);return}
   if(b.dataset.budget){const v=prompt("Budget für diesen Einkauf in Euro (leer lassen = kein Budget):",S.budget?String(S.budget).replace(".",","):"");if(v===null)return;S.budget=Math.max(0,parseFloat(v.replace(",","."))||0);save();render();return}
-  if(b.dataset.ztab!==undefined){S.zMkt=b.dataset.ztab;save();hideSugg();render();{const z=document.querySelector(".receipt .ztabs"),t=z&&z.querySelector('.ztab[aria-selected="true"]');if(t)z.scrollLeft=t.offsetLeft-z.offsetLeft-(z.clientWidth-t.offsetWidth)/2}if(STORES[S.zMkt]&&!NST)loadNst();return}
+  if(b.dataset.ztab!==undefined){const wasD=S.zMkt==="done";S.zMkt=b.dataset.ztab;save();hideSugg();render();if(S.zMkt==="done"||wasD)scrollTo({top:0});{const z=document.querySelector(".receipt .ztabs"),t=z&&z.querySelector('.ztab[aria-selected="true"]');if(t)z.scrollLeft=t.offsetLeft-z.offsetLeft-(z.clientWidth-t.offsetWidth)/2}if(STORES[S.zMkt]&&!NST)loadNst();return}
   if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
   if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
@@ -2499,7 +2500,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.newsdone){S.sheet=null;if(b.dataset.newsdone==="watch")S.tab="watch";render();return}
 });
 function copy(txt,ok){const fail=()=>toast("Kopieren hat nicht geklappt. Bitte Text markieren und von Hand kopieren.");try{navigator.clipboard.writeText(txt).then(()=>toast(ok),fail)}catch(e){fail()}}
-document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.lightbox){S.lightbox=null;render()}else if(e.key==="Escape"&&S.sheet){S.sheet=null;render()}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.lightbox){S.lightbox=null;render()}else if(e.key==="Escape"&&S.sheet){S.sheet=null;render()}else if(e.key==="Escape"&&S.tab==="list"&&S.zMkt==="done"){S.zMkt="";save();render();scrollTo({top:0})}
   if(e.key==="Enter"&&e.target.matches?.(".card[data-detail]")){S.detail=e.target.dataset.detail;S.dImg=0;S.sheet="detail";render()}});
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
