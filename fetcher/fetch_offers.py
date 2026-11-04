@@ -1236,7 +1236,8 @@ def load_scheck(kd=()):
         if not re.search(r"[A-ZÄÖÜ][a-zäöüß]{3,}", n) or re.search(r"APP-PREIS|ERHÄLTLICH|%|[<>]", n, re.I):
             continue  # kein Artikelname erkannt (Störer, Hinweis-Kasten)
         o = offer("scheck", n, r["p"], desc=r.get("d") or "", img=r.get("img"), img_large=r.get("il"),
-                  start=r.get("from"), end=r.get("to"), src="prospektangebote.de (Prospekt gelesen)", url=r.get("url"), page=r.get("pg"))
+                  start=r.get("from"), end=r.get("to"), src="prospektangebote.de (Prospekt gelesen)", url=r.get("url"), page=r.get("pg"),
+                  old=r.get("o"), uvp=r.get("ou") == 1)
         if o:
             o["pa"], o["ocr"] = 1, 1
             if isinstance(r.get("cr"), list) and len(r["cr"]) == 4:

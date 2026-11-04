@@ -13,6 +13,7 @@ Ablauf je Seite:
 3. Zuordnung: Absatz links neben dem Preis (unten bündig) oder direkt darüber. Nur eindeutige Paare werden
    übernommen (kein zweiter Absatz fast gleich nah, Absatz passt nicht ebenso gut zu einem anderen Preis).
 4. Der Absatz wird nochmal vergrößert gelesen (bessere Namen).
+5. Durchgestrichener Preis (UVP/statt) über `read_was`: nur wenn er genau zum roten „-NN%“-Kästchen passt.
 Jedes Angebot zeigt in der App den Prospekt-Ausschnitt (`cr`) und beim Antippen die ganze Seite (`il`) –
 so lässt sich jeder Preis im Original prüfen.
 
@@ -109,6 +110,130 @@ def read_prices(im):
             continue
         out.append({"box": (c[0], top, ct[1][0] + ct[1][2], max(d[1] + d[3] for d in eur)), "p": float(s)})
     return out
+
+
+# ---------- Durchgestrichener Preis (UVP / statt) ----------
+# Klein (11 px), durchgestrichen, rechts unter den Cent-Ziffern; darüber oft das Wort „UVP“, über dem Preis ein rotes
+# Kästchen „-33%“. Tesseract liest die Zahl unsicher (5,99 -> 5,29; 4,79 -> 4,75). Darum: Ziffern an festen Stellen
+# mit Vorlagen (`ocr_uvp.json`) vergleichen, aber nur unter den Zahlen, die genau zum gedruckten Prozentwert passen
+# (Prospekt rundet ab: floor((UVP - Preis) / UVP * 100)). Ohne lesbares Kästchen oder bei knappem Ergebnis: nichts.
+_U = json.load(open(os.path.join(HERE, "ocr_uvp.json")))
+UT = {d: np.array(v, np.float32) for d, v in _U["t"].items()}
+
+
+def _small_bands(im, box):
+    x0, y0, x1, y1 = box
+    H = y1 - y0
+    h, w = im.shape[:2]
+    X0, Y0, X1, Y1 = max(0, x0 + int(.45 * (x1 - x0))), max(0, y0 + int(.45 * H)), min(w, x1 + int(.5 * H)), min(h, y1 + int(.35 * H))
+    s = im[Y0:Y1, X0:X1].astype(int)
+    b, g, r = s[:, :, 0], s[:, :, 1], s[:, :, 2]
+    m = (((r > 120) & (r - g > 60) & (r - b > 40)) | ((.3 * r + .59 * g + .11 * b) < 150)).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, 8)
+    keep = np.zeros_like(m)
+    for i in range(1, n):
+        x, y, ww, hh, a = st[i]
+        if hh > .17 * H or ww > .4 * H or a < 4 or x == 0 or y == 0:
+            continue  # Preisziffern, angeschnittene Teile, Staub
+        keep[lab == i] = 1
+    rows, bands, i = keep.sum(1), [], 0
+    while i < len(rows):
+        if rows[i]:
+            j = i
+            while j < len(rows) and rows[j]:
+                j += 1
+            if j - i >= 5:
+                bands.append((i, j))
+            i = j
+        else:
+            i += 1
+    return keep, bands, X0, Y0
+
+
+def _cells(g):
+    W = g.shape[1]
+    nd = 3 if W < 38 else 4  # „5.99“ ~33 px, „27.99“ ~42 px
+    sc = W / (nd * _U["a"] + _U["dot"] - 1.0)
+    xs, x = [], 0.0
+    for i in range(nd):
+        if i == nd - 2:
+            x += _U["dot"]
+        xs.append(x)
+        x += _U["a"]
+    out = []
+    for x in xs:
+        a, e = int(round(x * sc)), min(W, int(round((x + _U["gw"]) * sc)))
+        c = cv2.resize(g[:, a:e], (_U["pw"], _U["ph"]), interpolation=cv2.INTER_AREA)
+        c = c - c.mean()
+        out.append((c / (np.linalg.norm(c) + 1e-6)).ravel())
+    return out
+
+
+def _badge(im, box):
+    """Prozent im roten Kästchen über dem Preis („-33%“), sonst None."""
+    x0, y0, x1, y1 = box
+    H = y1 - y0
+    h, w = im.shape[:2]
+    X0, Y0, X1, Y1 = max(0, x0 - int(.3 * H)), max(0, y0 - int(.75 * H)), min(w, x1 + int(.4 * H)), y0 + int(.1 * H)
+    s = im[Y0:Y1, X0:X1].astype(int)
+    b, g, r = s[:, :, 0], s[:, :, 1], s[:, :, 2]
+    red = ((r > 150) & (g < 90) & (b < 120)).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(red, 8)
+    best = None
+    for i in range(1, n):
+        x, y, ww, hh, a = st[i]
+        if ww > .6 * H and .2 * H < hh < .6 * H and a > .5 * ww * hh and (best is None or y > best[1]):
+            best = (x, y, ww, hh)
+    if not best:
+        return None
+    x, y, ww, hh = best
+    wh = (s[y + 2:y + hh - 2, x + 2:x + ww - 2].min(2) > 170).astype(np.uint8)
+    img = cv2.copyMakeBorder(cv2.resize(255 - wh * 255, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC).astype(np.uint8),
+                             20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
+    fd, tp = tempfile.mkstemp(suffix=".png")
+    os.close(fd)
+    cv2.imwrite(tp, img)
+    t = subprocess.run(["tesseract", tp, "-", "--psm", "7", "-c", "tessedit_char_whitelist=-0123456789%"],
+                       capture_output=True, text=True).stdout.replace(" ", "").strip()
+    os.remove(tp)
+    m = re.fullmatch(r"-(\d{1,2})%", t)
+    return int(m.group(1)) if m and 5 <= int(m.group(1)) <= 80 else None
+
+
+def read_was(im, box, p):
+    """Durchgestrichener Preis zu Preis p: (Preis, UVP?) oder None."""
+    pct = _badge(im, box)
+    if not pct:
+        return None
+    keep, bands, X0, Y0 = _small_bands(im, box)
+    if not bands:
+        return None
+    a, b = bands[-1]
+    nb = keep[a:b]
+    cols = np.where(nb.any(0))[0]
+    c0, c1 = cols[0], cols[-1] + 1
+    nb = nb[:, c0:c1]
+    if not (28 <= c1 - c0 <= 46 and 8 <= b - a <= 15) or not (nb.sum(1) > .6 * nb.shape[1]).any():
+        return None  # keine Zahl in passender Größe oder nicht durchgestrichen
+    g = 255 - cv2.cvtColor(im[Y0 + a:Y0 + b, X0 + c0:X0 + c1], cv2.COLOR_BGR2GRAY).astype(np.float32)
+    cl = _cells(g)
+    sim = {d: [float((t @ v).max()) for v in cl] for d, t in UT.items()}
+    free = "".join(max(sim, key=lambda d: sim[d][i]) for i in range(len(cl)))
+    R = []
+    for c in range(int(round(p * 100)) + 1, int(round(p * 300)) + 1):
+        u = c / 100
+        st = f"{u:.2f}".replace(".", "")
+        if len(st) == len(cl) and int((u - p) / u * 100 + 1e-9) == pct:
+            R.append((sum(sim[d][i] for i, d in enumerate(st)), u, st))
+    if not R:
+        return None
+    R.sort(reverse=True)
+    sc, u, st = R[0]
+    if len(R) > 1 and sc - R[1][0] < 0.15:
+        return None  # zwei Zahlen fast gleich gut -> unsicher
+    if sum(x != y for x, y in zip(st, free)) > 1:
+        return None  # Ziffern allein gelesen weichen zu stark ab
+    return u, len(bands) >= 2  # zwei Zeilen = „UVP“ + Zahl, eine = eigener früherer Preis
 
 
 # ---------- Text ----------
@@ -275,7 +400,11 @@ def page_offers(path):
         hh, ww = gray.shape
         X0, Y0, X1, Y1 = max(0, X0), max(0, Y0), min(ww, X1), min(hh, Y1)
         cr = [round(Y0 / hh * 100, 1), round((ww - X1) / ww * 100, 1), round((hh - Y1) / hh * 100, 1), round(X0 / ww * 100, 1)]
-        out.append({"n": name, "d": desc, "p": p["p"], "cr": cr})
+        o = {"n": name, "d": desc, "p": p["p"], "cr": cr}
+        w = read_was(im, p["box"], p["p"])
+        if w:
+            o["o"], o["ou"] = w[0], 1 if w[1] else 0
+        out.append(o)
     return out
 
 
@@ -317,6 +446,32 @@ def main():
     keep_o = [o for o in old.get("offers", []) if o.get("fid") in keep_f]
     tmp = tempfile.mkdtemp()
     changed = len(keep_f) != len(old.get("flyers", {}))
+    # schon gelesene Prospekte: durchgestrichene Preise nachlesen (einmal je Prospekt, Merker „wv“)
+    for fid, fv in keep_f.items():
+        if fv.get("wv"):
+            continue
+        pages = {}
+        for o in keep_o:
+            if o.get("fid") == fid and o.get("il"):
+                pages.setdefault(o["pg"], []).append(o)
+        got = 0
+        for pg, rows in sorted(pages.items()):
+            time.sleep(PAUSE)
+            b = get(rows[0]["il"], binary=True)
+            im = cv2.imdecode(np.frombuffer(b, np.uint8), cv2.IMREAD_COLOR) if b else None
+            if im is None:
+                continue
+            for pr in read_prices(im):
+                hit = [o for o in rows if abs(o["p"] - pr["p"]) < .001]
+                if len(hit) != 1:
+                    continue  # Preis auf der Seite nicht eindeutig einem Angebot zuzuordnen
+                w = read_was(im, pr["box"], pr["p"])
+                if w:
+                    hit[0]["o"], hit[0]["ou"] = w[0], 1 if w[1] else 0
+                    got += 1
+        fv["wv"] = 1
+        changed = True
+        log(f"Prospekt {fid}: {got} durchgestrichene Preise (UVP/statt) nachgelesen")
     for fl in flyers():
         if fl["to"] < today or fl["id"] in keep_f:
             continue
@@ -342,7 +497,7 @@ def main():
         if len(got) < 20:
             log(f"  nur {len(got)} Angebote erkannt – Prospekt wird beim nächsten Mal nochmal versucht")
             continue
-        keep_f[fl["id"]] = {"from": fl["from"], "to": fl["to"], "pages": len(fl["pages"]), "n": len(got)}
+        keep_f[fl["id"]] = {"from": fl["from"], "to": fl["to"], "pages": len(fl["pages"]), "n": len(got), "wv": 1}
         keep_o += got
         changed = True
         log(f"  -> {len(got)} Angebote")
