@@ -737,3 +737,25 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .donelink span{margin-left:auto;opacity:.6;font-size:1.3em;line-height:1}
 .donelink.back{width:auto;margin:0 0 10px;padding:8px 12px;font-size:.92em}
 .cart-done{width:100%;margin-top:8px}
+/* v147 Abgeschlossene Einkäufe als Kassenzettel */
+.trtitle{display:flex;flex-direction:column;gap:2px;margin:6px 4px 10px;font-size:1.15rem}
+.trtitle small{font-size:.8rem;font-weight:600;color:var(--muted)}
+.treceipt{margin-bottom:12px}
+.treceipt>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.treceipt>summary::-webkit-details-marker{display:none}
+.treceipt .trh{display:flex;align-items:center;gap:8px;min-width:0}
+.treceipt .trh>span{display:flex;flex-direction:column;min-width:0}
+.treceipt .trh small{font-size:.74rem;color:var(--muted)}
+.treceipt .trp{text-align:right;font-weight:800;white-space:nowrap}
+.treceipt .trp small{display:block;font-size:.74rem}
+.treceipt[open]>summary{padding-bottom:10px;margin-bottom:8px;border-bottom:1px dashed var(--line)}
+.treceipt .trtag{font-size:.76rem;font-weight:700;padding:5px 9px;border-radius:8px;margin-bottom:8px;display:inline-block}
+.treceipt .trtag.bon{background:rgba(11,143,98,.12);color:#0B8F62}
+.treceipt .trtag.est{background:rgba(234,88,12,.1);color:#C2410C}
+.treceipt .trbon{width:100%;margin:0 0 10px}
+.treceipt .rline{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.treceipt .rline>span:last-child{text-align:right;white-space:nowrap}
+.treceipt .rline small.sv{display:block;font-size:.72rem}
+.treceipt .bonraw{display:block;font-size:.7rem;color:var(--muted);opacity:.85}
+.treceipt .rline.neg{color:#0B8F62}
+.treceipt .ractions{margin-top:10px}

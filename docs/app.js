@@ -1024,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  147:["Abgeschlossene Einkäufe als echte Kassenzettel: Markt, Datum, jeder Artikel mit Preis, BEZAHLT und GESPART. Der neueste ist aufgeklappt.","Einkauf nur vom Zettel abgeschlossen? Beim Einkauf „🧾 Kassenbon hochladen“ tippen – der Bon ersetzt ihn mit allen Artikeln und den echten Preisen."],
   146:["Einkaufszettel aufgeräumt: oben nur noch die Markt-Logos. Logo antippen = Zettel dieses Markts, nochmal antippen = alle Märkte.","Abgeschlossene Einkäufe findest du jetzt ganz unten im Zettel. Abgehakte Artikel schließt du oben im Einkaufswagen mit „✓ Einkauf abschließen“ ab."],
   145:["Einkauf abschließen: Kassenbon hochladen schließt den Einkauf in diesem Markt ab – gekaufte Artikel verschwinden vom Zettel, der Zettel ist frei für den nächsten Einkauf.","Neuer Reiter „🧾 Erledigt“ im Einkaufszettel: alle abgeschlossenen Einkäufe mit Kassenzettel. Abgehakte Artikel kannst du auch per Knopf „✓ Einkauf abschließen“ abschließen."],
   144:["Merkliste: Der Abgleich zwischen Handy und PC führt jetzt immer zusammen – was ein Gerät noch hat, geht nicht mehr verloren, gelöscht wird nur, was du wirklich entfernst. „Kaufst du oft“ zeigt keine Kassenbon-Kürzel mehr."],
@@ -1489,23 +1490,36 @@ function hideTripPop(){const el=document.getElementById("tripPop");if(el)el.hidd
 const monKey=d=>d.slice(0,7),monName=k=>new Date(k+"-15").toLocaleDateString("de-DE",{month:"long",year:"numeric"});
 function storeSplit(ts){const m={};ts.forEach(t=>t.items.forEach(x=>m[x.s]=(m[x.s]||0)+x.p));const ex=ts.reduce((a,t)=>a+t.extra.reduce((b,x)=>b+x.p,0),0);if(ex>0)m._=ex;return Object.entries(m).sort((a,b)=>b[1]-a[1])}
 // Monatsbericht + Liste aller Einkäufe
-function tripsHTML(){if(!S.trips.length)return "";
+function tripsHTML(only){if(!S.trips.length)return "";
   const mk=monKey(TODAY),cur=S.trips.filter(t=>monKey(t.d)===mk);
   const sum=(ts,f)=>r2(ts.reduce((a,t)=>a+t[f],0));
   const months=[...new Set(S.trips.map(t=>monKey(t.d)))].sort().reverse().slice(0,6);
   const sp=storeSplit(cur),maxS=Math.max(1,...sp.map(x=>x[1]));
   const paid=sum(cur,"paid"),sav=sum(cur,"saved");
-  return `<section class="panel trips"><h3>Meine Einkäufe</h3>
+  return `<section class="panel trips"><h3>${only?"Monatsbericht":"Meine Einkäufe"}</h3>
    <div class="mrep"><div class="mrep-h">${esc(monName(mk))}</div>
     <div class="mrep-g"><div><span>Ausgegeben</span><b>${eur(paid)}</b></div><div><span>Gespart</span><b class="sv">${eur(sav)}</b></div><div><span>Einkäufe</span><b>${cur.length}</b></div><div><span>Ø pro Einkauf</span><b>${cur.length?eur(paid/cur.length):"–"}</b></div></div>
     ${paid+sav>0&&sav>0?`<p class="mrep-q">Ohne Angebote hättest du <b>${eur(paid+sav)}</b> bezahlt – du hast <b>${Math.round(sav/(paid+sav)*100)} %</b> gespart.</p>`:""}
     ${sp.length?`<div class="mbars">${sp.map(([k,v])=>`<div class="mbar"><span>${k==="_"?"Eigene Einträge":esc(sname(k))}</span><i style="--w:${Math.max(4,Math.round(v/maxS*100))}%;--c:${k==="_"?"#6B7280":(STORES[k]||{}).c||"#2B3034"}"></i><b>${eur(v)}</b></div>`).join("")}</div>`:""}
    </div>
    ${months.length>1?`<div class="mhist">${months.map(k=>{const ts=S.trips.filter(t=>monKey(t.d)===k);return `<div><span>${esc(monName(k))}</span><span>${ts.length} ×</span><span>${eur(sum(ts,"paid"))}</span><span class="sv">−${eur(sum(ts,"saved")).replace("−","")}</span></div>`}).join("")}</div>`:""}
-   <div class="tlist">${S.trips.slice(0,S.tripLimit||10).map(t=>{const st=[...new Set(t.items.map(x=>x.s))];
+   ${only?"":`<div class="tlist">${S.trips.slice(0,S.tripLimit||10).map(t=>{const st=[...new Set(t.items.map(x=>x.s))];
      return `<button class="trow" data-tripopen="${t.id}"><span class="td">${t.bon?"🧾 ":""}${t.chk&&t.chk.length?"⚠️ ":""}${fmtDate(t.d)}<small>${new Date(t.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})} Uhr</small></span><span class="tm">${st.map(x=>sb(x)).join("")}${t.extra.length?`<em>+${t.extra.length}</em>`:""}<small>${t.items.length+t.extra.length} Artikel</small></span><span class="tp">${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></button>`}).join("")}</div>
-   ${S.trips.length>(S.tripLimit||10)?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""}
+   ${S.trips.length>(S.tripLimit||10)?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""}`}
   </section>`}
+// Abgeschlossener Einkauf als Kassenzettel im SparRadar-Look (Kevin 04.11.: Bon-Artikel mit Originalpreisen)
+function tripReceipt(t,open){const g={};t.items.forEach(x=>(g[x.s]=g[x.s]||[]).push(x));const st=Object.keys(g),n=t.items.length+t.extra.length;
+  const row=x=>{const sub=x.bn&&norm(x.bn)!==norm(x.n)?x.bn:"";return `<div class="rline${x.p<0?" neg":""}"><span>${x.q>1?`<em class="qx">${x.q}×</em> `:""}${esc(x.n)}${x.pf?` <em class="rpf">+ ${eur(x.pf)} Pfand</em>`:""}${sub?`<small class="bonraw">${esc(sub)}</small>`:""}</span><span>${x.p||x.p===0&&t.bon?eur(x.p):"–"}${x.r>x.p+.004?`<small class="sv">−${eur(x.r-x.p).replace("−","")}</small>`:""}</span></div>`};
+  const time=new Date(t.at).toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"});
+  return `<details class="receipt treceipt"${open?" open":""}><summary><span class="trh">${st.map(x=>sb(x)).join("")}<span><b>${st.length===1?esc(sname(st[0])):st.length?"Mehrere Märkte":"Eigene Einträge"}</b><small>${fmtDate(t.d)} · ${time} Uhr · ${n} Artikel</small></span></span><span class="trp">${t.chk&&t.chk.length?"⚠️ ":""}${eur(t.paid)}${t.saved>0?`<small class="sv">−${eur(t.saved).replace("−","")}</small>`:""}</span></summary>
+   <div class="trtag ${t.bon?"bon":"est"}">${t.bon?"🧾 Original-Kassenbon – echte Preise":"✏️ Vom Einkaufszettel – Preise laut Angebot"}</div>
+   ${t.bon?"":`<button class="btn sm trbon" data-bonfor="${t.id}">🧾 Kassenbon hochladen = echte Preise &amp; alle Artikel</button>`}
+   ${chkHTML(t)}
+   ${st.map(s=>`<div class="rgroup">${st.length>1?`<div class="rs">${sb(s)}${esc(sname(s))}</div>`:""}${g[s].map(row).join("")}</div>`).join("")}
+   ${t.extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Eigene Einträge</div>${t.extra.map(row).join("")}</div>`:""}
+   <div class="rtot"><div class="big"><span>BEZAHLT</span><span>${eur(t.paid)}</span></div>${t.pf?`<div><span>davon Pfand</span><span>${eur(t.pf)}</span></div>`:""}${t.saved>0?`<div class="sv"><span>GESPART</span><span>${eur(t.saved)}</span></div>`:""}</div>
+   <div class="ractions"><button class="btn ghost sm" data-triprestore="${t.id}">Zurück auf den Zettel</button><button class="btn ghost sm" data-tripdel="${t.id}">Löschen</button></div>
+  </details>`}
 function renderTrip(){const t=S.trips.find(x=>x.id===S.tripId);if(!t)return renderKracher();
   const g={};t.items.forEach(x=>(g[x.s]=g[x.s]||[]).push(x));
   const row=x=>`<div class="rline"><span>${x.q>1?x.q+"× ":""}${esc(x.n)}${x.pf?` <em class="rpf">+ ${eur(x.pf)} Pfand</em>`:""}</span><span>${x.p?eur(x.p):""}${x.r>x.p+.004?`<small class="sv"> −${eur(x.r-x.p).replace("−","")}</small>`:""}</span></div>`;
@@ -1718,7 +1732,11 @@ function renderList(){
   const ztabs=`<div class="ztabs" role="tablist" aria-label="Einkaufszettel je Markt">${Object.keys(STORES).map(k=>{const n=zc(k);return `<button class="ztab${n?"":" empty"}" role="tab" data-ztab="${zm===k?"":k}" aria-selected="${zm===k}" title="${zm===k?"Nochmal antippen = alle Märkte":"Einkaufszettel "+esc(sname(k))}" aria-label="${esc(sname(k))}${n?`, ${n} Artikel`:""}">${sb(k)}${n?`<em>${n}</em>`:""}</button>`}).join("")}</div>`;
   const doneLink=`<button class="donelink" data-ztab="done">🧾 Abgeschlossene Einkäufe${S.trips.length?` <em>${S.trips.length}</em>`:""}<span>›</span></button>`;
   const openIds=[...S.list.filter(x=>byId(x)),...S.extra.map(x=>x.id)].filter(x=>S.checked.includes(x));
-  if(zDone)return `${holiHTML()}${cbDueHTML()}<button class="donelink back" data-ztab="">‹ Zurück zum Einkaufszettel</button><div class="receipt"><h3>ABGESCHLOSSENE EINKÄUFE</h3>${openIds.length?`<div class="zempty"><b>${openIds.length} ${openIds.length===1?"Artikel ist":"Artikel sind"} abgehakt, der Einkauf ist aber noch offen</b>Abschließen = Einkauf landet hier, die Artikel verschwinden vom Zettel.<button class="btn" data-findone="${esc(openIds.join(","))}" style="margin-top:10px">✓ Einkauf jetzt abschließen</button></div>`:""}${S.trips.length?`<div class="zempty">Tippe einen Einkauf an, um den ganzen Kassenzettel zu sehen.</div>`:openIds.length?"":`<div class="zempty"><b>Noch kein Einkauf abgeschlossen</b>Im Markt alles abhaken oder danach den Kassenbon hochladen – dann landet der Einkauf hier und der Zettel ist wieder frei.</div>`}</div>${bonBoxHTML()}${tripsHTML()}`;
+  if(zDone){const mk=monKey(TODAY),cur=S.trips.filter(t=>monKey(t.d)===mk),lim=S.tripLimit||10;
+    return `${holiHTML()}${cbDueHTML()}<button class="donelink back" data-ztab="">‹ Zurück zum Einkaufszettel</button>${openIds.length?`<div class="receipt"><div class="zempty"><b>${openIds.length} ${openIds.length===1?"Artikel ist":"Artikel sind"} abgehakt, der Einkauf ist aber noch offen</b>Abschließen = Einkauf landet hier, die Artikel verschwinden vom Zettel.<button class="btn" data-findone="${esc(openIds.join(","))}" style="margin-top:10px">✓ Einkauf jetzt abschließen</button></div></div>`:""}
+    <h2 class="trtitle">🧾 Abgeschlossene Einkäufe${cur.length?`<small>${esc(monName(mk))}: ${cur.length} × · ${eur(r2(cur.reduce((a,t)=>a+t.paid,0)))}${cur.some(t=>t.saved>0)?` · gespart ${eur(r2(cur.reduce((a,t)=>a+t.saved,0)))}`:""}</small>`:""}</h2>
+    ${S.trips.length?S.trips.slice(0,lim).map((t,i)=>tripReceipt(t,i===0)).join("")+(S.trips.length>lim?`<button class="btn ghost more" data-tripmore="1">Ältere Einkäufe zeigen</button>`:""):openIds.length?"":`<div class="receipt"><div class="zempty"><b>Noch kein Einkauf abgeschlossen</b>Im Markt alles abhaken oder danach den Kassenbon hochladen – dann landet der Einkauf hier und der Zettel ist wieder frei.</div></div>`}
+    ${bonBoxHTML()}${S.trips.length?tripsHTML(1):""}`}
   const items=zm?allI.filter(o=>o.s===zm):allI,extra=zm?S.extra.filter(x=>x.s===zm):S.extra;if(extra.length)loadDauer();
   // Bilder für eigene Einträge: Bilder-Liste + Artikelstamm erst hier laden
   if(extra.length&&(!SIMG||!CATALOG_N)){const again=()=>{if(S.tab==="list"&&SIMG&&CATALOG_N)render()};if(!SIMG)loadSugImgs(again);if(!CATALOG_N)loadCatalog(again)}
@@ -1902,7 +1920,7 @@ function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   if(r.total){const d=r2(r.total-r.items.filter(x=>x.on).reduce((a,x)=>a+x.p,0));if(Math.abs(d)>=.01)r.items.push({n:"Sonstiges (nicht erkannt)",q:1,p:d,on:true})}
   const d=r.d&&/^\d{4}-\d\d-\d\d$/.test(r.d)?r.d:TODAY,at=new Date(d+"T"+(r.t||"12:00")+":00").toISOString();
   // Gleicher Tag + gleicher Markt schon als Einkauf vom Zettel? Der Bon ist genauer und ersetzt ihn – Angebote/Namen/Gespart vom Zettel bleiben erhalten.
-  const dup=S.trips.find(x=>!x.bon&&x.d===d&&(x.items.some(i=>i.s===r.s)||x.extra.some(e=>e.s===r.s)));
+  const dup=(BON.for&&S.trips.find(x=>x.id===BON.for&&!x.bon))||S.trips.find(x=>!x.bon&&Math.abs(new Date(x.d)-new Date(d))<=864e5&&(x.items.some(i=>i.s===r.s)||x.extra.some(e=>e.s===r.s)));
   // Kein Einkauf vom Zettel? Dann mit dem offenen Zettel dieses Markts abgleichen – was auf dem Bon steht, ist gekauft und fliegt danach vom Zettel.
   const zi=dup?dup.items.filter(i=>i.s===r.s).map(i=>({...i})):S.list.map(byId).filter(o=>o&&o.s===r.s).map(o=>({id:o.id,n:o.n,b:o.b||"",s:o.s,q:qty(o.id),p:lineP(o),r:lineR(o),_z:1}));
   const ze=dup?dup.extra.map(e=>({...e})):S.extra.filter(x=>x.s===r.s||!x.s).map(x=>({id:x.id,n:x.n,q:qty(x.id),p:extraP(x),_z:1}));
@@ -1927,7 +1945,7 @@ function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   if(gone.size){S.list=S.list.filter(id=>!gone.has(id));S.extra=S.extra.filter(x=>!gone.has(x.id));S.checked=S.checked.filter(id=>!gone.has(id));gone.forEach(id=>delete S.qty[id]);S.act=S.act.filter(id=>S.list.includes(id));if(!S.list.length&&!S.extra.length)wakeOff()}
   const left=S.list.map(byId).filter(o=>o&&o.s===r.s).length+S.extra.filter(x=>x.s===r.s).length;
   S.trips.unshift(t);S.trips.sort((a,b)=>b.at.localeCompare(a.at));S.trips=S.trips.slice(0,400);
-  save();BON.st=null;S.tripId=t.id;S.sheet="trip";render();toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:`✓ ${sname(r.s)}-Einkauf abgeschlossen (${eur(t.paid)})`+(left?` – ${left} Artikel ${left>1?"waren":"war"} nicht auf dem Bon und ${left>1?"bleiben":"bleibt"} auf dem Zettel`:" – Zettel ist wieder frei"))}
+  save();BON.st=null;BON.for=null;S.tripId=t.id;S.sheet="trip";render();toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:`✓ ${sname(r.s)}-Einkauf abgeschlossen (${eur(t.paid)})`+(left?` – ${left} Artikel ${left>1?"waren":"war"} nicht auf dem Bon und ${left>1?"bleiben":"bleibt"} auf dem Zettel`:" – Zettel ist wieder frei"))}
 // Geteilter Bon (Teilen-Menü -> SparRadar): liegt kurz im Service-Worker-Speicher
 async function bonFromShare(){if(!/[?&]bon=1/.test(location.search))return;history.replaceState(null,"",location.pathname);
   try{const c=await caches.open("sr-share"),f=await c.match("bon-file"),t=await c.match("bon-text");
@@ -2450,6 +2468,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.triprestore){restoreTrip(b.dataset.triprestore);return}
   if(b.dataset.act){const id=b.dataset.act;S.act=S.act.includes(id)?S.act.filter(x=>x!==id):[...S.act,id];save();render();if(S.act.includes(id))toast("Aktiviert – der App-Preis zählt jetzt in der Summe");return}
   if(b.dataset.bonpick){bonPick(b.dataset.bonpick==="cam");return}
+  if(b.dataset.bonfor){BON.for=b.dataset.bonfor;bonPick(false);return}
   if(b.dataset.bonmore&&BON.r){BON.more=!BON.more;render();return}
   if(b.dataset.bonx!=null&&BON.r){const x=BON.r.items[+b.dataset.bonx];if(x)x.on=!x.on;render();return}
   if(b.dataset.bondiff&&BON.r){const r=BON.r,sum=r2(r.items.filter(x=>x.on).reduce((a,x)=>a+x.p,0));r.items.push({n:"Nicht erkannt",q:1,p:r2(r.total-sum),on:true});render();return}
