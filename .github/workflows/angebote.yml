@@ -36,11 +36,12 @@ jobs:
         working-directory: fetcher
         run: python check_new.py --snap || true
 
-      - name: Scheck-In-Prospekt lesen (Texterkennung, läuft parallel zum Abruf)
+      - name: Zookauf- und Scheck-In-Prospekt lesen (Texterkennung, läuft parallel zum Abruf)
         if: steps.gate.outputs.skip != '1'
         # Nur neue Prospekte werden gelesen (ca. 20 min), sonst fertig in Sekunden. Fehler stoppen den Abruf nicht.
         run: |
           (sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-deu >/dev/null && pip install -q numpy opencv-python-headless \
+            && (OMP_THREAD_LIMIT=1 timeout 15m python fetcher/fetch_zookauf.py || true) \
             && OMP_THREAD_LIMIT=1 timeout 50m python fetcher/fetch_scheck.py; touch "$RUNNER_TEMP/scheck.done") > "$RUNNER_TEMP/scheck.log" 2>&1 &
 
       - name: Angebote holen

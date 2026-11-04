@@ -628,7 +628,7 @@ def kd_store(it):
 
 
 APP_COND = re.compile(r"lidl\s*plus|app[- ]?preis|mit (der )?app|netto[- ]?app|payback|deutschlandcard|kundenkarte|coupon", re.I)
-APP_LABEL = {"lidl": "Lidl Plus", "edeka": "Edeka-App", "netto": "Netto-App", "rewe": "Rewe-App", "dm": "dm-App", "aldi": "Aldi-App", "mueller": "Müller-App"}
+APP_LABEL = {"lidl": "Lidl Plus", "edeka": "Edeka-App", "netto": "Netto-App", "rewe": "Rewe-App", "dm": "dm-App", "aldi": "Aldi-App", "mueller": "Müller-App", "zookauf": "Zookauf-Karte"}
 APP_HINT = re.compile(r"(?:mit\s+(?:der\s+)?app|app[- ]preis|rewe\s+bonus|lidl\s+plus|netto[- ]app)[^0-9]{0,25}(\d+)[,.](\d\d)", re.I)
 
 
@@ -1247,6 +1247,31 @@ def load_scheck(kd=()):
     return out
 
 
+def load_zookauf():
+    """Zookauf Wörth: Werbeprospekt (Blätterkatalog auf zookauf.de), aus den Seitenbildern gelesen
+    (fetch_zookauf.py -> docs/data/zookauf-ocr.json). Keine kaufDA-/meinprospekt-Seite (404, geprüft 04.11.)."""
+    today = dt.date.today()
+    out = []
+    for r in load("zookauf-ocr.json", {}).get("offers") or []:
+        if not r.get("p") or (r.get("to") or "9") < today.isoformat():
+            continue
+        if (r.get("from") or "") > (today + dt.timedelta(days=12)).isoformat():
+            continue  # Prospekt für übernächste Woche -> erst später zeigen
+        gp = r.get("gp") or {}
+        o = offer("zookauf", r.get("n") or "", r["p"], brand=r.get("b"), desc=r.get("d") or "",
+                  base=(gp["v"], gp["u"]) if gp.get("v") else None, img=r.get("img"),
+                  img_large=r.get("il") or (r.get("img") or "").replace("/large/", "/normal/") or None,  # = ganze Seite
+                  start=r.get("from"), end=r.get("to"), src="zookauf.de (Prospekt gelesen)", url=r.get("url"),
+                  page=r.get("pg"), cats=[r["cat"]] if r.get("cat") else None)
+        if o:
+            o["pa"], o["ocr"] = 1, 1
+            if isinstance(r.get("cr"), list) and len(r["cr"]) == 4:
+                o["cr"] = r["cr"]
+            out.append(o)
+    log(f"  Zookauf aus Prospekt gelesen: {len(out)} Angebote")
+    return out
+
+
 def pa_dedupe(offers):
     """prospektangebote-Angebote raus, wenn kaufDA denselben Artikel im selben Markt zum selben Preis hat
     (kaufDA hat Marke, Beschreibung, Grundpreis und Prospekt-ID)."""
@@ -1828,7 +1853,8 @@ def main():
         else:
             log("  ! Scheck-In-Prospekt noch nicht fertig gelesen – letzter Stand wird genommen")
     run("Scheck-In-Prospekt", lambda: load_scheck(results.get("kaufDA") or []))
-    new = pa_dedupe([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau", "prospektangebote", "Scheck-In-Prospekt") for o in results.get(name, [])])
+    run("Zookauf-Prospekt", load_zookauf)
+    new = pa_dedupe([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau", "prospektangebote", "Scheck-In-Prospekt", "Zookauf-Prospekt") for o in results.get(name, [])])
     # Sortiment-Abgleich: Jeder Abruf baut die Liste neu auf – neue Artikel kommen dazu, verschwundene fliegen raus.
     # Ausnahme: Liefert ein Markt plötzlich fast nichts (Seite kurz down, Sperre, Umbau), bleiben seine noch gültigen
     # alten Angebote stehen, statt dass der ganze Markt bis zum nächsten Abruf leer ist.

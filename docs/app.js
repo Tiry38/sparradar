@@ -10,7 +10,9 @@ const STORES = {
   dm:     {n:"dm",            m:"dm", c:"#B8327F", app:"dm App",     link:"https://www.dm.de/", dom:"dm.de"},
   // Maximilian-Center Wörth-Maximiliansau: nur zu sehen, wenn man den Markt oben ausdrücklich antippt (opt)
   mueller:{n:"Müller",        m:"Mü", c:"#E8620C", opt:1, link:"https://www.mueller.de/", dom:"mueller.de"},
-  scheck: {n:"Scheck-In Center",m:"SI",c:"#C4161C", opt:1, link:"https://www.scheck-in-center.de/", dom:"scheck-in-center.de"}
+  scheck: {n:"Scheck-In Center",m:"SI",c:"#C4161C", opt:1, link:"https://www.scheck-in-center.de/", dom:"scheck-in-center.de"},
+  // Zookauf Wörth (Tierbedarf): Prospekt von zookauf.de, nur bei Auswahl
+  zookauf:{n:"Zookauf",       m:"Zk", c:"#00968A", opt:1, link:"https://zookauf.de/seite/aktuelle-angebote", dom:"zookauf.de"}
 };
 const OPT = new Set(Object.keys(STORES).filter(k=>STORES[k].opt));
 const CATS = {obst:"Obst & Gemüse",fleisch:"Fleisch & Fisch",kuehl:"Milch, Käse & Eier",brot:"Brot & Backwaren",vorrat:"Vorrat",tk:"Tiefkühl",suess:"Süßes & Snacks",kaffee:"Kaffee & Tee",getraenke:"Getränke",katze:"Katzenfutter",drogerie:"Drogerie & Pflege",
@@ -348,7 +350,7 @@ function fixImg(o){const all=[o.img,o.il,...(o.ims||[])];if(!all.some(badImg))re
 // Größe kommt vom Abruf (o.iw) oder wird beim Laden gemessen (lowres()).
 const LOWPX=320;
 // Aus dem Prospekt gelesene Angebote (Scheck-In, o.cr = Ausschnitt oben/rechts/unten/links in %): Karte zeigt nur den Ausschnitt.
-const crSt = (o,u) => o.cr&&o.cr.length===4&&/offers-cdn\.net\//.test(o.img||"")&&(!u||sharp(u)===sharp(o.img)) ? ` style="object-view-box:inset(${o.cr.map(v=>(+v||0).toFixed(1)+"%").join(" ")})"` : "";
+const crSt = (o,u) => o.cr&&o.cr.length===4&&/offers-cdn\.net\/|file-upload\.zookauf\.de\//.test(o.img||"")&&(!u||sharp(u)===sharp(o.img)) ? ` style="object-view-box:inset(${o.cr.map(v=>(+v||0).toFixed(1)+"%").join(" ")})"` : "";
 const imgTag = (o,cls="") => safeUrl(o.img) ? `<img src="${esc(sharp(o.img))}" alt="${esc(o.n)}" loading="lazy" decoding="async" referrerpolicy="no-referrer" class="${cls}${o.iw&&Math.max(...o.iw)<LOWPX?" lowres":""}" data-cat="${o.c}"${crSt(o)}>` : (ILL[o.c]||ILL.sonstiges);
 // Beschriftung für kommende Angebote: „Nächste Woche“, oder „Ab Donnerstag“, wenn etwas noch diese Woche startet
 // Kevin 01.11.: konkretes Datum statt „Nächste Woche“ (sonntags sonst mit „Ab Montag“ zu verwechseln)
@@ -770,7 +772,7 @@ function renderOffers(){
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
    ${S.q.trim()?moreArticles(r):""}
-   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA. Ist der Prospekt deines Markts für nächste Woche noch nicht online, zeigt SparRadar eine „Vorschau“ (Edeka aus dem regionalen Prospekt bei kaufDA, Rewe aus dem allgemeinen Prospekt bei prospektewoche.de). Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
+   <div class="demo">${IC.bag}<span><b>Quellen:</b> Lidl und Aldi Süd direkt von deren Websites, Rewe, Netto, Edeka Jockgrim und dm aus den Prospekten bei kaufDA, Zookauf aus dem Prospekt auf zookauf.de. Ist der Prospekt deines Markts für nächste Woche noch nicht online, zeigt SparRadar eine „Vorschau“ (Edeka aus dem regionalen Prospekt bei kaufDA, Rewe aus dem allgemeinen Prospekt bei prospektewoche.de). Gezeigt werden alle Angebote: Lebensmittel, Getränke, Drogerie und auch Haushalt, Technik, Mode, Garten und mehr. Persönliche App-Coupons kann SparRadar nicht sehen. Prüfe sie vor dem Einkauf in der jeweiligen App.</span></div>`}
 
 // Suche: auch Artikel zeigen, die gerade nicht im Angebot sind, damit man sie auf die Merkliste setzen kann
 function moreArticles(shown){
@@ -1007,6 +1009,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  136:["Neuer Markt: Zookauf in Wörth. Oben die Kachel „Zookauf“ antippen, dann siehst du die Angebote aus dem Zookauf-Prospekt (Futter, Streu, Zubehör). Bei „Alle“ bleibt er ausgeblendet – genau wie Müller und Scheck-In."],
   135:["Bild auf dem Zettel antippen = deine Sorte wählen (z. B. genau deine Milch). SparRadar merkt sie sich und zeigt sie ab jetzt immer."],
   134:["Einkaufszettel mit Bildern: Jeder Artikel zeigt ein kleines Foto, so erkennst du ihn im Laden auf einen Blick."],
   133:["Neuer Look: Der Hintergrund hat jetzt grüne Farbverläufe und ein feines Raster – alles bleibt gut lesbar."],
@@ -1768,7 +1771,7 @@ async function pdfText(file){const pdfjs=await import("./vendor/pdf/pdf.min.mjs"
     if(!tc.items.length){const vp=pg.getViewport({scale:2.5}),cv=document.createElement("canvas");cv.width=vp.width;cv.height=vp.height;
       await pg.render({canvasContext:cv.getContext("2d"),viewport:vp}).promise;const w=await loadOCR();out.push((await w.recognize(cv)).data.text)}}
   return out.join("\n")}
-const BON_MKT=[["scheck",/scheck-? ?in/i],["lidl",/\blidl\b|\bl[$i1!|]dl\b|lidl\.de|lidl plus|\bldl-\d|schwarz beteiligung/i],["aldi",/\baldi\b|aldi-?s[uü]d|aldi\.de/i],["rewe",/\brewe\b|rewe\.de|rewe markt/i],
+const BON_MKT=[["scheck",/scheck-? ?in/i],["zookauf",/zoo ?kauf/i],["lidl",/\blidl\b|\bl[$i1!|]dl\b|lidl\.de|lidl plus|\bldl-\d|schwarz beteiligung/i],["aldi",/\baldi\b|aldi-?s[uü]d|aldi\.de/i],["rewe",/\brewe\b|rewe\.de|rewe markt/i],
   ["netto",/\bnetto\b|netto-online|marken-?discount/i],["edeka",/\bedeka\b|edeka\.de|e center|e-center|marktkauf/i],["dm",/\bdm[- ]?drogerie|\bdm\.de\b|dm-drogerie markt|\bmein dm\b/i],
   ["mueller",/mueller\.de|drogerie ?m[üu]ller|m[üu]ller handels|m[üu]ller ltd/i]];
 const BON_TOT=/^(zu zahlen|zu bezahlen|summe|gesamt(?:summe|betrag)?|total|endsumme|betrag)\b/i;
