@@ -732,6 +732,8 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .receipt .ztab{position:relative;overflow:visible}
 .receipt .ztab em{position:absolute;top:-9px;right:-6px;min-width:20px;text-align:center;padding:1px 6px;font-size:.72em;line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:1}
 @media (hover:none) and (pointer:coarse){.receipt .ztabs{padding:10px 8px 10px}}
-.receipt .ztab.done{padding:4px 10px;gap:4px;border-style:dashed}
-.receipt .ztab.done b{font-size:1.15em;line-height:1}.receipt .ztab.done small{font-weight:700;font-size:.82em}
-.receipt .ztab.done em{background:#2563EB}
+.donelink{display:flex;align-items:center;gap:8px;width:100%;margin:14px 0 4px;padding:12px 14px;border:1px solid var(--line);border-radius:14px;background:var(--surface2);color:inherit;font:inherit;font-weight:600;cursor:pointer;text-align:left}
+.donelink em{font-style:normal;font-size:.78em;font-weight:700;background:#2563EB;color:#fff;border-radius:999px;padding:1px 8px}
+.donelink span{margin-left:auto;opacity:.6;font-size:1.3em;line-height:1}
+.donelink.back{width:auto;margin:0 0 10px;padding:8px 12px;font-size:.92em}
+.cart-done{width:100%;margin-top:8px}
