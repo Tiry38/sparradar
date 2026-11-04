@@ -708,3 +708,9 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .zmic.on{background:#DC2626;border-color:#DC2626;color:#fff;animation:zmic 1.2s ease-in-out infinite}
 @keyframes zmic{50%{box-shadow:0 0 0 6px rgba(220,38,38,.25)}}
 @media (prefers-reduced-motion:reduce){.zmic.on{animation:none}}
+
+/* v138 Markt-Auswahl für eigene Einträge auf dem Zettel */
+.addrow .zmkt{flex:0 1 150px;min-width:0;border:1px solid var(--line);background:var(--surface2);color:inherit;border-radius:12px;padding:8px 10px;font:inherit}
+@media(max-width:559px){#extraForm .zmkt{flex:1 1 100%}}
+.xmk{padding:0 8px 6px 52px}
+.xmkt{font:inherit;font-size:.82em;border:1px solid var(--line);background:var(--surface2);color:inherit;border-radius:8px;padding:3px 6px;max-width:100%}

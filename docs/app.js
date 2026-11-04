@@ -64,7 +64,7 @@ const IC = {
 const store = {get(k,d){try{const v=localStorage.getItem("sr_"+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem("sr_"+k,JSON.stringify(v))}catch(e){}}};
 const S = {tab:"offers",week:0,q:"",stores:new Set(),cats:new Set(),sort:"off",flt:Object.assign({min:0,max:0,bio:0,vegan:0,real:0,app:0,noapp:0,low:0},store.get("flt",{}),store.get("fltq")?{}:{cb:0}),useApp:store.get("useApp",true),
   watch:store.get("watch2",[{k:"Katzenfutter",max:6},{k:"Butter"},{k:"Kaffee"}]),list:store.get("list",[]),
-  coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),act:store.get("act",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),sheet:null,limit:60};
+  coupons:store.get("coupons",[]),extra:store.get("extra",[]),checked:store.get("checked",[]),act:store.get("act",[]),saved:store.get("saved",[]),trips:store.get("trips",[]),qty:store.get("qty",{}),budget:store.get("budget",0),zMkt:store.get("zMkt",""),sheet:null,limit:60};
 let OFFERS = [], ALLO = [], OPTK = null, RAW = [], HIST = {}, META = {}, NAMES = [], APPV = {}, OLD = new Map();
 // lokales Datum (nicht UTC), sonst gilt nach Mitternacht noch der Vortag
 const TODAY = (d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`)(new Date());
@@ -99,7 +99,7 @@ let tt; function toast(m){const t=document.getElementById("toast");t.textContent
 // Scheck-In/Serpa und „Angebot eintragen“ wurden entfernt: alte Einträge vom Gerät löschen
 try{localStorage.removeItem("sr_manual")}catch(e){}
 S.coupons=S.coupons.filter(c=>c.s==="all"||STORES[c.s]);
-const save = () => {memoReset();store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);store.set("act",S.act);store.set("saved",S.saved);store.set("trips",S.trips);store.set("qty",S.qty);store.set("budget",S.budget);Sync.changed()};
+const save = () => {memoReset();store.set("watch2",S.watch);store.set("list",S.list);store.set("useApp",S.useApp);store.set("coupons",S.coupons);store.set("extra",S.extra);store.set("checked",S.checked);store.set("act",S.act);store.set("saved",S.saved);store.set("trips",S.trips);store.set("qty",S.qty);store.set("budget",S.budget);store.set("zMkt",S.zMkt);Sync.changed()};
 
 // ---------- Geräte verbinden (Handy <-> PC) ----------
 // Merkliste, Einkaufszettel und Coupons liegen zusätzlich in einem geheimen Gist im
@@ -891,7 +891,7 @@ function zAdd(full,brand,code){full=String(full||"").trim();if(!full)return;
   if(pick&&S.list.includes(pick.id)){id=pick.id;st="had"}
   else if(ex){id=ex.id;st="had"}
   else if(pick){S.list.push(pick.id);id=pick.id;st="offer"}
-  else{id="x-"+Date.now();while(S.extra.some(x=>x.id===id))id="x-"+(+id.slice(2)+1);S.extra.push(code?{id,n:full,ean:code}:{id,n:full});st="own"}
+  else{id="x-"+Date.now();while(S.extra.some(x=>x.id===id))id="x-"+(+id.slice(2)+1);S.extra.push(code?{id,n:full,ean:code,...exS()}:{id,n:full,...exS()});st="own"}
   const carted=cart&&cartPut(id),alt=st==="own"?ms.map(m=>m.o).sort((a,b)=>fin(a)-fin(b)).filter((o,i,a)=>a.findIndex(y=>y.s===o.s)===i).slice(0,3).map(o=>o.id):[];
   const old=Scan.added.findIndex(a=>a.id===id);
   if(st==="had"&&old>=0){const a=Scan.added.splice(old,1)[0];a.carted=a.carted||carted;Scan.added.unshift(a)}
@@ -937,7 +937,7 @@ function voiceItems(t){const brands=new Set(OFFERS.map(o=>norm(o.b)).filter(b=>b
     return {n:s.charAt(0).toUpperCase()+s.slice(1),q}}).filter(x=>x.n.length>=2)}
 function voiceAdd(txt){const its=voiceItems(txt);if(!its.length){toast("Nichts verstanden – bitte nochmal versuchen.");return}
   its.forEach((x,i)=>{const ex=S.extra.find(e=>norm(e.n)===norm(x.n));if(ex){S.qty[ex.id]=Math.min(49,qty(ex.id)+x.q);return}
-    const id="x-"+Date.now()+"-"+i;S.extra.push({id,n:x.n});if(x.q>1)S.qty[id]=x.q});
+    const id="x-"+Date.now()+"-"+i;S.extra.push({id,n:x.n,...exS()});if(x.q>1)S.qty[id]=x.q});
   save();render();toast("🎤 Dazu: "+its.map(x=>(x.q>1?x.q+"× ":"")+x.n).join(", "))}
 const Voice={rec:null,on:false,err:"",
   ok(){return !!(window.SpeechRecognition||window.webkitSpeechRecognition)&&!window.__SR_DESKTOP__},
@@ -1009,6 +1009,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  138:["Einkaufszettel: Neben dem Eingabefeld wählst du jetzt den Markt. Eigene Einträge (z. B. „Brot“) landen dann direkt im Abschnitt dieses Markts. Unter jedem eigenen Eintrag kannst du den Markt auch später noch ändern."],
   137:["Kein falscher Hinweis „Noch kein Prospekt“ mehr, wenn der Prospekt eines Markts erst später in dieser Woche startet (z. B. Zookauf ab Samstag)."],
   136:["Neuer Markt: Zookauf in Wörth. Oben die Kachel „Zookauf“ antippen, dann siehst du die Angebote aus dem Zookauf-Prospekt (Futter, Streu, Zubehör). Bei „Alle“ bleibt er ausgeblendet – genau wie Müller und Scheck-In."],
   135:["Bild auf dem Zettel antippen = deine Sorte wählen (z. B. genau deine Milch). SparRadar merkt sie sich und zeigt sie ab jetzt immer."],
@@ -1369,6 +1370,9 @@ function paidOf(x){if(x.p)return null;const ix=paidIdx();if(PAIDM.has(x.n))retur
   const r=ix.find(c=>c.k===norm(x.n))||ix.find(c=>paidHit(c,x.n))||null;PAIDM.set(x.n,r);return r}
 const extraT=x=>x.p?extraP(x):(paidOf(x)?r2(paidOf(x).u*qty(x.id)):0);
 // „3x Joghurt“, „Brot 1,99“, „Kaffee 4,49 €“ -> Menge, Name, Preis
+// Eigener Eintrag mit gewähltem Markt (Auswahl neben dem Eingabefeld; leer = Sonstiges)
+const exS=()=>S.zMkt&&STORES[S.zMkt]?{s:S.zMkt}:{};
+const mktSel=(id,cur,cls,lbl)=>`<select ${id?`id="${id}"`:""} class="${cls}" aria-label="${lbl}" title="${lbl}"><option value="">${id?"Markt: egal":"Sonstiges"}</option>${Object.keys(STORES).map(k=>`<option value="${k}"${k===cur?" selected":""}>${esc(sname(k))}</option>`).join("")}</select>`;
 function parseExtra(v){let q=1,n=v.trim(),p=0,m=n.match(/^(\d{1,2})\s*[x×*]\s*(.+)$/i)||n.match(/^(\d{1,2})\s+(.+)$/);
   if(m&&+m[1]>0&&+m[1]<50){q=+m[1];n=m[2]}
   m=n.match(/^(.*?)\s+(\d{1,3}[,.]\d{1,2})\s*€?$/)||n.match(/^(.*?)\s+(\d{1,3})\s*€$/);if(m){n=m[1];p=parseFloat(m[2].replace(",","."))}
@@ -1689,9 +1693,10 @@ function renderList(){
   const items=S.list.map(byId).filter(Boolean),extra=S.extra;if(extra.length)loadDauer();
   // Bilder für eigene Einträge: Bilder-Liste + Artikelstamm erst hier laden
   if(extra.length&&(!SIMG||!CATALOG_N)){const again=()=>{if(S.tab==="list"&&SIMG&&CATALOG_N)render()};if(!SIMG)loadSugImgs(again);if(!CATALOG_N)loadCatalog(again)}
-  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button>${Voice.ok()?`<button class="btn ghost zmic${Voice.on?" on":""}" type="button" id="zMic" aria-pressed="${Voice.on}" aria-label="Artikel sprechen, z. B. Milch, Butter und drei Eier" title="Artikel sprechen">${Voice.on?"🎤 Ich höre zu …":"🎤 Sprechen"}</button>`:""}</form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
+  const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off">${mktSel("zMkt",S.zMkt,"zmkt","Für welchen Markt? Neue Einträge landen dort auf dem Zettel")}<button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button>${Voice.ok()?`<button class="btn ghost zmic${Voice.on?" on":""}" type="button" id="zMic" aria-pressed="${Voice.on}" aria-label="Artikel sprechen, z. B. Milch, Butter und drei Eier" title="Artikel sprechen">${Voice.on?"🎤 Ich höre zu …":"🎤 Sprechen"}</button>`:""}</form><div id="exSugg"></div><p class="exhint">Tipp: Beim Tippen erscheinen passende Artikel – auch solche, die gerade nicht im Angebot sind. So steht dein ganzer Einkauf auf dem Zettel.</p>`;
   if(!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
+  const xg={},xs=x=>x.s&&STORES[x.s]?x.s:"";extra.forEach(x=>{const k=xs(x);if(k){(xg[k]=xg[k]||[]).push(x);groups[k]=groups[k]||[]}});const xRest=extra.filter(x=>!xs(x));
   const done=id=>S.checked.includes(id);
   const sortDone=a=>[...a.filter(x=>!done(x.id)),...a.filter(x=>done(x.id))];  // was im Wagen liegt, rutscht nach unten
   // Laufweg im Markt: Obst & Gemüse vorne, Tiefkühl zuletzt (bleibt kalt), Non-Food dazwischen wie in den meisten Märkten
@@ -1727,12 +1732,13 @@ function renderList(){
     if(o)return `<b class="zimg" ${pick}>${imgTag(o)}</b>`;
     return `<b class="zimg none" ${pick}>${ILL.sonstiges}<small>Sorte wählen</small></b>`};
   const line=(id,name,price,label)=>`<div class="rline${done(id)?" done":""}"><button class="rcheck" data-check="${esc(id)}" aria-pressed="${done(id)}" aria-label="${esc(name)} ${done(id)?"aus dem Wagen nehmen":"in den Wagen"}"><i></i>${zImg(id)}<span>${qty(id)>1?`<em class="qx">${qty(id)}×</em> `:""}${esc(name)}${label||""}</span></button>${cpBtn(id)}${stepper(id)}<span>${price}</span><button data-${id.startsWith("x-")?"delextra":"add"}="${esc(id)}" aria-label="${esc(name)} entfernen">${IC.x}</button></div>`;
+  const xLine=x=>line(x.id,x.n,x.p?eur(extraP(x)):paidOf(x)?`<i class="rca" title="geschätzt: zuletzt bezahlt">ca. ${eur(extraT(x))}</i>`:"",x.dp?` <em class="rsoon">${esc(x.dp)}</em>`:"")+(done(x.id)?"":`<div class="xmk">${mktSel("",xs(x),"xmkt","Markt für „"+x.n+"“ ändern").replace("<select ",`<select data-xmkt="${esc(x.id)}" `)}</div>`)+exHintHTML(x);
   const nDone=[...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).length;
-  const grpTot=os=>{const t=os.reduce((a,o)=>a+lineT(o),0),r=os.reduce((a,o)=>a+lineR(o)+linePf(o),0),p=r2(os.reduce((a,o)=>a+linePf(o),0));return `<div class="rsub"><span>Summe ${os.length} Artikel${p?` · inkl. ${eur(p)} Pfand`:""}${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
-  return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${endSoonHTML(items)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items,extra,sum)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(extra.length?1:0)} ${Object.keys(groups).length+(extra.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
+  const grpTot=(os,xx=[])=>{const xt=xx.reduce((a,x)=>a+extraT(x),0),t=os.reduce((a,o)=>a+lineT(o),0)+xt,r=os.reduce((a,o)=>a+lineR(o)+linePf(o),0)+xt,p=r2(os.reduce((a,o)=>a+linePf(o),0));return `<div class="rsub"><span>Summe ${os.length+xx.length} Artikel${p?` · inkl. ${eur(p)} Pfand`:""}${r>t+.004?` · gespart ${eur(r-t)}`:""}</span><span>${eur(t)}</span></div>`};
+  return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${cartHTML(items,extra)}${endSoonHTML(items)}${savedHTML()}${goneHTML()}${cbListTips(items)}${planHTML(items,extra,sum)}<div class="receipt"><h3>EINKAUFSZETTEL</h3><div class="sub">${Object.keys(groups).length+(xRest.length?1:0)} ${Object.keys(groups).length+(xRest.length?1:0)===1?"Abschnitt":"Abschnitte"} · ${items.length+extra.length} Artikel${nDone?` · ${nDone} im Wagen`:""}<br>sortiert nach Weg durch den Markt</div>
    ${Object.entries(groups).map(([s,os])=>`<div class="rgroup"><div class="rs">${sb(s)}${esc(sname(s))}${ANDROID&&MKT_APP[s]?`<button class="mktbtn" data-mktapp="${s}" title="${esc(MKT_APP[s].n)}-App öffnen, z. B. für deinen Code an der Kasse">📱 ${esc(MKT_APP[s].n)}</button>`:""}</div>
-     ${actSum(os)}${walkLines(os)}${Object.keys(groups).length>1?grpTot(os):""}</div>`).join("")}
-   ${extra.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(extra).map(x=>line(x.id,x.n,x.p?eur(extraP(x)):paidOf(x)?`<i class="rca" title="geschätzt: zuletzt bezahlt">ca. ${eur(extraT(x))}</i>`:"",x.dp?` <em class="rsoon">${esc(x.dp)}</em>`:"")+exHintHTML(x)).join("")}</div>`:""}
+     ${actSum(os)}${walkLines(os)}${sortDone(xg[s]||[]).map(xLine).join("")}${Object.keys(groups).length+(xRest.length?1:0)>1?grpTot(os,xg[s]||[]):""}</div>`).join("")}
+   ${xRest.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(xRest).map(xLine).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${est||items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${pfSum?`<div><span>davon Pfand</span><span>${eur(pfSum)}</span></div>`:""}${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    <div class="rnote">Die Summe ist dein Preis an der Kasse${pfSum?", mit Pfand (das bekommst du bei der Rückgabe der Flaschen zurück)":""}. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.${est?" „ca.“ bei eigenen Einträgen = so viel hast du zuletzt dafür bezahlt.":""}</div></div>
    <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
@@ -2296,7 +2302,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.sugg==="ex"){const inp=document.getElementById("extraIn"),x=parseExtra(inp?.value||""),v=b.dataset.v,k=norm(v);hideSugg();
     const o=weekOffers().find(o=>norm(o.n)===k||norm((o.b||"")+o.n)===k);
     if(o){if(!S.list.includes(o.id))S.list.push(o.id);if(x.q>1)S.qty[o.id]=x.q;toast(`${o.n} im Angebot bei ${sname(o.s)} – auf den Zettel gesetzt`)}
-    else{const id="x-"+Date.now();S.extra.push(x.p?{id,n:v,p:x.p}:{id,n:v});if(x.q>1)S.qty[id]=x.q;toast(`${v} auf den Zettel gesetzt`)}
+    else{const id="x-"+Date.now();S.extra.push(x.p?{id,n:v,p:x.p,...exS()}:{id,n:v,...exS()});if(x.q>1)S.qty[id]=x.q;toast(`${v} auf den Zettel gesetzt`)}
     save();render();document.getElementById("extraIn")?.focus();return}
   if(b.dataset.sugg==="kw"){const v=b.dataset.v;document.getElementById("kwIn").value=v;hideSugg();document.getElementById("kwForm").requestSubmit();return}
   if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
@@ -2433,7 +2439,7 @@ document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.lightbox){S.light
 document.addEventListener("submit",e=>{
   if(e.target.id==="kwForm"){e.preventDefault();const v=document.getElementById("kwIn").value.trim(),mx=parseNum(document.getElementById("kwMax").value);
     if(v){const i=S.watch.findIndex(w=>norm(w.k)===norm(v));if(i>=0)S.watch[i].max=mx||undefined;else S.watch.push(mx?{k:v,max:mx}:{k:v});save();toast(mx?`Vorrats-Alarm: „${v}“ unter ${eur(mx)}/kg`:`„${v}“ wird beobachtet`)}render()}
-  if(e.target.id==="extraForm"){e.preventDefault();hideSugg();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p}:{id,n:x.n});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
+  if(e.target.id==="extraForm"){e.preventDefault();hideSugg();const v=document.getElementById("extraIn").value.trim();if(v){const x=parseExtra(v),id="x-"+Date.now();S.extra.push(x.p?{id,n:x.n,p:x.p,...exS()}:{id,n:x.n,...exS()});if(x.q>1)S.qty[id]=x.q;save();render();document.getElementById("extraIn")?.focus()}return}
   if(e.target.id==="cpqForm"){e.preventDefault();cpqSave(e.target.dataset.id,document.getElementById("cpqType").value,parseNum(document.getElementById("cpqVal").value));return}
   if(e.target.id==="devForm"){e.preventDefault();const v=document.getElementById("devName").value.trim().slice(0,30);store.set("devName",v);Sync.push().then(()=>{toast(v?`Dieses Gerät heißt jetzt „${v}“`:"Name zurückgesetzt");render()});return}
   if(e.target.id==="syncForm"){e.preventDefault();const cp=codeParse(document.getElementById("syncToken").value),t=cp.t;if(cp.p)store.set("syncPick",cp.p);
@@ -2456,7 +2462,9 @@ document.addEventListener("submit",e=>{
     toast(n?`Coupon gespeichert, passt zu ${n} Angebot${n===1?"":"en"}`:"Coupon gespeichert. Gerade passt kein Angebot dazu.");render();return}
 });
 // Programm passend zum gewählten Markt vorschlagen
-document.addEventListener("change",e=>{if(e.target.id==="zCart"){Scan.cart=e.target.checked;zPaint();return}if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
+document.addEventListener("change",e=>{if(e.target.id==="zMkt"){S.zMkt=e.target.value;save();toast(S.zMkt?`Neue Einträge kommen zu ${sname(S.zMkt)}`:"Neue Einträge kommen zu Sonstiges");return}
+  if(e.target.dataset&&e.target.dataset.xmkt){const x=S.extra.find(y=>y.id===e.target.dataset.xmkt);if(x){if(e.target.value)x.s=e.target.value;else delete x.s;save();render()}return}
+  if(e.target.id==="zCart"){Scan.cart=e.target.checked;zPaint();return}if(e.target.id==="cpStore")document.getElementById("cpProg").value=defaultProg(e.target.value)});
 document.getElementById("q").addEventListener("input",e=>{S.q=e.target.value;S.limit=60;if(S.tab!=="offers")S.tab="offers";render();showSugg("qSugg",S.q,"q")});
 document.getElementById("q").addEventListener("focus",e=>showSugg("qSugg",e.target.value,"q"));
 document.addEventListener("input",e=>{if(e.target.id==="kwIn")showSugg("kwSugg",e.target.value,"kw");if(e.target.id==="extraIn")showSugg("exSugg",parseExtra(e.target.value).n,"ex");
