@@ -732,3 +732,6 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .receipt .ztab{position:relative;overflow:visible}
 .receipt .ztab em{position:absolute;top:-9px;right:-6px;min-width:20px;text-align:center;padding:1px 6px;font-size:.72em;line-height:1.4;box-shadow:0 1px 3px rgba(0,0,0,.25);z-index:1}
 @media (hover:none) and (pointer:coarse){.receipt .ztabs{padding:10px 8px 10px}}
+.receipt .ztab.done{padding:4px 10px;gap:4px;border-style:dashed}
+.receipt .ztab.done b{font-size:1.15em;line-height:1}.receipt .ztab.done small{font-weight:700;font-size:.82em}
+.receipt .ztab.done em{background:#2563EB}

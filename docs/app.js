@@ -1024,6 +1024,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  145:["Einkauf abschließen: Kassenbon hochladen schließt den Einkauf in diesem Markt ab – gekaufte Artikel verschwinden vom Zettel, der Zettel ist frei für den nächsten Einkauf.","Neuer Reiter „🧾 Erledigt“ im Einkaufszettel: alle abgeschlossenen Einkäufe mit Kassenzettel. Abgehakte Artikel kannst du auch per Knopf „✓ Einkauf abschließen“ abschließen."],
   144:["Merkliste: Der Abgleich zwischen Handy und PC führt jetzt immer zusammen – was ein Gerät noch hat, geht nicht mehr verloren, gelöscht wird nur, was du wirklich entfernst. „Kaufst du oft“ zeigt keine Kassenbon-Kürzel mehr."],
   143:["Kassenbon: Wird ein Bon zum Einkauf vom Zettel eingelesen, bleiben die Angebote (z. B. McCain Kroketten), Bilder und das Gespart erhalten. Bon-Artikel landen beim Zurückholen im richtigen Markt statt unter „Sonstiges“."],
   142:["Einkaufszettel: Der Kasten „Einkauf vom Kassenbon eintragen“ steht jetzt auch da, wenn ein Markt-Logo gewählt und der Zettel leer ist."],
@@ -1711,15 +1712,16 @@ function renderConnect(){const close=`<button class="ibtn" id="closeSheet" aria-
    <div class="factions"><button class="btn ghost" data-connect="0">Nicht jetzt</button><button class="btn big" data-connect="1">✓ Verbinden</button></div></div>`}
 
 function renderList(){
-  const zm=S.zMkt&&STORES[S.zMkt]?S.zMkt:"",allI=S.list.map(byId).filter(Boolean);
+  const zm=S.zMkt&&STORES[S.zMkt]?S.zMkt:"",zDone=S.zMkt==="done",allI=S.list.map(byId).filter(Boolean),nT=S.trips.filter(t=>monKey(t.d)===monKey(TODAY)).length;
   const zc=k=>allI.filter(o=>o.s===k).length+S.extra.filter(x=>x.s===k).length;
-  const ztabs=`<div class="ztabs" role="tablist" aria-label="Einkaufszettel je Markt"><button class="ztab all" role="tab" data-ztab="" aria-selected="${!zm}"><b>Alle</b>${allI.length+S.extra.length?`<em>${allI.length+S.extra.length}</em>`:""}</button>${Object.keys(STORES).map(k=>{const n=zc(k);return `<button class="ztab${n?"":" empty"}" role="tab" data-ztab="${k}" aria-selected="${zm===k}" title="Einkaufszettel ${esc(sname(k))}" aria-label="${esc(sname(k))}${n?`, ${n} Artikel`:""}">${sb(k)}${n?`<em>${n}</em>`:""}</button>`}).join("")}</div>`;
+  const ztabs=`<div class="ztabs" role="tablist" aria-label="Einkaufszettel je Markt"><button class="ztab all" role="tab" data-ztab="" aria-selected="${!zm&&!zDone}"><b>Alle</b>${allI.length+S.extra.length?`<em>${allI.length+S.extra.length}</em>`:""}</button><button class="ztab done" role="tab" data-ztab="done" aria-selected="${zDone}" title="Abgeschlossene Einkäufe" aria-label="Abgeschlossene Einkäufe${nT?`, ${nT} diesen Monat`:""}"><b>🧾</b><small>Erledigt</small>${nT?`<em>${nT}</em>`:""}</button>${Object.keys(STORES).map(k=>{const n=zc(k);return `<button class="ztab${n?"":" empty"}" role="tab" data-ztab="${k}" aria-selected="${zm===k}" title="Einkaufszettel ${esc(sname(k))}" aria-label="${esc(sname(k))}${n?`, ${n} Artikel`:""}">${sb(k)}${n?`<em>${n}</em>`:""}</button>`}).join("")}</div>`;
+  if(zDone)return `${holiHTML()}${cbDueHTML()}<div class="receipt"><h3>EINKAUFSZETTEL</h3>${ztabs}<div class="zempty"><b>Abgeschlossene Einkäufe</b>${S.trips.length?"Tippe einen Einkauf an, um den ganzen Kassenzettel zu sehen.":"Noch kein Einkauf abgeschlossen. Hake im Markt alles ab oder lade danach den Kassenbon hoch – dann landet der Einkauf hier und der Zettel ist wieder frei."}</div></div>${bonBoxHTML()}${tripsHTML()}`;
   const items=zm?allI.filter(o=>o.s===zm):allI,extra=zm?S.extra.filter(x=>x.s===zm):S.extra;if(extra.length)loadDauer();
   // Bilder für eigene Einträge: Bilder-Liste + Artikelstamm erst hier laden
   if(extra.length&&(!SIMG||!CATALOG_N)){const again=()=>{if(S.tab==="list"&&SIMG&&CATALOG_N)render()};if(!SIMG)loadSugImgs(again);if(!CATALOG_N)loadCatalog(again)}
   const addRow=`<form class="addrow" id="extraForm"><input id="extraIn" placeholder="${zm?PH(`${sname(zm)}: Artikel suchen oder eintippen, z. B. Brot 1,99`,`${sname(zm)}: z. B. Brot`):PH("Artikel suchen oder eintippen, z. B. Brot 1,99 oder 3x Joghurt","z. B. Brot oder 3x Joghurt")}" autocomplete="off"><button class="btn" type="submit">${IC.plus}Dazu</button><button class="btn ghost zscan" type="button" id="zScan" aria-label="Artikel per Strichcode auf den Zettel scannen" title="Strichcode scannen">${IC.scan}Scannen</button>${Voice.ok()?`<button class="btn ghost zmic${Voice.on?" on":""}" type="button" id="zMic" aria-pressed="${Voice.on}" aria-label="Artikel sprechen, z. B. Milch, Butter und drei Eier" title="Artikel sprechen">${Voice.on?"🎤 Ich höre zu …":"🎤 Sprechen"}</button>`:""}</form><div id="exSugg"></div><p class="exhint">${zm?`Vorschläge nur aus dem Sortiment von ${esc(sname(zm))}. Alles, was du hier einträgst, steht auf dem ${esc(sname(zm))}-Zettel.`:"Tipp: Unten im Einkaufszettel ein Markt-Logo antippen = Zettel nur für diesen Markt, Vorschläge nur aus seinem Sortiment."}</p>`;
-  if(zm&&!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}<div class="receipt"><h3>EINKAUFSZETTEL</h3>${ztabs}<div class="zempty"><b>Noch nichts für ${esc(sname(zm))} auf dem Zettel</b>Tippe oben einen Artikel ein – die Vorschläge kommen nur aus dem Sortiment von ${esc(sname(zm))}.</div></div>${bonBoxHTML()}${tripsHTML()}`;
-  if(!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}${tripsHTML()}`;
+  if(zm&&!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}<div class="receipt"><h3>EINKAUFSZETTEL</h3>${ztabs}<div class="zempty"><b>Noch nichts für ${esc(sname(zm))} auf dem Zettel</b>Tippe oben einen Artikel ein – die Vorschläge kommen nur aus dem Sortiment von ${esc(sname(zm))}.</div></div>${bonBoxHTML()}`;
+  if(!items.length&&!extra.length)return `${holiHTML()}${cbDueHTML()}${addRow}${freqHTML()}${savedHTML()}${goneHTML()}${goneHTML()?"":`<div class="empty"><b>Dein Einkaufszettel ist leer</b>Tippe bei einem Angebot auf Plus, übernimm im Kracher-Fenster deinen Wochenplan oder such oben jeden Artikel aus – auch was gerade nicht im Angebot ist. SparRadar sortiert alles nach Markt.</div>`}${bonBoxHTML()}`;
   const groups={};items.forEach(o=>(groups[o.s]=groups[o.s]||[]).push(o));
   const xg={},xs=x=>x.s&&STORES[x.s]?x.s:"";extra.forEach(x=>{const k=xs(x);if(k){(xg[k]=xg[k]||[]).push(x);groups[k]=groups[k]||[]}});const xRest=extra.filter(x=>!xs(x));
   const done=id=>S.checked.includes(id);
@@ -1766,8 +1768,8 @@ function renderList(){
    ${xRest.length?`<div class="rgroup"><div class="rs">${IC.bag}Sonstiges</div>${sortDone(xRest).map(xLine).join("")}</div>`:""}
    <div class="rtot"><div class="big"><span>SUMME</span><span>${est||items.some(o=>!done(o.id)&&tillUnknown(o))?"ca. ":""}${eur(sum)}</span></div>${pfSum?`<div><span>davon Pfand</span><span>${eur(pfSum)}</span></div>`:""}${nDone&&rest<sum-.004?`<div><span>Noch offen</span><span>${eur(rest)}</span></div>`:""}${reg>sum+.004?`<div><span>Normalpreis</span><span>${eur(reg)}</span></div><div class="sv"><span>GESPART</span><span>${eur(reg-sum)}</span></div>`:""}</div>
    <div class="rnote">Die Summe ist dein Preis an der Kasse${pfSum?", mit Pfand (das bekommst du bei der Rückgabe der Flaschen zurück)":""}. App-Preise zählen erst, wenn du sie oben mit „Aktiviert ✓“ bestätigst. Geld zurück, Payback und Bonus-Guthaben kommen später und sind nicht abgezogen.${est?" „ca.“ bei eigenen Einträgen = so viel hast du zuletzt dafür bezahlt.":""}</div></div>
-   <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?'<button class="btn ghost" id="clearDone">Erledigte entfernen</button>':""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
-   ${bonBoxHTML()}${tripsHTML()}`}
+   <div class="ractions"><a class="btn wa" href="${waLink(listText())}" target="_blank" rel="noopener">${WA_ICON}Per WhatsApp schicken</a><button class="btn ghost" id="copyList">Als Text kopieren</button>${nDone?`<button class="btn" id="finDone" data-ids="${esc([...items.map(o=>o.id),...extra.map(x=>x.id)].filter(done).join(","))}">✓ Einkauf abschließen (${nDone})</button>`:""}<button class="btn ghost" id="clearList">Zettel leeren</button></div>
+   ${bonBoxHTML()}`}
 
 // ---------- Kassenbon einlesen (Foto, Screenshot, PDF oder per „Teilen“ aus der Markt-App) ----------
 // Alles passiert auf dem Gerät: PDF-Text per pdf.js, Bilder per Texterkennung (tesseract.js). Nichts wird hochgeladen.
@@ -1898,9 +1900,11 @@ function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   const d=r.d&&/^\d{4}-\d\d-\d\d$/.test(r.d)?r.d:TODAY,at=new Date(d+"T"+(r.t||"12:00")+":00").toISOString();
   // Gleicher Tag + gleicher Markt schon als Einkauf vom Zettel? Der Bon ist genauer und ersetzt ihn – Angebote/Namen/Gespart vom Zettel bleiben erhalten.
   const dup=S.trips.find(x=>!x.bon&&x.d===d&&(x.items.some(i=>i.s===r.s)||x.extra.some(e=>e.s===r.s)));
-  const zi=dup?dup.items.filter(i=>i.s===r.s).map(i=>({...i})):[],ze=dup?dup.extra.map(e=>({...e})):[];
+  // Kein Einkauf vom Zettel? Dann mit dem offenen Zettel dieses Markts abgleichen – was auf dem Bon steht, ist gekauft und fliegt danach vom Zettel.
+  const zi=dup?dup.items.filter(i=>i.s===r.s).map(i=>({...i})):S.list.map(byId).filter(o=>o&&o.s===r.s).map(o=>({id:o.id,n:o.n,b:o.b||"",s:o.s,q:qty(o.id),p:lineP(o),r:lineR(o),_z:1}));
+  const ze=dup?dup.extra.map(e=>({...e})):S.extra.filter(x=>x.s===r.s||!x.s).map(x=>({id:x.id,n:x.n,q:qty(x.id),p:extraP(x),_z:1}));
   const zTake=(arr,x)=>{const q=x.q||1,u=r2(x.p/q),w=bToks(x.n);
-    const c=arr.filter(i=>!i._u&&(Math.abs(i.p-x.p)<.01||Math.abs(r2(i.p/(i.q||1))-u)<.01));
+    const c=arr.filter(i=>!i._u&&(Math.abs(i.p-x.p)<.01||Math.abs(r2(i.p/(i.q||1))-u)<.01||(i._z&&!i.p)));
     const f=c.find(i=>bToks((i.b||"")+" "+i.n).some(t=>t.length>=5&&w.some(v=>v.length>=5&&v.slice(0,5)===t.slice(0,5))))||null;if(f)f._u=1;return f};
   const items=r.items.filter(x=>x.on).map((x,i)=>{const o=bonMatch(x,r.s),q=x.q||1,z=zTake(zi,x),ze1=z?null:zTake(ze,x);
     const reg=o&&o.o>x.p/q+.004?r2(o.o*q):r2(x.p+(x.disc||0)),rz=z&&z.r>z.p?r2(x.p+(z.r-z.p)*(q/(z.q||1))):0;
@@ -1913,8 +1917,14 @@ function bonSave(){const r=BON.r;if(!r||!r.s)return;store.set("bonStore",r.s);
   const chk=r.items.filter(x=>x.on&&!bonMatch(x,r.s)).map(x=>{const o=bonOffer(x,r.s,d),q=x.q||1;return o?{n:x.n,q,paid:r2(x.p/q),off:o.p,on:(o.b?o.b+" ":"")+o.n}:null}).filter(Boolean);
   if(chk.length)t.chk=chk;
   if(dup)S.trips=S.trips.filter(x=>x!==dup);
+  // Zettel dieses Markts abschließen: abgehakte + auf dem Bon gefundene Einträge raus, nur nicht Gekauftes bleibt stehen
+  const gone=new Set([...zi,...ze].filter(i=>i._z&&i._u).map(i=>i.id));
+  S.list.forEach(id=>{const o=byId(id);if(o&&o.s===r.s&&S.checked.includes(id))gone.add(id)});
+  S.extra.forEach(x=>{if(x.s===r.s&&S.checked.includes(x.id))gone.add(x.id)});
+  if(gone.size){S.list=S.list.filter(id=>!gone.has(id));S.extra=S.extra.filter(x=>!gone.has(x.id));S.checked=S.checked.filter(id=>!gone.has(id));gone.forEach(id=>delete S.qty[id]);S.act=S.act.filter(id=>S.list.includes(id));if(!S.list.length&&!S.extra.length)wakeOff()}
+  const left=S.list.map(byId).filter(o=>o&&o.s===r.s).length+S.extra.filter(x=>x.s===r.s).length;
   S.trips.unshift(t);S.trips.sort((a,b)=>b.at.localeCompare(a.at));S.trips=S.trips.slice(0,400);
-  save();BON.st=null;S.tripId=t.id;S.sheet="trip";render();toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:dup?"✓ Bon gespeichert – ersetzt den Einkauf vom Zettel":"✓ Bon gespeichert: "+items.length+" Artikel, "+eur(t.paid))}
+  save();BON.st=null;S.tripId=t.id;S.sheet="trip";render();toast(chk.length?`⚠️ Kassen-Kontrolle: ${chk.length} Artikel teurer als im Angebot – bitte ansehen`:`✓ ${sname(r.s)}-Einkauf abgeschlossen (${eur(t.paid)})`+(left?` – ${left} Artikel ${left>1?"waren":"war"} nicht auf dem Bon und ${left>1?"bleiben":"bleibt"} auf dem Zettel`:" – Zettel ist wieder frei"))}
 // Geteilter Bon (Teilen-Menü -> SparRadar): liegt kurz im Service-Worker-Speicher
 async function bonFromShare(){if(!/[?&]bon=1/.test(location.search))return;history.replaceState(null,"",location.pathname);
   try{const c=await caches.open("sr-share"),f=await c.match("bon-file"),t=await c.match("bon-text");
@@ -2413,6 +2423,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.swapall){let n=0;b.dataset.swapall.split(",").forEach(p=>{const [a,c]=p.split("|"),i=S.list.indexOf(a);if(i>=0&&!S.list.includes(c)){S.list[i]=c;if(S.qty[a]){S.qty[c]=S.qty[a];delete S.qty[a]}n++}});save();toast(`${n} Artikel getauscht`);render();return}
   if(b.id==="watchFromSearch"){const k=S.q.trim();if(k&&!S.watch.some(w=>norm(w.k)===norm(k)))wAdd({k});save();toast(`„${k}“ wird beobachtet`);S.tab="watch";render();return}
   if(b.id==="clearList"){if(!confirm("Den ganzen Einkaufszettel leeren?"))return;S.list=[];S.extra=[];S.checked=[];save();render();return}
+  if(b.id==="finDone"){finishTrip(b.dataset.ids.split(","),false);return}
   if(b.id==="clearDone"){S.list=S.list.filter(id=>!S.checked.includes(id));S.extra=S.extra.filter(x=>!S.checked.includes(x.id));S.checked=[];save();render();return}
   if(b.id==="zMic"){Voice.start();return}
   if(b.id==="scanBtn"||b.id==="zScan"){Object.assign(Scan,{mode:b.id==="zScan"?"list":"",last:"",res:"",added:[],unknown:"",cart:null,msgT:""});S.sheet="scan";render();return}
@@ -2453,7 +2464,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.tpclose){hideTripPop();return}
   if(b.dataset.readd){readd(b.dataset.readd);return}
   if(b.dataset.budget){const v=prompt("Budget für diesen Einkauf in Euro (leer lassen = kein Budget):",S.budget?String(S.budget).replace(".",","):"");if(v===null)return;S.budget=Math.max(0,parseFloat(v.replace(",","."))||0);save();render();return}
-  if(b.dataset.ztab!==undefined){S.zMkt=b.dataset.ztab;save();hideSugg();render();{const z=document.querySelector(".receipt .ztabs"),t=z&&z.querySelector('.ztab[aria-selected="true"]');if(t)z.scrollLeft=t.offsetLeft-z.offsetLeft-(z.clientWidth-t.offsetWidth)/2}if(S.zMkt&&!NST)loadNst();return}
+  if(b.dataset.ztab!==undefined){S.zMkt=b.dataset.ztab;save();hideSugg();render();{const z=document.querySelector(".receipt .ztabs"),t=z&&z.querySelector('.ztab[aria-selected="true"]');if(t)z.scrollLeft=t.offsetLeft-z.offsetLeft-(z.clientWidth-t.offsetWidth)/2}if(STORES[S.zMkt]&&!NST)loadNst();return}
   if(b.dataset.delextra){S.extra=S.extra.filter(x=>x.id!==b.dataset.delextra);save();render();return}
   if(b.id==="toTop"){scrollTo({top:0,behavior:"smooth"});return}
   if(b.id==="copyList"){copy(listText(),"Einkaufszettel kopiert");return}
