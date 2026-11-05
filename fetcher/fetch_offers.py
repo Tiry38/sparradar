@@ -994,6 +994,13 @@ def fetch_sortiment(regional=None):
                 today = dt.date.today().isoformat()
                 preview = {str((it.get("parentContent") or {}).get("id")) for it in found
                            if str(it.get("validFrom") or "")[:10] >= today and it.get("publisherId") in pubs}
+                # Händler-Kennung gilt bei Edeka bundesweit -> Prospekte mit Eigenmarken anderer Regionen raus
+                for fid in sorted(preview):
+                    fr = foreign_region(store, [f"{it.get('brand') or ''} {it.get('title') or ''} {it.get('description') or ''}"
+                                                for it in found if str((it.get("parentContent") or {}).get("id")) == fid])
+                    if fr >= 2:
+                        preview.discard(fid)
+                        log(f"  {store}: Vorschau-Prospekt {fid} hat {fr} Eigenmarken anderer Regionen -> abgelehnt")
                 if preview:
                     log(f"  {store}: Vorschau nächste Woche aus Prospekt(en) {sorted(preview)}")
             ok = ok | preview
@@ -1072,6 +1079,19 @@ def pw_words(s):
     return set(re.findall(r"[a-zäöüß]{4,}", (s or "").lower()))
 
 
+# Regionale Eigenmarken anderer Edeka-Regionen (05.11.: kaufDA-Prospekt 90a11d9f und prospektewoche-Edeka waren
+# Edeka Minden-Hannover/Berlin – Bauerngut, Berliner Kindl, Brandenburger Quell –, Jockgrim = Edeka Südwest mit
+# „Unsere Heimat“). Bundesweite Markenartikel kosten in allen Regionen oft gleich, der Preisvergleich allein reicht nicht.
+REGION_BAD = {"edeka": ("bauerngut", "berliner kindl", "berliner pilsner", "berliner bürgerbräu",
+                        "brandenburger quell", "berlimo")}
+
+
+def foreign_region(store, texts):
+    """Wie viele Texte tragen eine Eigenmarke einer anderen Region? Ab 2 = Prospekt einer anderen Gegend."""
+    bad = REGION_BAD.get(store, ())
+    return sum(1 for t in texts if any(b in (t or "").lower() for b in bad)) if bad else 0
+
+
 def pw_region_ok(shop, store, items):
     """Passt der prospektewoche-Prospekt zu unserem Markt? (05.11.: Edeka dort = Prospekt der Region Jockgrim,
     früher war es eine andere Gegend.) Vergleich der laufenden Woche mit den echten Angeboten unseres Markts
@@ -1094,8 +1114,10 @@ def pw_region_ok(shop, store, items):
                 same += 1
             else:
                 diff += 1
-    ok = same >= 15 and diff * 5 <= same
-    log(f"  prospektewoche {shop}: laufende Woche {same} gleiche, {diff} andere Preise als unser Markt"
+    fr = foreign_region(store, [f"{it.get('title')} {it.get('subtitle')}" for _, it in items])
+    ok = same >= 15 and diff * 5 <= same and fr < 2
+    log(f"  prospektewoche {shop}: laufende Woche {same} gleiche, {diff} andere Preise als unser Markt,"
+        f" {fr} Eigenmarken anderer Regionen"
         f" -> {'gleiche Region, Vorschau wird übernommen' if ok else 'andere Region, nicht übernommen'}")
     return ok
 
@@ -1145,6 +1167,10 @@ def fetch_prospektewoche(shop="rewe", store="rewe", check=False):
                 out.append(o)
                 SEEN_NAMES.setdefault(title, o["img"])
                 SEEN_ST.setdefault(title, store)
+    fr = foreign_region(store, [f"{o.get('b') or ''} {o['n']} {o.get('d') or ''}" for o in out])
+    if check and fr >= 2:  # neue Woche selbst prüfen: Eigenmarken einer anderen Region -> verwerfen
+        log(f"  prospektewoche {shop}: neue Woche hat {fr} Eigenmarken anderer Regionen -> andere Region, nicht übernommen")
+        return []
     log(f"  prospektewoche {shop}: {len(out)} Vorschau-Angebote")
     return out
 
