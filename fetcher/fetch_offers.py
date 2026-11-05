@@ -1042,48 +1042,119 @@ def pw_dates(txt, today):
     return a.isoformat(), b.isoformat()
 
 
-def fetch_prospektewoche(shop="rewe", store="rewe"):
+def pw_week(shop, wk):
+    """Alle Artikel einer prospektewoche-Woche: [(Seite, Artikel-JSON)]"""
+    hw = http(f"{PW}/{shop}?week={wk}") or ""
+    pages = sorted(set(re.findall(rf'data-json-url="(/images/prospekte/{re.escape(shop)}/week{wk}/(\d+)\.json)"', hw)), key=lambda x: int(x[1]))
+    out = []
+    for path, pg in pages:
+        time.sleep(PAUSE)
+        raw = http(PW + path)
+        if raw is None:  # 429 „zu viele Abrufe“ -> einmal nach einer längeren Pause nochmal
+            time.sleep(20)
+            raw = http(PW + path)
+        try:
+            out += [(int(pg), it) for it in json.loads(raw or "{}").get("items") or []]
+        except ValueError:
+            continue
+    return out, len(pages)
+
+
+def pw_case(t):
+    """„CHAMPIGNONS WEIB oder BRAUN“ -> „Champignons Weiß oder Braun“ (frühe Prospekt-Daten in Großbuchstaben)"""
+    if sum(c.isupper() for c in t) <= sum(c.islower() for c in t):
+        return t
+    t = re.sub(r"\bWEIB\b", "WEIß", t)
+    return re.sub(r"[A-ZÄÖÜß]{2,}", lambda m: m.group(0) if m.group(0) in PA_KEEP else m.group(0).capitalize(), t)
+
+
+def pw_words(s):
+    return set(re.findall(r"[a-zäöüß]{4,}", (s or "").lower()))
+
+
+def pw_region_ok(shop, store, items):
+    """Passt der prospektewoche-Prospekt zu unserem Markt? (05.11.: Edeka dort = Prospekt der Region Jockgrim,
+    früher war es eine andere Gegend.) Vergleich der laufenden Woche mit den echten Angeboten unseres Markts
+    (kaufDA, ohne Vorschau). App-Preise (`ao`/`ap`) zählen nicht: kaufDA zeigt dort den App-Preis, prospektewoche
+    den Normalpreis. Übernommen wird nur bei mind. 15 gleichen Preisen und höchstens jedem 5. anders."""
+    ours = [o for o in OLD_OFFERS if o.get("s") == store and not o.get("pv") and not o.get("ao") and not o.get("ap")
+            and o.get("src") == "kaufda.de" and (o.get("from") or "")[:10] <= dt.date.today().isoformat()]
+    same = diff = 0
+    for _, it in items:
+        t = pw_words(it.get("title"))
+        try:
+            p = float(str(it.get("price") or "0").replace(",", "."))
+        except ValueError:
+            continue
+        if len(t) < 2 or not p:
+            continue
+        hit = next((o for o in ours if len(t & (pw_words(o.get("n")) | pw_words(o.get("b")))) >= max(2, len(t) * 0.7)), None)
+        if hit:
+            if abs(hit["p"] - p) < 0.005:
+                same += 1
+            else:
+                diff += 1
+    ok = same >= 15 and diff * 5 <= same
+    log(f"  prospektewoche {shop}: laufende Woche {same} gleiche, {diff} andere Preise als unser Markt"
+        f" -> {'gleiche Region, Vorschau wird übernommen' if ok else 'andere Region, nicht übernommen'}")
+    return ok
+
+
+def fetch_prospektewoche(shop="rewe", store="rewe", check=False):
     today = dt.date.today()
     h = http(f"{PW}/{shop}") or ""
     tabs = [pw_dates(t, today) for t in re.findall(r'tab-dates">([^<]+)<', h)]
+    if check:  # erst die laufende Woche mit unserem Markt vergleichen
+        cur = [wk for wk, span in enumerate(tabs, 1) if span and span[0] <= today.isoformat() <= span[1]]
+        if not any(span and span[0] >= today.isoformat() for span in tabs):
+            log(f"  prospektewoche {shop}: keine neue Woche")
+            return []
+        if not cur:
+            log(f"  prospektewoche {shop}: laufende Woche fehlt -> keine Prüfung möglich, nicht übernommen")
+            return []
+        time.sleep(PAUSE)
+        if not pw_region_ok(shop, store, pw_week(shop, cur[0])[0]):
+            return []
     out = []
     for wk, span in enumerate(tabs, 1):
         if not span or span[0] < today.isoformat():  # auch die Woche, die heute beginnt (Montag)
             continue  # nur Wochen, die noch nicht begonnen haben
         time.sleep(PAUSE)
-        hw = http(f"{PW}/{shop}?week={wk}") or ""
-        pages = sorted(set(re.findall(rf'data-json-url="(/images/prospekte/{re.escape(shop)}/week{wk}/(\d+)\.json)"', hw)), key=lambda x: int(x[1]))
-        log(f"  prospektewoche {shop} Woche {wk} ({span[0]} – {span[1]}): {len(pages)} Seiten")
-        for path, pg in pages:
-            time.sleep(PAUSE)
+        items, npages = pw_week(shop, wk)
+        log(f"  prospektewoche {shop} Woche {wk} ({span[0]} – {span[1]}): {npages} Seiten")
+        for pg, it in items:
+            title = clean_text((it.get("title") or "").replace("\xad", "")).strip(" ,").lstrip("¹²³⁴⁵*").strip()
+            title = pw_case(title)
+            desc = clean_text(it.get("subtitle") or "")
+            m = re.match(r"([A-ZÄÖÜ][a-zäöüß]+(?:\s[A-ZÄÖÜ][a-zäöüß]+)?):\s+(.+)", title)
+            if m and m.group(1) not in ("REWE", "EDEKA"):
+                title, desc = m.group(2), f"{m.group(1)}, {desc}".strip(", ")  # „Niederlande: Rispentomaten“
             try:
-                items = json.loads(http(PW + path) or "{}").get("items") or []
+                price = float(str(it.get("price") or "0").replace(",", "."))
+                old = float(str(it.get("old_price") or "0").replace(",", ".")) or None
             except ValueError:
                 continue
-            for it in items:
-                title = clean_text((it.get("title") or "").replace("\xad", "")).strip(" ,")
-                desc = clean_text(it.get("subtitle") or "")
-                m = re.match(r"([A-ZÄÖÜ][a-zäöüß]+(?:\s[A-ZÄÖÜ][a-zäöüß]+)?):\s+(.+)", title)
-                if m and m.group(1) not in ("REWE",):
-                    title, desc = m.group(2), f"{m.group(1)}, {desc}".strip(", ")  # „Niederlande: Rispentomaten“
-                try:
-                    price = float(str(it.get("price") or "0").replace(",", "."))
-                    old = float(str(it.get("old_price") or "0").replace(",", ".")) or None
-                except ValueError:
-                    continue
-                up = str(it.get("unit_price") or "")
-                base = up if "=" in up else desc
-                img = it.get("image")
-                o = offer(store, title, price, desc=desc, old=old, base=base,
-                          img=f"{PW}/images/prospekte/{shop}/week{wk}/{img}" if img else None,
-                          start=span[0], end=span[1], src="prospektewoche.de", page=int(pg))
-                if o:
-                    o["pv"] = 1
-                    out.append(o)
-                    SEEN_NAMES.setdefault(title, o["img"])
-                    SEEN_ST.setdefault(title, store)
+            up = str(it.get("unit_price") or "")
+            base = up if "=" in up else desc
+            img = it.get("image")
+            o = offer(store, title, price, desc=desc, old=old, base=base,
+                      img=f"{PW}/images/prospekte/{shop}/week{wk}/{img}" if img else None,
+                      start=span[0], end=span[1], src="prospektewoche.de", page=pg)
+            if o:
+                o["pv"] = 1
+                out.append(o)
+                SEEN_NAMES.setdefault(title, o["img"])
+                SEEN_ST.setdefault(title, store)
     log(f"  prospektewoche {shop}: {len(out)} Vorschau-Angebote")
     return out
+
+
+def fetch_previews():
+    """Rewe- und Edeka-Vorschau nacheinander (gleicher Server, prospektewoche antwortet bei zu vielen Abrufen mit 429).
+    Edeka nur, wenn die laufende Woche dort zu Jockgrim passt (pw_region_ok)."""
+    out = fetch_prospektewoche("rewe", "rewe")
+    time.sleep(PAUSE)
+    return out + fetch_prospektewoche("edeka", "edeka", check=True)
 
 
 # ---------- prospektangebote.de (Folderz) ----------
@@ -1860,7 +1931,7 @@ def main():
             early_save(name)
 
     threads = [threading.Thread(target=run, args=a) for a in
-               (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("Rewe-Vorschau", fetch_prospektewoche),
+               (("Lidl", fetch_lidl), ("Aldi", fetch_aldi), ("Vorschau", fetch_previews),
                 ("prospektangebote", fetch_prospektangebote))]
     for t in threads:
         t.start()
@@ -1878,7 +1949,7 @@ def main():
             log("  ! Scheck-In-Prospekt noch nicht fertig gelesen – letzter Stand wird genommen")
     run("Scheck-In-Prospekt", lambda: load_scheck(results.get("kaufDA") or []))
     run("Zookauf-Prospekt", load_zookauf)
-    new = pa_dedupe([o for name in ("Lidl", "Aldi", "kaufDA", "Rewe-Vorschau", "prospektangebote", "Scheck-In-Prospekt", "Zookauf-Prospekt") for o in results.get(name, [])])
+    new = pa_dedupe([o for name in ("Lidl", "Aldi", "kaufDA", "Vorschau", "prospektangebote", "Scheck-In-Prospekt", "Zookauf-Prospekt") for o in results.get(name, [])])
     # Sortiment-Abgleich: Jeder Abruf baut die Liste neu auf – neue Artikel kommen dazu, verschwundene fliegen raus.
     # Ausnahme: Liefert ein Markt plötzlich fast nichts (Seite kurz down, Sperre, Umbau), bleiben seine noch gültigen
     # alten Angebote stehen, statt dass der ganze Markt bis zum nächsten Abruf leer ist.

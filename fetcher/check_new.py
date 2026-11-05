@@ -1,6 +1,6 @@
 """SparRadar: Prospekt-Wächter (läuft jeden Tag, Fr–So und Mo früh alle 5 min, sonst alle 15 min; Cloudflare-Taktgeber).
 
-Schaut nur auf die 5 kaufDA-Händlerseiten, 2 kaufDA-Sortimentseiten, prospektewoche.de/rewe und die Aldi-Angebotsseite und meldet, ob dort
+Schaut nur auf die 5 kaufDA-Händlerseiten, 2 kaufDA-Sortimentseiten, prospektewoche.de (Rewe, Edeka) und die Aldi-Angebotsseite und meldet, ob dort
 ein Prospekt bzw. Angebote mit Startdatum ab heute stehen (auch montags erscheinende Prospekte, die am selben Tag starten), die SparRadar noch nicht abgerufen hat.
 Nur dann startet der Workflow den kompletten Abruf (fetch_offers.py). So stehen die Angebote der nächsten
 Woche so früh wie möglich in der App, ohne die Quellen ständig komplett abzufragen.
@@ -78,13 +78,15 @@ def future_marks(grow=False):
                 o = f.kd_offer(it)
                 if o:
                     SEEN.append(o)
-    # Rewe-Vorschau: neue Woche bei prospektewoche.de (nur die Startseite mit den Wochen-Reitern)
-    h = f.http(f"{f.PW}/rewe") or ""
-    time.sleep(f.PAUSE)
-    for t in re.findall(r'tab-dates">([^<]+)<', h):
-        span = f.pw_dates(t, dt.date.today())
-        if span and span[0] >= today:
-            marks[f"rewe-pw:{span[0]}"] = span[0]
+    # Rewe-/Edeka-Vorschau: neue Woche bei prospektewoche.de (nur die Startseiten mit den Wochen-Reitern;
+    # ob der Edeka-Prospekt zu Jockgrim passt, prüft erst der Abruf)
+    for shop in ("rewe", "edeka"):
+        h = f.http(f"{f.PW}/{shop}") or ""
+        time.sleep(f.PAUSE)
+        for t in re.findall(r'tab-dates">([^<]+)<', h):
+            span = f.pw_dates(t, dt.date.today())
+            if span and span[0] >= today:
+                marks[f"{shop}-pw:{span[0]}"] = span[0]
     h = f.http("https://www.aldi-sued.de/de/angebote.html") or ""
     days = [(day, path) for day, path in f.aldi_days(h) if day >= today]
     for day, _ in days:  # Aldi-Tagesseiten der nächsten Woche (z. B. /angebote/2026-11-02)
