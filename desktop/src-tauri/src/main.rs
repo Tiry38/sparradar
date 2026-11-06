@@ -94,9 +94,13 @@ fn main() {
                     if is_app(url) {
                         return true;
                     }
-                    let _ = std::process::Command::new("rundll32")
-                        .args(["url.dll,FileProtocolHandler", url.as_str()])
-                        .spawn();
+                    // nur normale Links an Windows weitergeben (Browser, Mail, SMS, Telefon) – nie file:, search-ms: o. Ä.,
+                    // die lokale Programme starten könnten (Audit 06.11.)
+                    if matches!(url.scheme(), "http" | "https" | "mailto" | "sms" | "tel") {
+                        let _ = std::process::Command::new("rundll32")
+                            .args(["url.dll,FileProtocolHandler", url.as_str()])
+                            .spawn();
+                    }
                     false
                 })
                 .build()?;

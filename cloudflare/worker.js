@@ -26,8 +26,13 @@ function newId() {
   return out.join("");
 }
 
-export default {
+const worker = {
+  // Audit 06.11.: Datenbank-Fehler als lesbare Antwort mit CORS-Kopf (sonst sieht die App nur „Netzwerkfehler“)
   async fetch(req, env) {
+    try { return await worker.route(req, env); }
+    catch (e) { console.log("Fehler:", e && e.message); return json(req, { error: "Speicher gerade nicht erreichbar – bitte gleich nochmal." }, 503); }
+  },
+  async route(req, env) {
     if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req) });
     const url = new URL(req.url), db = env.DB, now = Date.now();
     const o = req.headers.get("Origin");
@@ -60,7 +65,7 @@ export default {
     }
     if (req.method === "PUT") {
       const body = await req.text();
-      if (body.length > MAX) return json(req, { error: "zu groß" }, 413);
+      if (new TextEncoder().encode(body).length > MAX) return json(req, { error: "zu groß" }, 413); // Bytes, nicht Zeichen (Umlaute = 2 Bytes)
       try { JSON.parse(body); } catch { return json(req, { error: "kein JSON" }, 400); }
       const r = await db.prepare("UPDATE sync SET data = ?, at = ? WHERE id = ?").bind(body, now, id).run();
       if (!r.meta.changes) return json(req, { error: "Code unbekannt" }, 404);
@@ -111,3 +116,4 @@ export default {
     }))));
   },
 };
+export default worker;

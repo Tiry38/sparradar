@@ -520,8 +520,10 @@ def main():
         fl[nm] = info
         offers = [o for o in offers if o.get("fid") != nm] + got
         log(f"  {nm}: {len(got)} Angebote, gültig {info['from']} bis {info['to']}")
-    json.dump({"at": dt.datetime.now().isoformat(timespec="seconds"), "src": "zookauf.de Prospekt (Texterkennung)",
-               "flyers": fl, "offers": offers}, open(OUT, "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    with open(OUT + ".tmp", "w", encoding="utf-8") as f:  # erst fertig schreiben, dann tauschen
+        json.dump({"at": dt.datetime.now().isoformat(timespec="seconds"), "src": "zookauf.de Prospekt (Texterkennung)",
+                   "flyers": fl, "offers": offers}, f, ensure_ascii=False, separators=(",", ":"))
+    os.replace(OUT + ".tmp", OUT)
     log(f"Zookauf: {len(offers)} Angebote in {len(fl)} Prospekten")
 
 

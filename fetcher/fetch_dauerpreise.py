@@ -28,7 +28,11 @@ PAGE = re.compile(r'href="(?:https://www\.aldi-sued\.de)?(/(?:de/)?produkte/[^"#
 
 def robots():
     rp = urllib.robotparser.RobotFileParser()
-    rp.parse((f.http(BASE + "/robots.txt") or "").splitlines())
+    txt = f.http(BASE + "/robots.txt")
+    if txt is None:  # Audit 06.11.: robots.txt nicht lesbar -> nichts abrufen (leere Regeln hießen sonst „alles erlaubt“)
+        rp.disallow_all = True
+        return rp
+    rp.parse(txt.splitlines())
     return rp
 
 

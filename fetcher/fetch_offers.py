@@ -20,6 +20,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from http.client import HTTPException
 
 UA = "SparRadar/1.0 (private Angebotsuebersicht; 1 Abruf pro Tag)"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -107,7 +108,9 @@ def http(url, cookie=None):
     try:
         with urllib.request.urlopen(req, timeout=30) as r:
             return r.read().decode("utf-8", "replace")
-    except (urllib.error.URLError, TimeoutError) as e:
+    # Audit 06.11.: auch Verbindungsabbrüche beim Lesen (RemoteDisconnected, IncompleteRead, ConnectionReset)
+    # dürfen nicht die ganze Quelle beenden -> wie jeder andere Fehlabruf behandeln
+    except (OSError, HTTPException, ValueError) as e:
         log("  ! Abruf fehlgeschlagen:", url, e)
         return None
 
@@ -379,7 +382,11 @@ def fetch_lidl():
             time.sleep(PAUSE)
             if not raw:
                 return
-            d = json.loads(raw)
+            try:
+                d = json.loads(raw)
+            except ValueError:  # abgeschnittene Antwort/Fehlerseite statt JSON
+                log("  ! Lidl: keine gültige Antwort bei offset", offset)
+                return
             got = d.get("items") or []
             yield from got
             offset += len(got)
@@ -459,7 +466,10 @@ def aldi_items(html, day=None):
     m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', html or "", re.S)
     if not m:
         return []
-    data = json.loads(m.group(1))
+    try:
+        data = json.loads(m.group(1))
+    except ValueError:
+        return []
     out = []
     for i, v in enumerate(data):
         if not (isinstance(v, dict) and "price" in v and "name" in v and "sku" in v):
@@ -591,7 +601,10 @@ def kd_page(url):
     m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
     if not m:
         return [], 0
-    pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+    try:
+        pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+    except (ValueError, AttributeError):
+        return [], 0
     main = (pi.get("offers") or {}).get("main") or {}
     items = main.get("items") or []
     br = pi.get("brochures") or {}

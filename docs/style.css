@@ -59,7 +59,6 @@ header.top{position:relative;z-index:5;background:var(--bg);padding-block:14px 1
 .chip{flex:none;display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 13px 5px 6px;font-weight:600;font-size:.85rem;white-space:nowrap}
 .chip.plain{padding-left:13px}
 .chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
-.dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
 /* neutral store badge: short mark in the store colour, stands in for the real logo */
 .sb{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;background:var(--c);color:#fff;font-family:var(--f-display);font-weight:800;font-size:.66rem;letter-spacing:-.02em;text-transform:none;line-height:1}
 .sb.lg{width:34px;height:34px;border-radius:10px;font-size:.85rem}
@@ -118,7 +117,6 @@ main{display:grid;gap:14px;margin-top:6px}
 .thumb svg.ill{width:62%;height:auto;filter:drop-shadow(0 6px 10px rgba(0,0,0,.12))}
 .thumb .sb{position:absolute;left:10px;top:10px}
 .thumb .off{position:absolute;right:10px;top:10px}
-.thumb .imgnote{position:absolute;left:10px;bottom:8px;font-size:.66rem;font-weight:600;color:var(--muted);background:var(--surface);border-radius:6px;padding:1px 6px;opacity:.9}
 .body{padding:12px 14px 14px;display:grid;gap:9px;align-content:start}
 .store{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 .off{font-family:var(--f-price);font-weight:800;font-size:1rem;background:var(--alert);color:#fff;border-radius:8px;padding:1px 7px;font-variant-numeric:tabular-nums}
@@ -157,16 +155,8 @@ main{display:grid;gap:14px;margin-top:6px}
 .btn{border:0;border-radius:12px;padding:10px 16px;font-weight:700;background:var(--accent);color:var(--accent-ink);display:inline-flex;align-items:center;gap:8px;text-decoration:none}
 .btn.ghost{background:var(--surface2);color:var(--fg);border:1px solid var(--line)}
 .kw{display:flex;flex-wrap:wrap;gap:8px}
-.kwchip{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 6px 6px 12px;background:var(--surface2);border:1px solid var(--line);font-weight:600;font-size:.88rem}
-.kwchip em{font-style:normal;font-family:var(--f-mono);font-size:.74rem;color:var(--muted)}
-.kwchip .n{font-family:var(--f-price);font-size:.95rem;background:var(--save-bg);color:var(--save);border-radius:999px;padding:0 8px}
-.kwchip .n.zero{background:var(--line);color:var(--muted)}
-.kwchip button{border:0;background:transparent;width:24px;height:24px;border-radius:50%;color:var(--muted);display:grid;place-items:center}
 .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 @media (max-width:860px){.two{grid-template-columns:minmax(0,1fr)}}
-.setrow{display:flex;align-items:center;gap:12px;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
-.setrow span{font-weight:600;font-size:.9rem}
-.setrow small{display:block;color:var(--muted);font-weight:500;font-size:.8rem}
 
 /* receipt */
 .receipt{background:var(--receipt);font-family:var(--f-mono);font-size:.86rem;border-radius:4px;padding:22px 20px 26px;max-width:460px;width:100%;justify-self:center;box-shadow:var(--shadow);

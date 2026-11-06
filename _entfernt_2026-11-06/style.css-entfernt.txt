@@ -1,0 +1,10 @@
+.dot{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.thumb .imgnote{position:absolute;left:10px;bottom:8px;font-size:.66rem;font-weight:600;color:var(--muted);background:var(--surface);border-radius:6px;padding:1px 6px;opacity:.9}
+.kwchip{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 6px 6px 12px;background:var(--surface2);border:1px solid var(--line);font-weight:600;font-size:.88rem}
+.kwchip em{font-style:normal;font-family:var(--f-mono);font-size:.74rem;color:var(--muted)}
+.kwchip .n{font-family:var(--f-price);font-size:.95rem;background:var(--save-bg);color:var(--save);border-radius:999px;padding:0 8px}
+.kwchip .n.zero{background:var(--line);color:var(--muted)}
+.kwchip button{border:0;background:transparent;width:24px;height:24px;border-radius:50%;color:var(--muted);display:grid;place-items:center}
+.setrow{display:flex;align-items:center;gap:12px;justify-content:space-between;border-top:1px solid var(--line);padding-top:10px}
+.setrow span{font-weight:600;font-size:.9rem}
+.setrow small{display:block;color:var(--muted);font-weight:500;font-size:.8rem}

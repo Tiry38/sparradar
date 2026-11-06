@@ -187,6 +187,14 @@ Zusätzlich fragt der Abruf kaufDA-Stichwortseiten für Karlsruhe ab (`/Karlsruh
 ## App-Funktionen (Überblick)
 Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ersparnis/Grundpreis/Preis · „Jetzt gültig“/„Demnächst“ · **Kracher**-Button (bestes Angebot inkl. Kombi aus App-Preis, Rewe-Bonus, eigenen Coupons) · Preisverlauf mit Tiefstpreis- und Fake-Rabatt-Erkennung · Merkliste mit Wunsch-Grundpreis (Vorrats-Alarm) · Wochenplan · Einkaufszettel im Kassenbon-Stil (Summe pro Markt, Tausch-Tipps) · Gespart-Zähler · Barcode-Scanner · Preisvergleich · Meine Coupons · Spartipps · echte Produktfotos (Fallback: gezeichnete Illustrationen).
 
+## Audit 06.11.2026 (v155)
+- Backup-Zweig `backup-2026-11-05` (Stand vor dem Audit), entfernter toter Code in `_entfernt_2026-11-06/`.
+- **Tempo:** `weekOffers()` ist zwischengespeichert (`WKM`, hängt an `OFFERS` + `S.week`) -> Ergebnis nie direkt verändern (nur kopieren/filtern). `sameElsewhere` nutzt Index `seIdx` (WeakMap je Pool, Schlüssel `tokKey`), `cheaper` den Wochen-Pool `wkPool`. Start bis Karten (Handy, 4× gedrosselt) 4,1 s -> 3,1 s.
+- **Service Worker** `CACHE = "sparradar-v6"`: Cache-Schlüssel ohne `?v=`, nur Antworten 200 werden gespeichert, offline `index.html` nur für Seitenaufrufe.
+- **Nachladen:** `load()` behält bei Fehlern die alten Angebote; `freshen()` mit Sperre (`freshen.busy`); Tageswechsel lädt nicht neu, solange ein Fenster/Eingabefeld offen ist.
+- **Worker:** `const worker = {fetch, route, scheduled}`; Datenbankfehler -> 503 mit CORS, Größe in Bytes.
+- **Fetcher:** `http()` fängt auch `HTTPException`/`ValueError`; JSON überall abgesichert; OCR-Dateien werden atomar geschrieben (`.tmp` + `os.replace`). Workflows pushen mit 4 Versuchen.
+
 ## Testen
 - Abruf lokal: `python fetcher/fetch_offers.py` (dauert ca. 3–5 Minuten). Auf Kevins Windows-PC scheitert Aldi lokal an einem Zertifikatsfehler, auf GitHub funktioniert es.
 - App lokal: `python -m http.server 8765 --directory docs`, dann http://localhost:8765 öffnen.

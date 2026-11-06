@@ -34,5 +34,6 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add docs/data/dauerpreise.json || true
           git diff --cached --quiet || git commit -m "Aldi-Dauerpreise $(date +%F)"
-          git pull --rebase --autostash
-          git push
+          # mit Wiederholung, falls gleichzeitig ein anderer Lauf gepusht hat (Audit 06.11.)
+          for i in 1 2 3 4; do git pull --rebase --autostash && git push && exit 0; sleep $((i * 5)); done
+          exit 1

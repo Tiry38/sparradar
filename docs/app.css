@@ -15,7 +15,6 @@ header.top{position:static}
 .form .row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}
 .links{display:flex;flex-wrap:wrap;gap:8px}
 .links a{font-size:.84rem}
-code.topic{font-family:var(--f-mono);background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:2px 8px;user-select:all}
 .chipsep{flex:none;width:1px;align-self:stretch;background:var(--line);margin:2px 4px}
 /* Maus (PC, Windows-App): Leisten umbrechen statt unsichtbar seitlich scrollen */
 @media (hover:hover) and (pointer:fine){.chips{flex-wrap:wrap;overflow:visible}}
@@ -91,8 +90,6 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .mrow em{flex:none;font-style:normal;font-size:.8rem;color:var(--save);font-weight:700}
 .newsico{width:38px;height:38px;border-radius:11px;background:var(--grad-brand,#1E9E5A);color:#fff;display:grid;place-items:center;flex:none}
 /* Zahnrad: dezent, öffnet die Einstellungen */
-.gearbtn{flex:none;width:36px;height:36px;border-radius:11px;border:1px solid transparent;background:transparent;color:var(--muted);display:grid;place-items:center;opacity:.7}
-.gearbtn:hover{opacity:1;background:var(--surface)}
 /* Einkaufszettel: abhaken und eigene Einträge */
 #extraForm{max-width:620px;width:100%;justify-self:center}
 .rline .rcheck{all:unset;box-sizing:border-box;cursor:pointer;display:flex;align-items:center;gap:8px;min-width:0;width:auto;height:auto;color:var(--fg)}
@@ -116,7 +113,6 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .zpt.on{outline:3px solid var(--save)}
 .rline.done .zimg{opacity:.45;filter:grayscale(.6)}
 .rs svg{width:16px;height:16px}
-.rhint{text-align:center;color:var(--muted);font-size:.72rem;margin:-8px 0 12px}
 .valid.last{color:var(--alert);font-weight:800}
 .totop{position:fixed;right:16px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:7;width:46px;height:46px;border-radius:50%;border:0;background:var(--grad-brand,#1E7A47);color:#fff;display:grid;place-items:center;box-shadow:0 6px 20px rgba(30,122,71,.35)}
 @media (min-width:721px){.totop{bottom:24px}}
@@ -291,7 +287,6 @@ input[type=search]::-webkit-search-cancel-button{-webkit-appearance:none;display
 .cart-bar i{display:block;height:100%;background:var(--save);border-radius:99px;transition:width .25s}
 .cart-f{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between;font-size:.82rem;color:var(--muted)}
 .cart-f .over{color:var(--alert);font-weight:700}
-.cart-done{justify-self:start;white-space:normal;text-align:left}
 .freq{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-2px 0 12px;font-size:.85rem}
 .freq>span{font-weight:700;color:var(--muted)}
 .freq .chip{font-size:.8rem;padding:5px 9px}
@@ -423,41 +418,26 @@ button.savedc{width:100%;border:0;font:inherit;cursor:pointer;text-align:center}
   .pinbar.pinned::before{content:"";position:absolute;inset:0 -16px;background:var(--bg);z-index:-1}}
 .kr-note{font-size:.8rem;color:var(--muted);margin:10px 2px 0}
 /* Coupon-Sucher */
-.btn.cpfind{width:100%;justify-content:center;font-size:1.05rem;padding:14px;margin-bottom:14px}
-.cpf-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
-.cpf-r .mini{border:0;padding:0;cursor:pointer}
-.cpf-r .pr small{display:block;color:var(--muted)}
 .cpf-b{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-.cbico{display:grid;place-items:center;font-size:26px;background:color-mix(in srgb,var(--accent,#1f9d55) 12%,transparent)}
-.cbhit{display:block;margin-top:3px;color:var(--ok,#1f9d55);font-weight:600}
-.cbhit b{color:inherit}
 .cblink{margin-top:6px;grid-template-columns:1fr 1fr}
 .cbdue{border:2px solid var(--ok,#1f9d55)}
-.cbsteps{margin:6px 0 10px;padding-left:20px}
-.cbsteps li{margin:3px 0}
 .cbd-r{grid-template-columns:1fr}
 .cbd-r .cpf-b{grid-template-columns:1fr 1fr}
-.cbapp{grid-column:1/-1}
 .tp-cbh{margin-top:10px;font-size:.92em}
 .cpf-b .btn{justify-content:center}
-@media(min-width:560px) and (max-width:719px){.drow.cpf-r{grid-template-columns:auto minmax(0,1fr) auto auto}.cpf-r .cpf-b{grid-column:auto;display:flex;align-self:center}}
 /* PC: Kacheln nebeneinander statt endlos breiter Zeilen (Kevin: am PC musste man von links nach rechts schauen) */
 @media(min-width:720px){
- .cpf .rows,.cbdue .rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
- .cpf .rows>.drow,.cbdue .rows>.drow{margin:0;grid-template-rows:auto 1fr;align-items:start}
- .cpf .rows>.drow .cpf-b,.cbdue .rows>.drow .cpf-b{align-self:end;margin-top:4px}
- .cpf>p,.cbdue>p,.cpf>.cpf-n,.cphow>p,.cphow>ol{max-width:760px}
+ .cbdue .rows{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+ .cbdue .rows>.drow{margin:0;grid-template-rows:auto 1fr;align-items:start}
+ .cbdue .rows>.drow .cpf-b{align-self:end;margin-top:4px}
+ .cbdue>p,.cphow>p,.cphow>ol{max-width:760px}
  #cpFindAll{max-width:360px}
 }
 .cpf-n{font-size:.8rem;color:var(--muted)}
 #cpFindAll{margin-top:10px}
 .cphow ol{margin:6px 0 0;padding-left:20px;display:grid;gap:8px;line-height:1.45}
-.cpf-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 14px;font-size:.9rem}
-.cpf-act .mktbtn,.rs .mktbtn.ks{background:transparent;border:1.5px solid var(--save);border-radius:999px;padding:6px 12px;font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;color:inherit}
+.rs .mktbtn.ks{background:transparent;border:1.5px solid var(--save);border-radius:999px;padding:6px 12px;font:inherit;font-size:.85rem;font-weight:600;cursor:pointer;color:inherit}
 .rs .mktbtn.ks{margin-left:auto}
-.cpf-ch{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 12px}
-.cpf-ch .chip small{opacity:.7;margin-left:2px}
-@media(hover:none) and (pointer:coarse){.cpf-ch{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-right:-16px;padding-right:16px}.cpf-ch .chip{flex:none}}
 
 .tp-cb{display:flex;justify-content:center;width:100%;margin-top:8px;text-align:center;white-space:normal}
 
@@ -627,7 +607,6 @@ ol.cbg .btn{margin-top:6px;width:100%;justify-content:center}
 .verdict.up{background:color-mix(in oklab,#F08A24 14%,var(--surface))}
 /* v119 (01.11.): Neu seit dem letzten Besuch, Merkliste -> Zettel, Knöpfe in der Detailansicht immer sichtbar */
 .newtag{font-style:normal;font-size:.68rem;font-weight:700;color:#fff;background:#1E9E5A;border-radius:6px;padding:1px 5px;margin-left:4px;letter-spacing:0}
-.wk-n{--wkc:color-mix(in oklab,#1E9E5A 22%,transparent)}
 .sheet.detail .dmain{position:sticky;bottom:calc(-24px - env(safe-area-inset-bottom,0px));z-index:2;background:var(--bg);flex-wrap:nowrap;align-items:center;
   margin-inline:calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:10px max(16px,env(safe-area-inset-left,0px)) calc(12px + env(safe-area-inset-bottom,0px));
   border-top:1px solid var(--line);box-shadow:0 -10px 18px -12px rgba(0,0,0,.3)}
@@ -710,7 +689,6 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 @media (prefers-reduced-motion:reduce){.zmic.on{animation:none}}
 
 /* v138 Markt-Auswahl für eigene Einträge auf dem Zettel */
-.addrow .zmkt{flex:0 1 150px;min-width:0;border:1px solid var(--line);background:var(--surface2);color:inherit;border-radius:12px;padding:8px 10px;font:inherit}
 .xmk{padding:0 8px 6px 52px}
 .xmkt{font:inherit;font-size:.82em;border:1px solid var(--line);background:var(--surface2);color:inherit;border-radius:8px;padding:3px 6px;max-width:100%}
 /* v140 Zettel-Reiter je Markt */
@@ -736,7 +714,6 @@ html.simple .toolbar,html.simple #scanBtn,html.simple .demo,html.simple .cmpp,ht
 .donelink em{font-style:normal;font-size:.78em;font-weight:700;background:#2563EB;color:#fff;border-radius:999px;padding:1px 8px}
 .donelink span{margin-left:auto;opacity:.6;font-size:1.3em;line-height:1}
 .donelink.back{width:auto;margin:0 0 10px;padding:8px 12px;font-size:.92em}
-.cart-done{width:100%;margin-top:8px}
 /* v147 Abgeschlossene Einkäufe als Kassenzettel */
 .trtitle{display:flex;flex-direction:column;gap:2px;margin:6px 4px 10px;font-size:1.15rem}
 .trtitle small{font-size:.8rem;font-weight:600;color:var(--muted)}

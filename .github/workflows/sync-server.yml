@@ -34,7 +34,7 @@ jobs:
           echo "ok=true" >> $GITHUB_OUTPUT
       - uses: actions/setup-node@v5
         if: steps.chk.outputs.ok == 'true'
-        with: { node-version: 20 }
+        with: { node-version: 22 }
       - name: Datenbank anlegen (falls noch nicht da)
         if: steps.chk.outputs.ok == 'true'
         working-directory: cloudflare

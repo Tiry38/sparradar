@@ -28,17 +28,19 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           cp fetcher/backfill-state.json /tmp/state.json
           cp fetcher/backfill-rows.json /tmp/rows.json
+          ok=0
           for i in 1 2 3 4; do
             git fetch -q origin main && git reset -q --hard origin/main
             cp /tmp/state.json fetcher/backfill-state.json
             cp /tmp/rows.json fetcher/backfill-rows.json
             (cd fetcher && python backfill_history.py --merge /tmp/rows.json)
             git add docs/data/history.json fetcher/backfill-state.json fetcher/backfill-rows.json
-            git diff --cached --quiet && break
+            git diff --cached --quiet && { ok=1; break; }
             git commit -qm "Preisverlauf nachgetragen (Internet-Archiv)"
-            git push -q && break
+            git push -q && { ok=1; break; }
             sleep 15
           done
+          [ "$ok" = 1 ] || { echo "::error::Speichern nach 4 Versuchen fehlgeschlagen"; exit 1; }
       - name: Weitermachen, falls noch etwas offen ist
         if: steps.col.outputs.left != '0'
         env:

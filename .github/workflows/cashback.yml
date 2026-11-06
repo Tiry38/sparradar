@@ -29,5 +29,6 @@ jobs:
           git config user.email "actions@users.noreply.github.com"
           git add docs/data/cashback.json 2>/dev/null || true
           git diff --cached --quiet || git commit -m "Geld-zurück-Aktionen $(date +%F)"
-          git pull --rebase -X theirs --autostash
-          git push
+          # mit Wiederholung, falls gleichzeitig ein anderer Lauf gepusht hat (Audit 06.11.)
+          for i in 1 2 3 4; do git pull --rebase -X theirs --autostash && git push && exit 0; sleep $((i * 5)); done
+          exit 1

@@ -502,10 +502,11 @@ def main():
         changed = True
         log(f"  -> {len(got)} Angebote")
     if changed or not os.path.exists(OUT):
-        with open(OUT, "w", encoding="utf-8") as f:
+        with open(OUT + ".tmp", "w", encoding="utf-8") as f:
             json.dump({"at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="minutes"),
                        "src": "prospektangebote.de (Prospektseiten, Texterkennung)", "flyers": keep_f, "offers": keep_o},
                       f, ensure_ascii=False, separators=(",", ":"))
+        os.replace(OUT + ".tmp", OUT)  # erst fertig schreiben, dann tauschen (kein halbes JSON bei Abbruch)
     log(f"Scheck-In: {len(keep_o)} Angebote aus {len(keep_f)} Prospekt(en)")
 
 

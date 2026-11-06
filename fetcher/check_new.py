@@ -38,7 +38,10 @@ def future_marks(grow=False):
         m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
         if not m:
             continue
-        pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+        try:
+            pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+        except (ValueError, AttributeError):
+            continue
         br = pi.get("brochures") or {}
         f.note_online(br)
         home[store] = f._ids([br.get("viewer"), br.get("publisher")], set()) | f.local_flyers(store)
@@ -67,7 +70,10 @@ def future_marks(grow=False):
         m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
         if not m:
             continue
-        pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+        try:
+            pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+        except (ValueError, AttributeError):
+            continue
         for it in ((pi.get("offers") or {}).get("main") or {}).get("items") or []:
             start = str(it.get("validFrom") or "")[:10]
             if start >= today and it.get("publisherId") == pub:
@@ -99,8 +105,11 @@ def future_marks(grow=False):
             items += f.aldi_pages(f.ALDI_WEEK)
         SEEN.extend(o for o in map(f.aldi_offer, items) if o)
     m = re.search(r'<script[^>]*id="__NUXT_DATA__"[^>]*>(.*?)</script>', h, re.S)
-    if m:
-        data = json.loads(m.group(1))
+    try:
+        data = json.loads(m.group(1)) if m else []
+    except ValueError:
+        data = []
+    if data:
         for i, v in enumerate(data):
             if isinstance(v, dict) and "onSaleDate" in v and "sku" in v:
                 start = str(f.nuxt_resolve(data, i).get("onSaleDate") or "")[:10]
@@ -159,9 +168,10 @@ def add_seen():
 
 
 def main():
-    marks = future_marks(grow="--snap" not in sys.argv and "--save" not in sys.argv)
-    seen = f.load("prospekte.json", {})
     snap = os.path.join(os.environ.get("RUNNER_TEMP") or "/tmp", "sr-prospekte-start.json")
+    # --save mit Merkliste vom Start: keine neuen Abrufe nötig (Audit 06.11.: sparte ~10 Seitenabrufe, Netzfehler konnten den Schritt scheitern lassen)
+    marks = {} if "--save" in sys.argv and os.path.exists(snap) else future_marks(grow="--snap" not in sys.argv and "--save" not in sys.argv)
+    seen = f.load("prospekte.json", {})
     if "--snap" in sys.argv:  # beim Start des Abrufs: was jetzt sichtbar ist, wird gleich abgerufen
         with open(snap, "w") as fh:
             json.dump(marks, fh)

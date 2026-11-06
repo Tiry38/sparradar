@@ -167,7 +167,11 @@ def brand(n):
     return re.sub(r"[^a-z0-9äöüß]", "", (n.split() or [""])[0].lower())
 
 def main():
-    items = mystipendium()
+    try:  # Audit 06.11.: ein Fehler bei der ersten Quelle stoppt die zweite nicht mehr
+        items = mystipendium()
+    except Exception as e:
+        print("mystipendium.de nicht geholt:", e, file=sys.stderr)
+        items = []
     try:
         time.sleep(10)
         for x in sparwelt():

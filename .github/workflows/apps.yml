@@ -61,7 +61,7 @@ jobs:
           fetch-depth: 0  # für die Versionsnummer (Anzahl Änderungen an desktop/)
       - uses: actions/setup-node@v5
         with:
-          node-version: "20"
+          node-version: "22"
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:

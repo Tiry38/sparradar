@@ -40,7 +40,7 @@ jobs:
         if: steps.gate.outputs.skip != '1'
         # Nur neue Prospekte werden gelesen (ca. 20 min), sonst fertig in Sekunden. Fehler stoppen den Abruf nicht.
         run: |
-          (sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-deu >/dev/null && pip install -q numpy opencv-python-headless \
+          (sudo apt-get update -qq >/dev/null; sudo apt-get install -y -qq tesseract-ocr tesseract-ocr-deu >/dev/null && pip install -q numpy opencv-python-headless \
             && (OMP_THREAD_LIMIT=1 timeout 15m python fetcher/fetch_zookauf.py || true) \
             && OMP_THREAD_LIMIT=1 timeout 50m python fetcher/fetch_scheck.py; touch "$RUNNER_TEMP/scheck.done") > "$RUNNER_TEMP/scheck.log" 2>&1 &
 
@@ -58,7 +58,7 @@ jobs:
       - name: Sichtbare Prospekte merken (für den Prospekt-Wächter)
         if: steps.gate.outputs.skip != '1'
         working-directory: fetcher
-        run: python check_new.py --save
+        run: python check_new.py --save || true   # Fehler hier dürfen den fertigen Abruf nicht verwerfen
 
       - name: Bilder für neue Artikel aus eigenen Daten ergänzen (schnell, ohne Suche)
         if: steps.gate.outputs.skip != '1'
@@ -81,4 +81,9 @@ jobs:
             git add docs/data/history.json
             git diff --cached --quiet || git commit -qm "Preisverlauf: Archiv-Preise wieder eingetragen"
           fi
-          git push
+          # Wiederholen, falls in der Zwischenzeit ein anderer Lauf (Bilder, Cashback, PC-Abruf) gepusht hat
+          for i in 1 2 3 4; do
+            git push && exit 0
+            sleep $((i * 5)); git pull --rebase -X theirs --autostash || true
+          done
+          exit 1

@@ -1,0 +1,33 @@
+function exHintHTML(x){const h=exHits(x),d=dpHit(x),pd=paidOf(x);
+  const paidRow=pd&&!S.checked.includes(x.id)?`<div class="exhit paid"><span>🧾 Zuletzt bezahlt: <b>${eur(pd.u)}</b> <small>${[pd.s?sname(pd.s):"",fmtDate(pd.d),norm(pd.n)!==norm(x.n)?"„"+pd.n+"“":""].filter(Boolean).map(esc).join(" · ")}</small></span></div>`:"";
+  const dpBox=(t,extra="")=>`<div class="exhit dp"><span>🏷️ ${t}: <b>${eur(d.p)}</b> <small>${esc((d.b?d.b+" ":"")+d.n)}${extra}</small></span><button class="btn ghost sm" data-exprice="${esc(x.id)}|${d.p}">Preis eintragen</button></div>`;
+  if(h.length){const o=h[0];
+    // Aldi hat den Artikel sonst sowieso billiger (gleiche Einheit, mind. 5 % pro kg/l/Stück) -> zusätzlich zeigen
+    const cheaperDp=d&&d.gp&&o.gp&&unit(o)!=null&&d.gp.u===o.gp.u&&d.gp.v<unit(o)*.95;
+    return paidRow+`<div class="exhit"><span>💡 Im Angebot: <b>${esc(sname(o.s))} ${eur(fin(o))}</b> <small>${esc((o.b?o.b+" ":"")+o.n)}${unitTxt(o)?" · "+esc(unitTxt(o)):""}</small></span><button class="btn sm" data-extake="${esc(x.id)}|${esc(o.id)}">Nehmen</button>${h.length>1?`<span class="exalt">Auch: ${h.slice(1,4).map(y=>`<button class="chip plain" data-extake="${esc(x.id)}|${esc(y.id)}" title="${esc((y.b?y.b+" ":"")+y.n)}">${esc(sname(y.s))} ${eur(fin(y))}</button>`).join("")}</span>`:""}</div>`
+      +(cheaperDp?dpBox("Bei Aldi sonst immer billiger",` · 1 ${esc(d.gp.u)} = ${eur(d.gp.v)}`):"")}
+  if(x.p)return "";if(pd)return paidRow;if(!d)return "";
+  return dpBox("Aldi-Normalpreis")}
+
+----
+const cbShort=a=>a.typ==="nfor"?`${a.need} für ${a.need-1}`:a.typ==="eur"?"zurück":`${a.pct??100} %`;
+
+----
+function cbHitTxt(a,o){const p=fin(o),n=a.need||1,back=cbBack(a,p),pay=Math.max(0,p*n-back);
+  if(back>=p*n-.005)return " → mit Geld zurück <b>gratis</b>";
+  return n>1?` → ${n} Stück zahlen, ${eur(back)} zurück: <b>je ${eur(pay/n)}</b>`:` → danach nur <b>${eur(pay)}</b>`}
+
+----
+const cbShopTxt=a=>a.shops?.length?"bei "+a.shops.map(sname).join(", "):"in vielen Märkten";
+
+----
+const CB_ICO={drogerie:"🧴",lebensmittel:"🍽️",tiernahrung:"🐾"};
+
+----
+const SHARE_TXT = `Schau mal: SparRadar zeigt alle Angebote rund um Wörth am Rhein (Lidl, Aldi, Rewe, Netto, Edeka, dm) 🛒\n${APP_URL}\n\nAls Android-App zum Installieren:\n${APK_URL}`;
+
+----
+  if(false&&IN_ANDROID_APP&&APPV.code&&(!AND_V||AND_V<APPV.code))
+
+----
+    return `<div class="appupd">${IC.bell}<span><b>Neue App-Version da.</b> Kurz aktualisieren, dann ist alles auf dem neuesten Stand.</span>${window.SparRadarApp?'<button class="btn sm" id="appUpdNow">Aktualisieren</button>':`<a class="btn sm" href="${APK_URL}">Aktualisieren</a>`}</div>`;

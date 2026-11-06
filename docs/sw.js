@@ -1,5 +1,5 @@
 // SparRadar Service Worker: App offline verfügbar, Angebote immer frisch (Netz zuerst, sonst Cache)
-const CACHE = "sparradar-v5";
+const CACHE = "sparradar-v6"; // v6 (Audit 06.11.): Einträge ohne ?v=…, keine Fehlerseiten mehr im Offline-Speicher
 const SHARE = "sr-share"; // geteilter Kassenbon (Teilen-Menü einer anderen App -> SparRadar), nur kurz auf dem Gerät
 const SHELL = ["./", "index.html", "manifest.webmanifest", "icon.svg"];
 
@@ -29,14 +29,16 @@ self.addEventListener("fetch", e => {
     return;
   }
   if (e.request.method !== "GET" || url.origin !== location.origin) return;
+  // Offline-Speicher ohne Suchteil (?v=155, ?bon=1 …): jede Datei nur einmal, alte Versionen werden ersetzt statt endlos gesammelt
+  const key = url.origin + url.pathname;
   e.respondWith(
     // am Browser-Cache vorbei, damit neue App-Versionen und Angebote sofort ankommen
     fetch(new Request(e.request.url, { cache: "no-cache" }))
       .then(res => {
-        const copy = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, copy));
+        if (res.ok && res.status === 200) { const copy = res.clone(); caches.open(CACHE).then(c => c.put(key, copy)).catch(() => {}); } // keine 404/Fehler speichern
         return res;
       })
-      .catch(() => caches.match(e.request).then(r => r || caches.match("index.html")))
+      // offline: gespeicherte Fassung; nur Seitenaufrufe bekommen notfalls index.html (nie als Skript/JSON)
+      .catch(() => caches.match(key).then(r => r || (e.request.mode === "navigate" ? caches.match("index.html") : Response.error())))
   );
 });
