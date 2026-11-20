@@ -27,6 +27,7 @@
 <link rel="stylesheet" href="style.css?v=7">
 <link rel="stylesheet" href="app.css?v=155">
 <link rel="stylesheet" href="look.css?v=5">
+<link rel="stylesheet" href="neo.css?v=1">
 <script>try{var z=JSON.parse(localStorage.getItem("sr_zoom")||"1");if(z>1){document.documentElement.style.zoom=z;document.documentElement.classList.add("zoomed")}}catch(e){}</script>
 </head>
 <body>
@@ -79,11 +80,12 @@
       </div>
     </div>
   </header>
-  <main id="main"><div class="empty"><b>Angebote werden geladen …</b></div></main>
+  <main id="main"><div class="skel" aria-busy="true"><div class="sk sk-h"></div><div class="sk-grid"><div class="sk-c"><div class="sk sk-i"></div><div class="sk sk-l"></div><div class="sk sk-l s"></div><div class="sk sk-l p"></div></div><div class="sk-c"><div class="sk sk-i"></div><div class="sk sk-l"></div><div class="sk sk-l s"></div><div class="sk sk-l p"></div></div><div class="sk-c"><div class="sk sk-i"></div><div class="sk sk-l"></div><div class="sk sk-l s"></div><div class="sk sk-l p"></div></div><div class="sk-c"><div class="sk sk-i"></div><div class="sk sk-l"></div><div class="sk sk-l s"></div><div class="sk sk-l p"></div></div><div class="sk-c"><div class="sk sk-i"></div><div class="sk sk-l"></div><div class="sk sk-l s"></div><div class="sk sk-l p"></div></div><div class="sk-c"><div class="sk sk-i"></div><div class="sk sk-l"></div><div class="sk sk-l s"></div><div class="sk sk-l p"></div></div></div><p>Angebote werden geladen …</p></div></main>
 </div>
 <div class="scrim" id="sheet" hidden></div>
 <div class="toast" id="toast" hidden></div>
-<script src="app.js?v=155"></script>
+<button class="totop" id="toTop" type="button" aria-label="Nach oben" title="Nach oben"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+<script src="app.js?v=156"></script>
 <script>if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>

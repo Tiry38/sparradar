@@ -1,6 +1,7 @@
 """SparRadar: Prospekt-Wächter (läuft jeden Tag, Fr–So und Mo früh alle 5 min, sonst alle 15 min; Cloudflare-Taktgeber).
 
-Schaut nur auf die 5 kaufDA-Händlerseiten, 2 kaufDA-Sortimentseiten, prospektewoche.de (Rewe, Edeka) und die Aldi-Angebotsseite und meldet, ob dort
+Schaut nur auf die 5 kaufDA-Händlerseiten, 2 kaufDA-Sortimentseiten, meinprospekt (Edeka Jockgrim, dm Kandel + reihum
+2 Orte/2 Stichwortseiten), prospektewoche.de (Rewe, Edeka) und die Aldi-Angebotsseite und meldet, ob dort
 ein Prospekt bzw. Angebote mit Startdatum ab heute stehen (auch montags erscheinende Prospekte, die am selben Tag starten), die SparRadar noch nicht abgerufen hat.
 Nur dann startet der Workflow den kompletten Abruf (fetch_offers.py). So stehen die Angebote der nächsten
 Woche so früh wie möglich in der App, ohne die Quellen ständig komplett abzufragen.
@@ -14,6 +15,7 @@ import os
 import re
 import sys
 import time
+import urllib.parse
 
 import fetch_offers as f
 
@@ -84,6 +86,49 @@ def future_marks(grow=False):
                 o = f.kd_offer(it)
                 if o:
                     SEEN.append(o)
+    # meinprospekt.de (gleiche Bonial-Daten wie kaufDA, andere Auswahl; robots.txt erlaubt Ortsseiten): v156, Tiry 20.11.
+    # („Suche nach neuen Angeboten verbessern“). Edeka Jockgrim + dm Kandel jedes Mal (neuer Prospekt erscheint dort teils
+    # früher als auf der kaufDA-Händlerseite), dazu reihum je Durchgang 2 weitere Edeka-Orte und 2 dm-Stichwortseiten mit
+    # Treffern – jede zeigt andere 12 Angebote, die der Wächter einsammelt (nur aus den eigenen Prospekten).
+    slot = int(time.time() // 300)
+    mpm = f.load("mp-terms.json", {})
+    old = (dt.date.today() - dt.timedelta(days=21)).isoformat()
+    dm_hot = sorted(t for t, d in ((mpm.get("dm") or {}).get("hit") or {}).items() if d >= old)
+    pages = [("edeka", f"{f.MP}/jockgrim/edeka", True), ("dm", f"{f.MP}/kandel/dm-de", True)]
+    if grow:
+        ed = [c for c in f.MP_CITY["edeka"] if c != "jockgrim"]
+        pages += [("edeka", f"{f.MP}/{ed[(slot * 2 + k) % len(ed)]}/edeka", False) for k in range(2)]
+        pages += [("dm", f"{f.MP}/angebote/{urllib.parse.quote(dm_hot[(slot * 2 + k) % len(dm_hot)])}/dm-de", False)
+                  for k in range(min(2, len(dm_hot)))]
+    for store, url, home_page in pages:
+        h = f.http(url)
+        time.sleep(f.MP_PAUSE)
+        m = re.search(r'<script id="__NEXT_DATA__"[^>]*>(.*?)</script>', h or "", re.S)
+        if not m:
+            continue
+        try:
+            pi = (((json.loads(m.group(1)).get("props") or {}).get("pageProps") or {}).get("pageInformation") or {})
+        except (ValueError, AttributeError):
+            continue
+        br = pi.get("brochures") or {}
+        if home_page:
+            f.note_online(br)
+            if store == "dm":  # dm-Prospekt ist bundesweit gleich; Edeka nur über die eigene kaufDA-Händlerseite/flyers.json
+                home.setdefault(store, set()).update(f._ids([br.get("viewer"), br.get("publisher")], set()))
+            for key in ("viewer", "publisher"):
+                lst = br.get(key)
+                for b in lst if isinstance(lst, list) else []:
+                    start = str((b or {}).get("validFrom") or "")[:10]
+                    who = str(b.get("publisherName") or "")
+                    if start >= today and not re.search(r"online", str(b.get("title") or ""), re.I) \
+                            and re.search(r"edeka|dm", who, re.I) and not re.search(r"center|e center", who, re.I):
+                        marks[f"{store}:{b.get('id') or b.get('contentId')}"] = start
+        if grow:
+            for it in ((pi.get("offers") or {}).get("main") or {}).get("items") or []:
+                if f.kd_store(it) == store and str((it.get("parentContent") or {}).get("id")) in home.get(store, set()):
+                    o = f.kd_offer(it)
+                    if o:
+                        SEEN.append(o)
     # Rewe-/Edeka-Vorschau: neue Woche bei prospektewoche.de (nur die Startseiten mit den Wochen-Reitern;
     # ob der Edeka-Prospekt zu Jockgrim passt, prüft erst der Abruf)
     for shop in ("rewe", "edeka"):

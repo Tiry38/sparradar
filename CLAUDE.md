@@ -195,6 +195,11 @@ Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ers
 - **Worker:** `const worker = {fetch, route, scheduled}`; Datenbankfehler -> 503 mit CORS, Größe in Bytes.
 - **Fetcher:** `http()` fängt auch `HTTPException`/`ValueError`; JSON überall abgesichert; OCR-Dateien werden atomar geschrieben (`.tmp` + `os.replace`). Workflows pushen mit 4 Versuchen.
 
+## Neuer Look + Suche + Wächter (v156, 20.11., Kevin: „Design beeindruckend modern, Suche nach neuen Angeboten besser, App aufs Maximum“)
+- **`docs/neo.css`** (nach `look.css` geladen, `?v=` hochzählen bei Änderung): Tokens `--glass`, `--lift`, `--ease-spring` (+ Dunkel), Glas-Effekte, Karten heben sich beim Drüberfahren, Produktbilder `mix-blend-mode:multiply` (weißer Rand verschwindet), Fenster federn, Griff oben am Handy-Fenster. **Handy: Reiterleiste schwebt als Glas-Pille** (unten 10 px + safe-area, `body` padding-bottom 112 px). Lade-Umrisse (`.skel`) stehen direkt in `index.html` in `<main>`, bis die Angebote da sind. Knopf „Nach oben“ `#toTop` (ab 2,2 Bildschirmhöhen). Reiterwechsel per View Transitions. `prefers-reduced-motion` schaltet alles ab.
+- **Suche** (`searchOffers(list,q,fz)`): Wörter einzeln (`sTokOk`/`sWord`, gleiche Wortgrenzen-Regeln wie die Merkliste: Wein ≠ Schweinebraten, Reis ≠ Preis), Synonyme `SYN` (Hack → Hackfleisch, Klopapier → Toilettenpapier, Pommes …; nur am Wortanfang, „rose“/„weizen“ bewusst nicht), Rangstufen `relTier` (ganzes Wort vor Wortende vor Rest). Kein Treffer -> Tippfehler-Suche (`sFuzzy`, Damerau-Levenshtein) mit Hinweis „Ergebnisse für „Philadelphia“ – So suchen“ (`data-qfix`). Nur `filtered()` nutzt `fz=1`, Scanner nicht.
+- **Prospekt-Wächter + meinprospekt** (`check_new.py`): je Durchgang zusätzlich Jockgrim-Edeka + Kandel-dm (meinprospekt, neue Prospekte ab heute lösen den Abruf aus), beim Sammeln 2 wechselnde Edeka-Orte (`MP_CITY`) + 2 dm-Treffer-Stichwortseiten (`mp-terms.json`, < 21 Tage) -> `SEEN`. Pause `MP_PAUSE`.
+
 ## Testen
 - Abruf lokal: `python fetcher/fetch_offers.py` (dauert ca. 3–5 Minuten). Auf Kevins Windows-PC scheitert Aldi lokal an einem Zertifikatsfehler, auf GitHub funktioniert es.
 - App lokal: `python -m http.server 8765 --directory docs`, dann http://localhost:8765 öffnen.

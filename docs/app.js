@@ -262,11 +262,50 @@ const hayD = o => o._hayD ??= norm(dClean(o));
 const matches = (o,k) => hay(o).includes(norm(k)) || norm(CATS[o.c]||"")===norm(k);
 const matchesAll = (o,t) => t.every(x=>matches(o,x));
 // Treffer im Namen als ganzes Wort zuerst, dann im Namen, dann Marke/Markt
+// Suche: Treffer, bei denen jedes Wort im Artikelnamen steht, vor Treffern nur über Marke/Beschreibung (v156)
+const relTier = (o,t) => o._rt?.q===t.join(" ")?o._rt.v:(o._rt={q:t.join(" "),v:t.reduce((a,x)=>a+sRank(o,x),0)}).v;
 const relevance = (o,t) => {const n=(o.n||"").toLowerCase();return t.reduce((a,x)=>{const w=x.toLowerCase();
   return a+(new RegExp("(^|[^a-zäöüß])"+w.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"([^a-zäöüß]|$)").test(n)?0:norm(o.n).includes(norm(x))?1:2)},0)};
-function searchOffers(list,q){const t=q.trim().split(/\s+/).filter(Boolean);if(!t.length)return list;
-  let r=list.filter(o=>matchesAll(o,t));
+// Suche (v156, Tiry 20.11.: „Suche verbessern“): 1) ganze Wörter/Wortteile im Namen, Marke, Markt – „Wein“ findet keinen
+// Schweinenacken mehr, „Reis“ keinen Sparpreis; 2) Synonyme (Hack = Hackfleisch, Klopapier = Toilettenpapier, Nudeln = Pasta …);
+// 3) sonst wie früher Teilwort + Beschreibung; 4) zuletzt Tippfehler (1–2 Buchstaben daneben) -> Hinweis „Meintest du …?“
+const SYN={hack:["hackfleisch","gehacktes"],gehacktes:["hackfleisch"],klopapier:["toilettenpapier"],wcpapier:["toilettenpapier"],
+  nudeln:["pasta","spaghetti","fusilli","penne","tagliatelle","farfalle","makkaroni","spirelli","tortellini","gnocchi"],pasta:["nudeln","spaghetti","fusilli","penne"],
+  haehnchen:["huhn","haehnchen","chicken","gefluegel","haehnchenbrust","haehnchenschenkel"],huhn:["haehnchen","huhn"],chicken:["haehnchen","chicken"],
+  osaft:["orangensaft"],orangensaft:["osaft"],limo:["limonade"],spueli:["spuelmittel"],pommes:["pommes","kartoffelsticks","frites"],
+  jogurt:["joghurt"],yoghurt:["joghurt"],yogurt:["joghurt"],bier:["bier","pils","pilsner","pilsener","weizen","radler","helles","weissbier","weizenbier","hefeweizen"],
+  wein:["wein","rotwein","weisswein","riesling","merlot","primitivo","dornfelder","grauburgunder","spaetburgunder","lambrusco"],
+  sekt:["sekt","prosecco","secco","cremant","champagner"],schoki:["schokolade"],schoko:["schokolade","schoko"],kekse:["kekse","keks","cookies","gebaeck"],
+  wurst:["wurst","salami","schinken","aufschnitt","wiener","bratwurst","lyoner"],klopapiere:["toilettenpapier"],
+  kaffeepads:["pads","senseo"],kapseln:["kapseln","tassimo","dolce","nespresso"],windeln:["windeln","pampers"],
+  katzenstreu:["streu","katzenstreu"],sprudel:["mineralwasser","sprudel"],wasser:["wasser","mineralwasser","sprudel"],
+  tk:["tiefkuehl","tiefgefroren"],eis:["eis","eiscreme","speiseeis"],brot:["brot","toast","broetchen","baguette"],salat:["salat","eisberg","rucola","feldsalat"]};
+const SYN_FALSE=x=>(v,i)=>(x.startsWith("ei")&&v.slice(i-2,i)==="fr")||(x.startsWith("reis")&&v[i-1]==="p")||(x.startsWith("wein")&&v.slice(i-3,i)==="sch")||
+  (x==="kaese"&&/(leber|fleisch)$/.test(v.slice(0,i)))||(x.startsWith("eis")&&/(r|p|bl|kr|gl|w)$/.test(v.slice(0,i)));
+// passt Suchwort x (normalisiert) zu Wort v? Anfang immer, hinten im Wort nur als letzter Wortteil (+ Mehrzahl), ab 5 Buchstaben überall
+function sWord(v,x){if(v.startsWith(x))return true;const i=v.indexOf(x);if(i<0)return false;
+  if(SYN_FALSE(x)(v,i))return false;if(x.length>=5)return true;
+  return i>=3&&/^(|e|n|en|s|es|er|ern|ns)$/.test(v.slice(i+x.length))}
+// Synonyme nur als ganzes Wort bzw. Wortanfang (sonst wäre „Zahnpasta“ eine Nudel)
+const sSyn = x => {const n=norm(x);return SYN[n]||(n.endsWith("s")&&n.length>4&&SYN[n.slice(0,-1)])||[]};
+const sVars = x => [norm(x),...sSyn(x)];
+const sTokOk = (o,x) => {if(norm(CATS[o.c]||"")===norm(x))return true;const w=oWords(o),n=norm(x);return w.some(t=>sWord(t,n))||sSyn(x).some(v=>w.some(t=>t.startsWith(v)))};
+// Rang je Suchwort: 0 = ganzes Wort im Namen, 1 = letzter Wortteil (Almbutter), 2 = sonst im Namen (Butterkeks), 3 = nur Marke/Beschreibung
+const sRank = (o,x) => {const n=norm(x),ws=toks(hyph(o.n)),sy=sSyn(x);let b=3;
+  for(const w of ws){if(w===n||sy.includes(w)||(w.startsWith(n)&&/^(e|n|en|s|es|er|ern|ns)$/.test(w.slice(n.length))))return 0;
+    if(b>1&&w.endsWith(n)&&sWord(w,n))b=1;else if(b>2&&(sWord(w,n)||sy.some(v=>w.startsWith(v))))b=2}return b};
+// Tippfehler: Abstand höchstens 1 (ab 8 Buchstaben 2), Vertauschen zählt als 1
+function sDist(a,b,max){if(Math.abs(a.length-b.length)>max)return max+1;const m=a.length,n=b.length;let p2=[],p=Array.from({length:n+1},(_,j)=>j);
+  for(let i=1;i<=m;i++){const c=[i];let lo=i;for(let j=1;j<=n;j++){let v=Math.min(p[j]+1,c[j-1]+1,p[j-1]+(a[i-1]===b[j-1]?0:1));
+    if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])v=Math.min(v,p2[j-2]+1);c[j]=v;if(v<lo)lo=v}if(lo>max)return max+1;p2=p;p=c}return p[n]}
+const sFuzzy = (o,x) => {const n=norm(x);if(n.length<4)return null;const max=n.length>=8?2:1;
+  for(const t of oWords(o)){if(t.length<3)continue;const cut=t.slice(0,n.length+max);if(sDist(n,t,max)<=max||(t.length>n.length&&sDist(n,cut.slice(0,n.length),max)<=max&&cut.length>=n.length))return t}return null};
+function searchOffers(list,q,fz){const t=q.trim().split(/\s+/).filter(Boolean);if(fz)S._qFix="";if(!t.length)return list;
+  let r=list.filter(o=>t.every(x=>sTokOk(o,x)));
+  if(!r.length)r=list.filter(o=>matchesAll(o,t));
   if(!r.length)r=list.filter(o=>t.every(x=>matches(o,x)||hayD(o).includes(norm(x))));
+  if(!r.length&&fz){const fix={};r=list.filter(o=>t.every(x=>{if(sTokOk(o,x))return true;const w=sFuzzy(o,x);if(w){const ow=(`${o.b||""} ${o.n}`.match(/[A-Za-zÄÖÜäöüß0-9]+/g)||[]).find(v=>norm(v)===w)||w;fix[ow]=(fix[ow]||0)+1;return true}return false}));
+    const best=Object.entries(fix).sort((a,b)=>b[1]-a[1])[0];if(best)S._qFix=best[0]}
   return r}
 // Merkliste: passt ein Angebot zum gemerkten Artikel?
 // 1) alle wichtigen Wörter kommen im Angebot vor (Name, Marke, Beschreibung), Reihenfolge egal
@@ -507,7 +546,7 @@ function filtered(){
   let r=weekOffers();
   if(S.stores.size)r=r.filter(o=>S.stores.has(o.s));
   const qt=S.q.trim().split(/\s+/).filter(Boolean);S._catOff=false;
-  if(qt.length){r=searchOffers(r,S.q);
+  if(qt.length){r=searchOffers(r,S.q,1);
     // Suche findet in der gewählten Kategorie nichts? Dann in allen Kategorien suchen statt „nicht im Angebot“
     if(S.cats.size){const rc=r.filter(o=>S.cats.has(o.c));if(rc.length||!r.length)r=rc;else S._catOff=true}}
   else if(S.cats.size)r=r.filter(o=>S.cats.has(o.c));
@@ -516,7 +555,7 @@ function filtered(){
   // Sortierung „Ersparnis“ (Kevins Wunsch 01.11.): erst Lebensmittel, dann Getränke, Drogerie & Pflege, Tier, dann der Rest – innerhalb jeder Gruppe nach % Rabatt
   const f0={off:(a,b)=>catGrp(a)-catGrp(b)||sortPct(b)-sortPct(a)||fin(a)-fin(b),gp:(a,b)=>((unit(a)??1e9)-(unit(b)??1e9)),p:(a,b)=>((a.p>0?fin(a):1e9)-(b.p>0?fin(b):1e9))}[S.sort];
   // immer zuerst nach der gewählten Sortierung (Standard: stärkster Rabatt), bei Gleichstand der passendere Name
-  const f=qt.length?(a,b)=>f0(a,b)||relevance(a,qt)-relevance(b,qt):f0;
+  const f=qt.length?(a,b)=>relTier(a,qt)-relTier(b,qt)||f0(a,b)||relevance(a,qt)-relevance(b,qt):f0;
   return r.sort(f)}
 const CAT_GRP={getraenke:1,drogerie:2,katze:3,tier:3};
 const catGrp=o=>NONFOOD_CATS.includes(o.c)&&!CAT_GRP[o.c]?4:(CAT_GRP[o.c]??(o.c==="sonstiges"?4:0));
@@ -790,6 +829,7 @@ function renderOffers(){
    <div class="meta"><h2>${title}</h2><span>${r.length} von ${weekOffers().length} Angeboten</span></div>
    ${missingHTML()}
    ${fltCount()?`<p class="catoff fact">Filter aktiv: <b>${fltSummary().map(esc).join(" · ")}</b> <button class="linkbtn" data-fclear="1">Filter aus</button></p>`:""}
+   ${S._qFix&&S.q.trim()?`<p class="catoff">Kein genauer Treffer – Ergebnisse für <b>„${esc(S._qFix)}“</b>. <button class="linkbtn" data-qfix="${esc(S._qFix)}">So suchen</button></p>`:""}
    ${S._catOff?`<p class="catoff">In „${esc(catNames().join(", "))}“ nichts gefunden – hier die Treffer aus allen Kategorien.</p>`:""}
    ${r.length?`<div class="grid">${shown.map(o=>card(o,bestIds)).join("")}</div>${r.length>shown.length?`<button class="btn ghost more" id="more">${r.length-shown.length} weitere anzeigen</button>`:""}`:
     `<div class="empty"><b>Gerade nicht im Angebot</b>Setz den Begriff auf deine Merkliste. Sobald ein Markt ihn reduziert, siehst du es dort.<br><br><button class="btn" id="watchFromSearch">${IC.bell} „${esc(S.q.trim()||"Suche")}“ beobachten</button></div>`}
@@ -1031,6 +1071,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  156:["Neuer Look: Glas-Flächen, weichere Karten, Produktbilder ohne weiße Kästen, schwebende Leiste unten am Handy und sanfte Bewegungen beim Antippen.","Die Suche verzeiht Tippfehler („Philadelpia“ findet Philadelphia) und kennt andere Wörter (Hack, Klopapier, Nudeln …). „Wein“ zeigt keinen Schweinebraten mehr – passende Artikel stehen oben.","Neue Angebote von Edeka und dm kommen tagsüber schneller in die App: SparRadar schaut jetzt zusätzlich bei einem zweiten Prospekt-Portal nach.","Beim Laden zeigt die App gleich die Umrisse der Karten, und ein Knopf bringt dich beim langen Scrollen schnell wieder nach oben."],
   155:["SparRadar startet spürbar schneller und rechnet Preisvergleiche flotter.","Fällt das Internet beim Nachladen kurz aus, bleiben deine Angebote stehen statt zu verschwinden.","Offline klappt besser: Die App merkt sich nur fehlerfreie Seiten."],
   154:["Im Fenster „Alles im Wagen“ steht jetzt das Markt-Logo über dem Knopf „Mit Markt-App abschließen“."],
   153:["Letzter Artikel im Wagen: SparRadar fragt jetzt „Ohne Markt-App abschließen“ (sofort erledigt) oder „Mit Markt-App abschließen“ (App öffnet sich, danach Kassenbon hochladen)."],
@@ -2387,7 +2428,10 @@ document.addEventListener("click",e=>{
     else{const id="x-"+Date.now();S.extra.push(x.p?{id,n:v,p:x.p,...exS()}:{id,n:v,...exS()});if(x.q>1)S.qty[id]=x.q;toast(`${v} auf den Zettel gesetzt`)}
     save();render();document.getElementById("extraIn")?.focus();return}
   if(b.dataset.sugg==="kw"){const v=b.dataset.v;document.getElementById("kwIn").value=v;hideSugg();document.getElementById("kwForm").requestSubmit();return}
-  if(b.id&&b.id.startsWith("tab-")){S.tab=b.id.slice(4);render();scrollTo({top:0});return}
+  if(b.id&&b.id.startsWith("tab-")){const t=b.id.slice(4),go=()=>{S.tab=t;render();scrollTo({top:0})};
+    // sanfter Reiterwechsel (v156): View Transitions, wo vorhanden und Bewegung erlaubt
+    if(t!==S.tab&&document.startViewTransition&&!matchMedia("(prefers-reduced-motion: reduce)").matches)document.startViewTransition(go);else go();return}
+  if(b.id==="toTop"){scrollTo({top:0,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth"});return}
   if(b.id==="wk0"||b.id==="wk1"){S.week=+b.id[2];S.limit=60;render();return}
   if(b.id==="openK"){S.sheet="k";render();return}
   if(b.id==="openFilter"||b.id==="openFilter2"){S.sheet="filter";render();return}
@@ -2423,6 +2467,7 @@ document.addEventListener("click",e=>{
   if(b.dataset.store!==undefined){const k=b.dataset.store;if(!k)S.stores.clear();else S.stores.has(k)?S.stores.delete(k):S.stores.add(k);S.limit=60;render();return}
   if(b.dataset.cat!==undefined){const k=b.dataset.cat;if(!k)S.cats.clear();else S.cats.has(k)?S.cats.delete(k):S.cats.add(k);S.limit=60;render();return}
   if(b.id==="appSw"){S.useApp=!S.useApp;save();render();return}
+  if(b.dataset.qfix){S.q=b.dataset.qfix;document.getElementById("q").value=S.q;S.limit=60;render();return}
   if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
   if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){wDel(i);toast(`${o.n} von der Merkliste genommen`)}else{wAdd({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
   if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{const c=cheaper(byId(id));if(c&&!S.list.includes(c.x.id)){askCheaper(byId(id),c);return}S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
@@ -2622,3 +2667,5 @@ setInterval(()=>{const d=new Date(),t=`${d.getFullYear()}-${String(d.getMonth()+
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Date.now()-(freshen.last||0)>60*1000){freshen.last=Date.now();freshen()}});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)Sync.pull()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&S.checked.length&&(S.list.length||S.extra.length))wakeOn()});
+// Knopf „Nach oben“ (v156): erscheint nach gut zwei Bildschirmhöhen
+(()=>{const b=document.getElementById("toTop");if(!b)return;let on=false;addEventListener("scroll",()=>{const v=scrollY>innerHeight*2.2;if(v!==on){on=v;b.classList.toggle("on",v)}},{passive:true})})();
