@@ -208,3 +208,10 @@ Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ers
 ## Puls-Ebene (v157, 21.11., Tiry: „State-of-the-Art-Style“, Skills frontend-design + web-design-guidelines)
 - **`docs/pulse.css`** (nach `neo.css`, `?v=` hochzählen): gleitende Markierung im Wochen-Umschalter (`.seg::before`, per `:has(#wk1[aria-pressed=true])`) und in der Reiterleiste (`.tabthumb`, setzt `render()` in `app.js` samt `--ti` = Reiter-Index; bei View Transition zeigt `sr-tabs` live, damit sie gleitet). Kracher mit wanderndem Verlauf. `.ibtn` Tipp-Fläche 44 px per `::after`, `touch-action:manipulation`, `content-visibility:auto` für Karten, `overscroll-behavior:contain` in Fenstern. `buzz()` = 8-ms-Vibration bei Merken/Plus (nur Touch, nicht bei „weniger Bewegung“). `theme-color` hell/dunkel per `media`.
 - **Markt-Logo auf Karten (v158):** `.card .thumb .sb` 36 px (Handy 32 px), Logo freigestellt (`object-fit:contain`, weiß, kein `multiply`, kein Mitzoomen). Ursache des Fehlers: `neo.css` `.thumb img{mix-blend-mode:multiply}` traf auch das Logo-Bild – neue Bild-Effekte in `.thumb` immer auf `.thumb>img` bzw. Produktbild begrenzen.
+
+## Wochen-Titelblatt (v159, 21.11., Tiry: High-Impact/Editorial/Awwwards; Grün bleibt, „große Bühne“)
+- Skills: frontend-design, impeccable (Binärprogramm in Sitzung gesperrt, Regeln aus den Dateien), apple-design, web-design-guidelines.
+- `kracherBtn()` baut `.kracher.kv`: `.kv-pic` (weißer `.kv-spot` + Produktfoto `multiply`, Weiß per `brightness` geglättet – **kein drop-shadow auf Fotos**, sonst Kasten), `.kv-stamp` (drehender SVG-Rundtext „Kracher der Woche“ + Rabatt), `.kv-txt` (Preis als Schlagzeile, max. 6rem). Kein Etikett über Überschriften (impeccable-Verbot).
+- Bewegung: Auftritt `kv-in` nur beim ersten Aufbau (`KV_SEEN`); PC: Maus kippt Foto/Stempel (`--mx/--my`, Zeiger-Listener in app.js); Handy: Foto-Parallax per `animation-timeline:view()`. Alles aus bei „weniger Bewegung“.
+- `morphOpen()`: Kartenbild fliegt per View Transition `sr-pic` ins Detailfenster.
+- Abschnitts-Überschriften `.meta h2` clamp(1.75–2.6rem), `-0.035em`.

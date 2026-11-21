@@ -764,6 +764,17 @@ function listText(){const items=S.list.map(byId).filter(Boolean),g={};items.forE
 const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
 
 // ---------- Ansichten ----------
+// Bild der angetippten Karte fliegt ins Detailfenster (View Transition, Chrome/Edge/Android); sonst sofort öffnen
+function morphOpen(el,go){const src=el.querySelector(".thumb img,.thumb svg");
+  if(!src||!document.startViewTransition||matchMedia("(prefers-reduced-motion: reduce)").matches){go();return}
+  src.style.viewTransitionName="sr-pic";
+  const vt=document.startViewTransition(()=>{src.style.viewTransitionName="";go();const t=document.querySelector(".dpic img,.dpic svg");if(t)t.style.viewTransitionName="sr-pic"});
+  vt.finished.finally(()=>{const t=document.querySelector(".dpic img,.dpic svg");if(t)t.style.viewTransitionName=""})}
+// Kracher-Titelblatt kippt am PC mit der Maus in den Raum (nur feiner Zeiger, nicht bei „weniger Bewegung“)
+(()=>{let raf=0;const fine=matchMedia("(hover:hover) and (pointer:fine)"),rm=matchMedia("(prefers-reduced-motion: reduce)");
+  let px=0,py=0,pk=null;document.addEventListener("pointermove",e=>{if(!fine.matches||rm.matches)return;const k=e.target.closest&&e.target.closest(".kv");if(!k)return;
+    px=e.clientX;py=e.clientY;pk=k;if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(!pk||!pk.isConnected)return;const r=pk.getBoundingClientRect();pk.style.setProperty("--mx",((px-r.left)/r.width-.5).toFixed(3));pk.style.setProperty("--my",((py-r.top)/r.height-.5).toFixed(3))})},{passive:true});
+  document.addEventListener("pointerout",e=>{const k=e.target.closest&&e.target.closest(".kv");if(k&&!k.contains(e.relatedTarget)){k.style.setProperty("--mx",0);k.style.setProperty("--my",0)}},{passive:true})})();
 // Kurzer Tipp-Impuls am Handy (Android), aus bei „weniger Bewegung“
 function buzz(){try{if(navigator.vibrate&&matchMedia("(pointer:coarse)").matches&&!matchMedia("(prefers-reduced-motion: reduce)").matches)navigator.vibrate(8)}catch(e){}}
 function card(o,bestIds){
@@ -804,11 +815,16 @@ function weekHTML(hitCount){const t=[];
   if(vrAll.length||S.flt.vr)t.push(`<button class="wk wk-v${S.flt.vr?" on":""}" data-govr="1" aria-pressed="${!!S.flt.vr}"><i>📦</i><b>${vrAll.length?`${vrAll.length} Vorrats-Tipps${bei}`:`Kein Vorrats-Tipp${bei}`}</b>${S.flt.vr?ON:`<small>${vrm?`${vrm} davon kaufst du oft · `:""}haltbar und gerade besonders günstig</small>`}</button>`);
   if(!t.length)return "";
   return `<section class="wkbox" aria-label="Deine Woche"><h3>Deine Woche</h3><div class="wkrow">${t.join("")}</div></section>`}
+let KV_SEEN=false;
+// Kracher als Wochen-Titelblatt (v159): Preis als Schlagzeile, Produkt freigestellt auf weißem Spot, Rund-Stempel mit Rabatt
 function kracherBtn(){const k=ranked()[0];if(!k)return"";
-  return `<button class="kracher" id="openK" aria-label="Kracher öffnen">
-   <span class="boom">${IC.flame}</span>
-   <span><span class="eyebrow">Kracher ${S.week?nextShort():"der Woche"}</span><span class="what" style="display:block">${esc(k.n)} bei ${esc(sname(k.s))}</span><span class="how" style="display:block">${comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).fresh?[ref(k)>fin(k)?"statt "+eur(ref(k)):"",validTxt(k)].filter(Boolean).join(" · "):verdict(k).l} · antippen für Details</span></span>
-   <span class="big"><b>${eur(fin(k))}</b>${offPct(k)?`<span>−${offPct(k)} %</span>`:""}</span></button>`}
+  const lbl=`Kracher ${S.week?nextShort():"der Woche"}`,pct=offPct(k),first=!KV_SEEN;KV_SEEN=true;
+  const how=comboLabels(k).length?"Kombi: "+comboLabels(k).join(" + "):verdict(k).fresh?[ref(k)>fin(k)?"statt "+eur(ref(k)):"",validTxt(k)].filter(Boolean).join(" · "):verdict(k).l;
+  const ring=(lbl+" · ").toUpperCase().repeat(2);
+  return `<button class="kracher kv${first?" kv-in":""}" id="openK" aria-label="${esc(lbl)}: ${esc(k.n)} bei ${esc(sname(k.s))} für ${eur(fin(k))}${pct?`, ${pct} % günstiger`:""} – Details öffnen">
+   <span class="kv-pic" aria-hidden="true"><span class="kv-spot"></span>${imgTag(k,"kv-img")}</span>
+   <span class="kv-stamp" aria-hidden="true"><svg viewBox="0 0 120 120"><defs><path id="kvRing" d="M60,60 m-47,0 a47,47 0 1,1 94,0 a47,47 0 1,1 -94,0"/></defs><text><textPath href="#kvRing" textLength="292">${esc(ring)}</textPath></text></svg><b>${pct?`−${pct}<small>%</small>`:IC.flame}</b></span>
+   <span class="kv-txt"><span class="kv-price">${eur(fin(k)).replace(" €","<small> €</small>")}</span><span class="kv-what">${esc(k.n)}</span><span class="kv-how">${esc(sname(k.s))} · ${esc(how)}</span></span></button>`}
 
 // Märkte ohne Angebote in der gewählten Woche (z. B. Prospekt für nächste Woche noch nicht veröffentlicht)
 // mehrere Kategorien gleichzeitig (Kevins Wunsch)
@@ -1073,6 +1089,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  159:["Der Kracher der Woche ist jetzt ein Titelblatt: großer Preis, Produktfoto im Rampenlicht und ein Stempel mit dem Rabatt. Am PC bewegt es sich mit der Maus, am Handy beim Scrollen.","Tippst du ein Angebot an, fliegt das Produktbild direkt ins Detailfenster.","Größere, klarere Überschriften und mehr Luft zwischen den Bereichen."],
   158:["Markt-Logos auf den Angeboten sind wieder klar zu erkennen: größer, freigestellt mit weißem Rand – nicht mehr mit dem Farbkästchen verschmolzen."],
   157:["Neuer Feinschliff: Beim Wechsel zwischen Angebote, Merkliste, Zettel und Coupons gleitet die Markierung jetzt weich mit – genauso beim Umschalten der Woche.","Der Kracher der Woche leuchtet mit einem sanft wandernden Farbverlauf.","Merken und Plus lassen sich leichter treffen, am Handy gibt es beim Antippen einen kurzen Vibrations-Impuls.","Lange Angebotslisten scrollen flüssiger."],
   156:["Neuer Look: Glas-Flächen, weichere Karten, Produktbilder ohne weiße Kästen, schwebende Leiste unten am Handy und sanfte Bewegungen beim Antippen.","Die Suche verzeiht Tippfehler („Philadelpia“ findet Philadelphia) und kennt andere Wörter (Hack, Klopapier, Nudeln …). „Wein“ zeigt keinen Schweinebraten mehr – passende Artikel stehen oben.","Neue Angebote von Edeka und dm kommen tagsüber schneller in die App: SparRadar schaut jetzt zusätzlich bei einem zweiten Prospekt-Portal nach.","Beim Laden zeigt die App gleich die Umrisse der Karten, und ein Knopf bringt dich beim langen Scrollen schnell wieder nach oben."],
@@ -2423,7 +2440,7 @@ document.addEventListener("click",e=>{
   if(!e.target.closest(".sugg,#q,#kwIn"))hideSugg();
   // Artikel antippen (nicht auf Knöpfe/Links) = Detailansicht
   const det=!b&&!e.target.closest("a")&&e.target.closest("[data-detail]");
-  if(det){S.detail=det.dataset.detail;S.dImg=0;S.sheet="detail";render();return}
+  if(det){morphOpen(det,()=>{S.detail=det.dataset.detail;S.dImg=0;S.sheet="detail";render()});return}
   if(!b)return;
   if(b.dataset.detail){S.detail=b.dataset.detail;S.dImg=0;S.sheet="detail";S._shown=null;render();return}
   if(b.dataset.sugg==="q"){const v=b.dataset.v;S.q=v;document.getElementById("q").value=v;S.limit=60;hideSugg();S.tab="offers";render();return}
