@@ -1089,6 +1089,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  162:["Der Hintergrund ist jetzt ein echtes 3D-Farbspiel (WebGL), das am PC deiner Maus folgt.","Angebote und Bereiche gleiten beim Scrollen elegant ins Bild, Überschriften fahren Wort für Wort herein.","Am PC: weiches Scrollen, ein eigener Mauszeiger („Ansehen“, „Öffnen“) und Knöpfe, die sich zur Maus ziehen.","„Deine Woche“ am PC als großes Kachel-Mosaik."],
   161:["Komplett neuer Hintergrund: lebendige Farbwolken in Grün, Türkis und Sonnengelb, die sich langsam bewegen.","Merkliste, Einkaufszettel, Coupons und alle Fenster im neuen Glas-Look: Treffer als grüne Abzeichen, der Zettel startet mit einer großen grünen Summen-Karte, Spartipps in Farbe."],
   160:["Neuer Look in der ganzen App: Märkte als runde Logo-Kreise, Angebotskarten mit großem Preisschild über dem Produktbild und dem Namen als Schlagzeile.","„Deine Woche“ in kräftigen Farben, größerer SparRadar-Schriftzug."],
   159:["Der Kracher der Woche ist jetzt ein Titelblatt: großer Preis, Produktfoto im Rampenlicht und ein Stempel mit dem Rabatt. Am PC bewegt es sich mit der Maus, am Handy beim Scrollen.","Tippst du ein Angebot an, fliegt das Produktbild direkt ins Detailfenster.","Größere, klarere Überschriften und mehr Luft zwischen den Bereichen."],
