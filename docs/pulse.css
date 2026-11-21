@@ -1,0 +1,62 @@
+/* SparRadar Puls-Ebene (v157, Tiry 21.11.: „im State-of-the-Art-Style verbessern“).
+   Liegt nach neo.css. Ein mutiges Element: die gleitende Markierung (Wochen-Umschalter + Reiterleiste)
+   wie in nativen Apps. Dazu der Kracher mit lebendem Farbverlauf und Qualitäts-Grundlagen nach den
+   Vercel-Web-Interface-Guidelines (Tipp-Flächen, Doppeltipp-Zoom, Lange-Listen-Tempo, Fenster-Scrollen). */
+
+/* ---------- Grundlagen ---------- */
+button,a,input,select,label,summary,[role="tab"],.card{touch-action:manipulation}
+.name,.kracher .what,.empty h3,.panel h3{text-wrap:pretty}
+.sheet,.sheet *{overscroll-behavior:contain}
+.gp,.was,.badge,.mtile em,.tag,.off{font-variant-numeric:tabular-nums}
+
+/* Kleine Rund-Knöpfe (Merken, Plus) behalten ihre Größe, die Tipp-Fläche wächst auf 44 px. */
+.ibtn{position:relative}
+.ibtn::after{content:"";position:absolute;inset:-5px;border-radius:inherit}
+
+/* Lange Angebotslisten: Karten außerhalb des Bildschirms werden erst beim Hinscrollen gezeichnet. */
+.grid>.card{content-visibility:auto;contain-intrinsic-size:auto 440px}
+@media (max-width:559px){.grid>.card{contain-intrinsic-size:auto 400px}}
+
+/* ---------- Wochen-Umschalter: gleitende Pille ---------- */
+@supports selector(:has(*)){
+  .seg{position:relative;isolation:isolate;display:inline-grid;grid-template-columns:1fr 1fr}
+  .seg::before{content:"";position:absolute;z-index:-1;top:3px;bottom:3px;left:3px;width:calc(50% - 3px);border-radius:999px;
+    background:var(--grad-brand);box-shadow:0 6px 16px -6px rgba(30,122,71,.6),inset 0 1px 0 rgba(255,255,255,.22);
+    transition:transform .5s var(--ease-spring)}
+  .seg:has(#wk1[aria-pressed="true"])::before{transform:translateX(100%)}
+  .seg button,.seg button[aria-pressed="true"]{background:transparent;box-shadow:none}
+  .seg button[aria-pressed="true"]{color:#fff}
+}
+
+/* ---------- Reiterleiste: gleitende Markierung (Element .tabthumb kommt aus app.js) ---------- */
+nav.tabs{--tp:4px;--tg:4px;isolation:isolate}
+@media (min-width:721px){nav.tabs{position:relative}}
+@media (max-width:720px){nav.tabs{--tp:6px}}
+.tabthumb{position:absolute;z-index:-1;top:var(--tp);bottom:var(--tp);left:var(--tp);pointer-events:none;
+  width:calc((100% - 2 * var(--tp) - 3 * var(--tg)) / 4);border-radius:13px;background:var(--grad-brand);
+  box-shadow:0 8px 20px -8px rgba(30,122,71,.65),inset 0 1px 0 rgba(255,255,255,.22);
+  transform:translateX(calc(var(--ti,0) * (100% + var(--tg))));transition:transform .55s var(--ease-spring)}
+@media (max-width:720px){.tabthumb{border-radius:20px}}
+nav.tabs:has(.tabthumb) button[aria-selected="true"]{background:transparent;box-shadow:none;color:#fff}
+nav.tabs button{transition:color .3s var(--ease-out),transform .2s var(--ease-spring)}
+/* Beim Reiterwechsel (View Transition) zeigt die Leiste live, damit die Markierung sichtbar gleitet. */
+::view-transition-old(sr-tabs){display:none}
+::view-transition-new(sr-tabs){animation:none}
+
+/* ---------- Kracher der Woche: lebender Farbverlauf ---------- */
+.kracher{background:linear-gradient(115deg,#FFE45C 0%,#FFC21A 30%,#FF9F1C 55%,#FFB238 75%,#FFE45C 100%);background-size:260% 100%;
+  animation:pKracher 16s ease-in-out infinite alternate}
+@keyframes pKracher{from{background-position:0% 50%}to{background-position:100% 50%}}
+.kracher .big b{letter-spacing:-.03em;text-shadow:0 1px 0 rgba(255,255,255,.35)}
+@media (hover:hover){.kracher:hover{box-shadow:0 18px 40px -14px rgba(255,138,31,.6)}}
+
+/* ---------- Karten: Preisschild antwortet aufs Antippen ---------- */
+.card .tag{transition:transform .35s var(--ease-spring)}
+@media (hover:hover){.card:hover .tag{transform:translateY(-1px) scale(1.03)}}
+.card:active .tag{transform:scale(.97)}
+
+/* ---------- Weniger Bewegung ---------- */
+@media (prefers-reduced-motion:reduce){
+  .seg::before,.tabthumb{transition:none}
+  .kracher{animation:none;background-position:30% 50%}
+}

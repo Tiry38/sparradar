@@ -764,6 +764,8 @@ function listText(){const items=S.list.map(byId).filter(Boolean),g={};items.forE
 const WA_ICON='<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.7.3-.2.3-.9.9-.9 2.2s.9 2.5 1 2.7c.1.2 1.8 2.8 4.4 3.9 1.6.7 2.3.8 3.1.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3Z"/></svg>';
 
 // ---------- Ansichten ----------
+// Kurzer Tipp-Impuls am Handy (Android), aus bei „weniger Bewegung“
+function buzz(){try{if(navigator.vibrate&&matchMedia("(pointer:coarse)").matches&&!matchMedia("(prefers-reduced-motion: reduce)").matches)navigator.vibrate(8)}catch(e){}}
 function card(o,bestIds){
   const fav=S.watch.some(w=>norm(w.k)===norm(o.n)),inL=S.list.includes(o.id),vd=verdict(o),cl=comboLabels(o),ch=cheaper(o);
   // App-Preis direkt beim Preis: „Lidl Plus App-Preis 1,49 €“; mehrere Vorteile zusammen = „Mit Kombi“
@@ -1071,6 +1073,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  157:["Neuer Feinschliff: Beim Wechsel zwischen Angebote, Merkliste, Zettel und Coupons gleitet die Markierung jetzt weich mit – genauso beim Umschalten der Woche.","Der Kracher der Woche leuchtet mit einem sanft wandernden Farbverlauf.","Merken und Plus lassen sich leichter treffen, am Handy gibt es beim Antippen einen kurzen Vibrations-Impuls.","Lange Angebotslisten scrollen flüssiger."],
   156:["Neuer Look: Glas-Flächen, weichere Karten, Produktbilder ohne weiße Kästen, schwebende Leiste unten am Handy und sanfte Bewegungen beim Antippen.","Die Suche verzeiht Tippfehler („Philadelpia“ findet Philadelphia) und kennt andere Wörter (Hack, Klopapier, Nudeln …). „Wein“ zeigt keinen Schweinebraten mehr – passende Artikel stehen oben.","Neue Angebote von Edeka und dm kommen tagsüber schneller in die App: SparRadar schaut jetzt zusätzlich bei einem zweiten Prospekt-Portal nach.","Beim Laden zeigt die App gleich die Umrisse der Karten, und ein Knopf bringt dich beim langen Scrollen schnell wieder nach oben."],
   155:["SparRadar startet spürbar schneller und rechnet Preisvergleiche flotter.","Fällt das Internet beim Nachladen kurz aus, bleiben deine Angebote stehen statt zu verschwinden.","Offline klappt besser: Die App merkt sich nur fehlerfreie Seiten."],
   154:["Im Fenster „Alles im Wagen“ steht jetzt das Markt-Logo über dem Knopf „Mit Markt-App abschließen“."],
@@ -2370,6 +2373,7 @@ function appTwins(l){const k=x=>[x.s,norm(x.n),x.b||"",x.from||"",x.to||""].join
 function render(){optSync();memoReset();quickCheck();
   document.getElementById("filters").hidden=S.tab!=="offers";
   ["offers","watch","list","tips"].forEach(t=>document.getElementById("tab-"+t).setAttribute("aria-selected",t===S.tab));
+  {const nv=document.querySelector("nav.tabs");if(nv){if(!nv.querySelector(".tabthumb"))nv.insertAdjacentHTML("afterbegin",'<span class="tabthumb" aria-hidden="true"></span>');nv.style.setProperty("--ti",Math.max(0,["offers","watch","list","tips"].indexOf(S.tab)))}}
   document.getElementById("wk1").textContent=nextLabel();document.getElementById("wk0").textContent=WEEKEND?"Ab Montag":"Diese Woche";
   document.getElementById("wk0").setAttribute("aria-pressed",S.week===0);document.getElementById("wk1").setAttribute("aria-pressed",S.week===1);
   const hits=new Set(watchHits(null).flatMap(x=>x.hits.map(o=>o.id))).size;
@@ -2469,8 +2473,8 @@ document.addEventListener("click",e=>{
   if(b.id==="appSw"){S.useApp=!S.useApp;save();render();return}
   if(b.dataset.qfix){S.q=b.dataset.qfix;document.getElementById("q").value=S.q;S.limit=60;render();return}
   if(b.id==="qclear"){S.q="";document.getElementById("q").value="";render();return}
-  if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){wDel(i);toast(`${o.n} von der Merkliste genommen`)}else{wAdd({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
-  if(b.dataset.add){const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{const c=cheaper(byId(id));if(c&&!S.list.includes(c.x.id)){askCheaper(byId(id),c);return}S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
+  if(b.dataset.fav){const o=byId(b.dataset.fav);if(!o)return;buzz();const i=S.watch.findIndex(w=>norm(w.k)===norm(o.n));if(i>=0){wDel(i);toast(`${o.n} von der Merkliste genommen`)}else{wAdd({k:o.n});toast(`${o.n} gemerkt`)}save();render();return}
+  if(b.dataset.add){buzz();const id=b.dataset.add,i=S.list.indexOf(id);if(i>=0){S.list.splice(i,1);delete S.qty[id]}else{const c=cheaper(byId(id));if(c&&!S.list.includes(c.x.id)){askCheaper(byId(id),c);return}S.list.push(id);toast("Auf den Einkaufszettel gesetzt")}save();render();return}
   if(b.dataset.cheap){const id=b.dataset.cheap,n=byId(id);document.getElementById("cheapAsk").hidden=true;if(!S.list.includes(id))S.list.push(id);toast(n?`${sname(n.s)}: auf den Einkaufszettel gesetzt`:"Auf den Einkaufszettel gesetzt");save();render();return}
   if(b.dataset.wsel!=null&&b.dataset.wsel!==""){const i=+b.dataset.wsel;S.wsel=S.wsel===i?null:i;render();return}
   if(b.dataset.cpqlist){const id=b.dataset.cpqlist,o=byId(id);S.detail=id;S.dImg=0;S.sheet="detail";S._shown=null;S.cpq=o&&couponsFor(o).length?null:id;render();

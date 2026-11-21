@@ -204,3 +204,6 @@ Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ers
 - Abruf lokal: `python fetcher/fetch_offers.py` (dauert ca. 3–5 Minuten). Auf Kevins Windows-PC scheitert Aldi lokal an einem Zertifikatsfehler, auf GitHub funktioniert es.
 - App lokal: `python -m http.server 8765 --directory docs`, dann http://localhost:8765 öffnen.
 - Abruf auf GitHub von Hand starten: Actions → „Angebote abrufen“ → „Run workflow“ (oder `gh workflow run angebote.yml`).
+
+## Puls-Ebene (v157, 21.11., Tiry: „State-of-the-Art-Style“, Skills frontend-design + web-design-guidelines)
+- **`docs/pulse.css`** (nach `neo.css`, `?v=` hochzählen): gleitende Markierung im Wochen-Umschalter (`.seg::before`, per `:has(#wk1[aria-pressed=true])`) und in der Reiterleiste (`.tabthumb`, setzt `render()` in `app.js` samt `--ti` = Reiter-Index; bei View Transition zeigt `sr-tabs` live, damit sie gleitet). Kracher mit wanderndem Verlauf. `.ibtn` Tipp-Fläche 44 px per `::after`, `touch-action:manipulation`, `content-visibility:auto` für Karten, `overscroll-behavior:contain` in Fenstern. `buzz()` = 8-ms-Vibration bei Merken/Plus (nur Touch, nicht bei „weniger Bewegung“). `theme-color` hell/dunkel per `media`.
