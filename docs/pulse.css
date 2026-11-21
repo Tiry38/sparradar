@@ -397,3 +397,5 @@ html.fx .grid>.card{animation:none}
 }
 .meta>span,.gp{font-family:var(--f-mono)}
 .fxw,.fxw>span,.meta h2 .fxw,.meta h2 .fxw>span{font:inherit;color:inherit;letter-spacing:inherit;font-variant-numeric:inherit}
+/* v163: Hintergrund steht still (Tiry) – auch die CSS-Ersatz-Aurora */
+html::before{animation:none}

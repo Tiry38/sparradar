@@ -1,6 +1,6 @@
 /* SparRadar FX (v162, Tiry 21.11., Skill „modern-awwwards-web-design“)
    Liegt nach app.js und ändert nur Bewegung und Tiefe – keine App-Logik.
-   1 WebGL-Shader-Hintergrund (flüssige Aurora mit Körnung, folgt der Maus)
+   1 WebGL-Shader-Hintergrund (Aurora mit Körnung, steht still – Tiry 21.11.)
    2 Lenis: träges, weiches Scrollen (nur PC mit Maus)
    3 Eigener Cursor mit Text („Ansehen“, „Öffnen“) – nur PC
    4 Magnetische Knöpfe mit elastischem Nachfedern – nur PC
@@ -18,7 +18,6 @@
   if (FINE) root.classList.add("fx-fine");
 
   /* ---------- 1 Shader-Hintergrund ---------- */
-  const mouse = { x: .5, y: .5, tx: .5, ty: .5 };
   (function shader() {
     const cv = document.createElement("canvas");
     cv.id = "fxbg"; cv.setAttribute("aria-hidden", "true");
@@ -66,21 +65,18 @@ void main(){
     size(); addEventListener("resize", size, { passive: true });
     document.body.prepend(cv);
     root.classList.add("fx-gl");
-    let t0 = performance.now(), last = 0, raf = 0;
-    const frameGap = FINE ? 1000 / 60 : 1000 / 30;
-    const draw = now => {
-      mouse.x += (mouse.tx - mouse.x) * .04; mouse.y += (mouse.ty - mouse.y) * .04;
-      gl.uniform2f(uR, cv.width, cv.height); gl.uniform1f(uT, (now - t0) / 1000 + 20);
-      gl.uniform2f(uM, mouse.x, mouse.y); gl.uniform1f(uD, root.dataset.theme === "dark" || (root.dataset.theme !== "light" && dk.matches) ? 1 : 0);
+    // Tiry 21.11.: Hintergrund steht still – ein Bild, neu gezeichnet nur bei Größen- oder Hell/Dunkel-Wechsel
+    const draw = () => {
+      gl.uniform2f(uR, cv.width, cv.height); gl.uniform1f(uT, 20.); gl.uniform2f(uM, .5, .5);
+      gl.uniform1f(uD, root.dataset.theme === "dark" || (root.dataset.theme !== "light" && dk.matches) ? 1 : 0);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     };
-    const loop = now => { raf = requestAnimationFrame(loop); if (now - last < frameGap) return; last = now; draw(now); };
-    if (RM) { draw(performance.now()); dk.addEventListener?.("change", () => draw(performance.now())); addEventListener("resize", () => draw(performance.now())); return; }
-    raf = requestAnimationFrame(loop);
-    document.addEventListener("visibilitychange", () => { cancelAnimationFrame(raf); if (!document.hidden) raf = requestAnimationFrame(loop); });
-    cv.addEventListener("webglcontextlost", e => { e.preventDefault(); cancelAnimationFrame(raf); cv.remove(); root.classList.remove("fx-gl"); });
+    draw();
+    addEventListener("resize", () => requestAnimationFrame(draw), { passive: true });
+    dk.addEventListener?.("change", draw);
+    new MutationObserver(draw).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    cv.addEventListener("webglcontextlost", e => { e.preventDefault(); cv.remove(); root.classList.remove("fx-gl"); });
   })();
-  addEventListener("pointermove", e => { mouse.tx = e.clientX / innerWidth; mouse.ty = e.clientY / innerHeight; }, { passive: true });
 
   if (RM || !G) return;
 

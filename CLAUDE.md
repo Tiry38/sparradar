@@ -220,7 +220,7 @@ Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ers
 
 ## FX-Ebene (v162, 21.11., Tirys Skill „modern-awwwards-web-design“)
 - `docs/fx.js` (nach app.js, `?v=` hochzählen) + `docs/vendor/fx/` (GSAP 3.15.1, ScrollTrigger, Lenis 1.3.27 – lokal, offline). Ändert nur Bewegung, keine Logik.
-- WebGL-Shader-Hintergrund `#fxbg` (Domain-Warping-Aurora + Körnung, folgt der Maus, rechnet in 50 % bzw. Handy 35 % Auflösung und 30 fps, pausiert im Hintergrund; ohne WebGL bleibt die CSS-Aurora `html::before`).
+- WebGL-Shader-Hintergrund `#fxbg` (Domain-Warping-Aurora + Körnung, 50 % bzw. Handy 35 % Auflösung; ohne WebGL bleibt die CSS-Aurora `html::before`). **v163, Tiry: Hintergrund steht STILL** – ein Bild, neu gezeichnet nur bei Größen-/Hell-Dunkel-Wechsel, keine Maus-Reaktion, CSS-Aurora ohne Animation. Nicht wieder animieren.
 - Nur PC mit Maus: Lenis-Scrollen (stoppt nur bei **sichtbarem** `.scrim` – das Gerüst ist immer im DOM!), Cursor `#fxdot/#fxring` („Ansehen“ auf Karten, „Öffnen“ auf Kracher), Magnet-Knöpfe (`.btn,#zoomBtn,.scanbtn,#openFilter2,.totop,.kv-stamp`, Klasse `.fx-m`).
 - Überall: Reveal per Clip-Path + 3D (`ScrollTrigger.batch`, nicht beim Tippen im Suchfeld, Auslöser entfernter Elemente werden aufgeräumt), Überschriften Wort für Wort (`.fxw`, `aria-label` behält den Text). „Deine Woche“ am PC als Bento (erste Kachel 2×2).
 - „Weniger Bewegung“: nur Shader-Standbild, kein GSAP/Lenis/Cursor.
