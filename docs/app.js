@@ -1089,6 +1089,7 @@ function renderLightbox(){const u=S.lightbox,pg=/zoomlarge_page_/.test(u||"");re
 // ---------- „Was ist neu“ nach einem Update ----------
 // Bei jeder neuen Version hier oben einen Eintrag ergänzen (Schlüssel = Nummer aus app.js?v= in index.html)
 const CHANGES={
+  160:["Neuer Look in der ganzen App: Märkte als runde Logo-Kreise, Angebotskarten mit großem Preisschild über dem Produktbild und dem Namen als Schlagzeile.","„Deine Woche“ in kräftigen Farben, größerer SparRadar-Schriftzug."],
   159:["Der Kracher der Woche ist jetzt ein Titelblatt: großer Preis, Produktfoto im Rampenlicht und ein Stempel mit dem Rabatt. Am PC bewegt es sich mit der Maus, am Handy beim Scrollen.","Tippst du ein Angebot an, fliegt das Produktbild direkt ins Detailfenster.","Größere, klarere Überschriften und mehr Luft zwischen den Bereichen."],
   158:["Markt-Logos auf den Angeboten sind wieder klar zu erkennen: größer, freigestellt mit weißem Rand – nicht mehr mit dem Farbkästchen verschmolzen."],
   157:["Neuer Feinschliff: Beim Wechsel zwischen Angebote, Merkliste, Zettel und Coupons gleitet die Markierung jetzt weich mit – genauso beim Umschalten der Woche.","Der Kracher der Woche leuchtet mit einem sanft wandernden Farbverlauf.","Merken und Plus lassen sich leichter treffen, am Handy gibt es beim Antippen einen kurzen Vibrations-Impuls.","Lange Angebotslisten scrollen flüssiger."],

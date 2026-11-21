@@ -215,3 +215,4 @@ Suche nur in Angeboten · Filter nach Markt und Kategorie · Sortierung nach Ers
 - Bewegung: Auftritt `kv-in` nur beim ersten Aufbau (`KV_SEEN`); PC: Maus kippt Foto/Stempel (`--mx/--my`, Zeiger-Listener in app.js); Handy: Foto-Parallax per `animation-timeline:view()`. Alles aus bei „weniger Bewegung“.
 - `morphOpen()`: Kartenbild fliegt per View Transition `sr-pic` ins Detailfenster.
 - Abschnitts-Überschriften `.meta h2` clamp(1.75–2.6rem), `-0.035em`.
+- **v160 durchgängiger Look:** Märkte als Story-Kreise (`#storeChips .mtile .sb.lg` 64 px rund, Ring in Marktfarbe `--c`, gewählt = grüner Doppelring; PC als Raster `auto-fit 86px`), Karten: `.body` Flex-Spalte, `.pricerow` `order:-2` mit negativem Rand über der Bildkante, `.name` Schlagzeile (`order:-1`), Markt/Marke darunter, App-/Geld-zurück-Schild oben rechts unter dem Rabatt, Plus-Knopf grün rund. „Deine Woche“ `.wk-*` mit Verläufen (`--w1/--w2`). Titel `.logo h1` bis 2,5rem.

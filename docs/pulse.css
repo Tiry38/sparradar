@@ -176,3 +176,80 @@ input,textarea{caret-color:#16A34A}
   .kv-pic,.kv-stamp{transform:none;transition:none;animation:none!important}
   .kv-in .kv-img,.kv-in .kv-spot,.kv-in .kv-price,.kv-in .kv-what,.kv-in .kv-how,.kv-in .kv-stamp,.kv-in .kv-pic>svg{animation:none}
 }
+
+/* =====================================================================================
+   v160 – Durchgängiger Magazin-Look (Tiry: „außer dem Kracher ist nichts anders“)
+   Märkte als Story-Kreise · Karten mit Preis über der Bildkante · farbige „Deine Woche“ · Titelzeile
+   ===================================================================================== */
+
+/* ---------- Titelzeile ---------- */
+.logo h1{font-size:clamp(1.9rem,7vw,2.5rem);line-height:.95;letter-spacing:-.045em;font-weight:800}
+.logo-mark{width:46px;height:46px;border-radius:15px}
+#stand{font-size:.78rem;margin-top:4px;display:block}
+
+/* ---------- Märkte als Story-Kreise ---------- */
+#storeChips{gap:6px 4px;padding:14px 14px 10px;margin:-10px -14px -4px;scroll-padding-inline:14px}
+#storeChips .mtile{flex:none;display:flex;flex-direction:column;align-items:center;gap:6px;min-width:78px;padding:0 2px;
+  background:none;border:0;box-shadow:none;border-radius:0;-webkit-backdrop-filter:none;backdrop-filter:none;text-align:center;font-weight:700}
+#storeChips .mtile .sb.lg{width:64px;height:64px;border-radius:50%;font-size:1.05rem;
+  box-shadow:0 0 0 3px var(--bg),0 0 0 5px color-mix(in oklab,var(--c,#22C55E) 70%,transparent),0 10px 22px -8px rgba(20,23,38,.45);
+  transition:transform .45s var(--ease-spring),box-shadow .3s var(--ease-out)}
+#storeChips .mtile .sb.lg img{padding:14%;border-radius:50%;background:#fff;mix-blend-mode:normal}
+#storeChips .mtile.all .sb.lg{background:var(--grad-brand);color:#fff;--c:#22C55E}
+#storeChips .mtile .mtx{display:flex;flex-direction:column;align-items:center;gap:1px}
+#storeChips .mtile .mn{font-size:.8rem;letter-spacing:-.01em}
+#storeChips .mtile em{font-size:.68rem;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:3px}
+#storeChips .mtile .mcb{margin-left:0;font-size:.58rem;padding:1px 4px}
+#storeChips .mtile.opt:not([aria-pressed="true"]) .sb.lg{box-shadow:0 0 0 3px var(--bg),0 0 0 5px color-mix(in oklab,var(--muted) 45%,transparent),0 6px 14px -8px rgba(20,23,38,.35)}
+#storeChips .mtile.opt:not([aria-pressed="true"]){border:0}
+#storeChips .mtile[aria-pressed="true"]{box-shadow:none}
+#storeChips .mtile[aria-pressed="true"] .sb.lg{transform:scale(1.06);
+  box-shadow:0 0 0 3px var(--bg),0 0 0 6px #22C55E,0 0 0 11px rgba(34,197,94,.18),0 14px 28px -8px rgba(30,122,71,.55)}
+#storeChips .mtile[aria-pressed="true"] .mn{color:var(--fg)}
+#storeChips .mtile[aria-pressed="true"] em{color:#16A34A}
+@media (hover:hover){#storeChips .mtile:hover{transform:none;box-shadow:none}#storeChips .mtile:hover .sb.lg{transform:translateY(-3px) scale(1.05)}}
+#storeChips .mtile:active .sb.lg{transform:scale(.92)}
+@media (hover:hover) and (pointer:fine) and (min-width:721px){
+  #storeChips{display:grid;grid-template-columns:repeat(auto-fit,minmax(86px,1fr));justify-items:center;row-gap:14px}
+  #storeChips .mtile{min-width:0;width:100%;flex-direction:column;padding:0}
+  #storeChips .mtile .mtx{align-items:center}
+}
+
+/* ---------- Angebotskarten: Preis ragt über die Bildkante ---------- */
+.grid>.card .thumb{border-top:0;aspect-ratio:1/1}
+.grid>.card .body{display:flex;flex-direction:column;gap:8px;position:relative;z-index:2}
+.grid>.card .pricerow{order:-2;margin-top:-32px;align-items:flex-end;gap:6px 10px;flex-wrap:wrap}
+.grid>.card .tag,.grid>.card .bonustag{box-shadow:0 0 0 3px var(--surface),inset 0 1px 0 rgba(255,255,255,.65),0 14px 24px -10px rgba(255,140,0,.75)}
+.grid>.card .was{text-align:left;padding-bottom:2px}
+.grid>.card .name{order:-1;font-family:var(--f-display);font-weight:800;font-size:1.12rem;line-height:1.12;letter-spacing:-.02em}
+.grid>.card .name small{font-family:var(--f-body);font-weight:500;letter-spacing:0;margin-top:3px}
+.grid>.card .store{order:0;text-transform:none;letter-spacing:0;font-size:.76rem;font-weight:600}
+.grid>.card .thumb .apptag{left:auto;right:8px;bottom:auto;top:44px}
+.grid>.card .thumb .cbtag{bottom:auto;top:44px}
+.grid>.card .thumb .apptag~.cbtag{top:72px}
+.grid>.card .thumb .off{top:9px;right:9px}
+.grid>.card .card-foot{border-top:0;padding-top:2px;margin-top:auto}
+.grid>.card .ibtn{border-radius:50%;border:0;background:color-mix(in oklab,var(--fg) 6%,transparent)}
+.grid>.card .ibtn.add[aria-pressed="false"]{background:var(--grad-brand);color:#fff;box-shadow:0 8px 16px -8px rgba(30,122,71,.7)}
+.grid>.card .ibtn[aria-pressed="true"]{border-radius:50%}
+@media (max-width:559px){
+  html:not(.zoomed) .grid>.card .pricerow{margin-top:-26px}
+  html:not(.zoomed) .grid>.card .name{font-size:.95rem}
+  html:not(.zoomed) .grid>.card .store{font-size:.64rem}
+  html:not(.zoomed) .grid>.card .thumb .apptag,html:not(.zoomed) .grid>.card .thumb .cbtag{top:40px}
+  html:not(.zoomed) .grid>.card .thumb .apptag~.cbtag{top:64px}
+}
+
+/* ---------- Deine Woche: farbige Verlaufskacheln ---------- */
+.wk{--w1:#3A4147;--w2:#16191C;--w3:rgba(0,0,0,.5);border:0;color:#fff;-webkit-backdrop-filter:none;backdrop-filter:none;min-height:76px;
+  background:linear-gradient(135deg,var(--w1),var(--w2));box-shadow:0 14px 28px -14px var(--w3)}
+.wk i{background:rgba(255,255,255,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.wk b{color:#fff}
+.wk small{color:rgba(255,255,255,.88)}
+.wk-w{--w1:#F59E0B;--w2:#D9480F;--w3:rgba(217,72,15,.7)}
+.wk-c{--w1:#F97316;--w2:#C2410C;--w3:rgba(194,65,12,.7)}
+.wk-v{--w1:#0EA5A4;--w2:#0F6B5C;--w3:rgba(15,107,92,.7)}
+.wk-p{--w1:#2563EB;--w2:#1E3A8A;--w3:rgba(30,58,138,.7)}
+.wk-l{--w1:#22C55E;--w2:#14532D;--w3:rgba(20,83,45,.7)}
+.wk-w,.wk-c,.wk-v,.wk-p,.wk-l{color:#fff}
+.wk.on{box-shadow:0 0 0 3px var(--bg),0 0 0 5px #22C55E,0 14px 28px -14px var(--w3)}
