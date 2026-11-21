@@ -60,3 +60,12 @@ nav.tabs button{transition:color .3s var(--ease-out),transform .2s var(--ease-sp
   .seg::before,.tabthumb{transition:none}
   .kracher{animation:none;background-position:30% 50%}
 }
+
+/* ---------- Markt-Logo auf den Angebotskarten (v158, Tiry: „Logos sieht man schlecht, nicht mehr freigestellt“) ----------
+   Ursache: neo.css (v156) setzt `.thumb img{mix-blend-mode:multiply}` – das traf auch das Logo, es verschmolz mit dem
+   Farbkästchen. Jetzt: Logo freigestellt, füllt die Fläche, 36 px (Handy 2 Spalten 32 px), weißer Rand + Schatten,
+   zoomt beim Drüberfahren nicht mit. Ohne Logo-Bild bleibt das Farbkästchen mit Kürzel. */
+.card .thumb .sb{width:36px;height:36px;border-radius:11px;font-size:.8rem;left:9px;top:9px;z-index:2;
+  box-shadow:0 0 0 2px #fff,0 6px 14px -4px rgba(20,23,38,.45)}
+.card .thumb .sb img,.dpic .sb img{padding:0;object-fit:contain;background:#fff;border-radius:inherit;mix-blend-mode:normal;transform:none!important;transition:none}
+@media (max-width:559px){html:not(.zoomed) .grid>.card .thumb .sb{width:32px;height:32px;border-radius:10px}}
